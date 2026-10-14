@@ -318,7 +318,6 @@ export default function Player({ navigate }: PlayerProps) {
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Question 1 of 1</h3>
 
-                  {/* MCQ / Typed toggle */}
                   <div className="flex gap-2 mb-4">
                     <button
                       onClick={() => setQuizMode("mcq")}
@@ -428,18 +427,18 @@ export default function Player({ navigate }: PlayerProps) {
                       ATP comes in, they let go and reset. That's why muscles need energy to relax
                       too.
                     </p>
-                    <p className="text-classoni-navy/70 text-xs mb-3 font-semibold">
+                    <p className="text-classoni-navy/60 text-xs mb-3 font-medium">
                       How did you find this explanation?
                     </p>
-                    <div className="flex gap-2 flex-wrap">
-                      <button className="bg-blue-500/15 text-blue-600 rounded-full px-3 py-1.5 text-xs font-semibold">
-                        🔵 Helpful 3
+                    <div className="flex gap-4 flex-wrap items-center">
+                      <button className="text-classoni-navy text-xs font-medium">
+                        Helpful <span className="text-classoni-navy/40">· 3</span>
                       </button>
-                      <button className="bg-green-500/15 text-green-600 rounded-full px-3 py-1.5 text-xs font-semibold">
-                        🟢 More Helpful 5
+                      <button className="text-classoni-navy text-xs font-medium">
+                        More helpful <span className="text-classoni-navy/40">· 5</span>
                       </button>
-                      <button className="bg-purple-500/15 text-purple-600 rounded-full px-3 py-1.5 text-xs font-semibold">
-                        🟣 Very Helpful 2
+                      <button className="text-classoni-navy text-xs font-medium">
+                        Very helpful <span className="text-classoni-navy/40">· 2</span>
                       </button>
                     </div>
                   </div>
@@ -535,4 +534,4 @@ export default function Player({ navigate }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-    }
+         }
