@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Share2, ThumbsUp, X, Gift, User } from "lucide-react";
+import { Share2, ThumbsUp, X } from "lucide-react";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 
@@ -18,7 +18,7 @@ const QUIZ_OPTIONS = [
   "The actin filaments dissolve and reassemble in a more compact form.",
 ];
 
-const QUIZ_CORRECT_INDEX = 1; // option B
+const QUIZ_CORRECT_INDEX = 1;
 
 const QUIZ_EXPLANATION =
   "During contraction, the actin and myosin filaments do not change length; they slide past each other, which shortens the sarcomere.";
@@ -28,11 +28,24 @@ type Sheet = "apply" | "explain" | "quiz" | "posts" | null;
 export default function Player({ navigate }: PlayerProps) {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [activeSheet, setActiveSheet] = useState<Sheet>(null);
+
+  // Apply
   const [applySolved, setApplySolved] = useState(false);
+
+  // Explain
   const [explainText, setExplainText] = useState("");
   const [explainSubmitted, setExplainSubmitted] = useState(false);
+
+  // Quiz
+  const [quizMode, setQuizMode] = useState<"mcq" | "typed">("mcq");
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
+  const [typedAnswer, setTypedAnswer] = useState("");
+  const [typedSubmitted, setTypedSubmitted] = useState(false);
+
+  // Share
   const [shareNotice, setShareNotice] = useState("");
+
+  // Feedback
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState<"like" | "dislike" | null>(null);
   const [feedbackReason, setFeedbackReason] = useState("");
@@ -40,7 +53,7 @@ export default function Player({ navigate }: PlayerProps) {
 
   const words = CAPTION.split(" ");
 
-  // Word-by-word highlighting
+  // Word-by-word caption highlighting
   useEffect(() => {
     if (activeSheet || feedbackOpen) return;
     const timer = setInterval(() => {
@@ -70,6 +83,9 @@ export default function Player({ navigate }: PlayerProps) {
     setApplySolved(false);
     setExplainSubmitted(false);
     setQuizAnswer(null);
+    setTypedAnswer("");
+    setTypedSubmitted(false);
+    setQuizMode("mcq");
   };
 
   const handleShare = async () => {
@@ -119,7 +135,7 @@ export default function Player({ navigate }: PlayerProps) {
         />
       </div>
 
-      {/* CAPTIONS — word highlighting */}
+      {/* CAPTIONS */}
       <div className="flex-shrink-0 px-4 py-2">
         <p className="text-center text-classoni-navy text-base leading-relaxed">
           {words.map((word, i) => (
@@ -137,14 +153,12 @@ export default function Player({ navigate }: PlayerProps) {
         </p>
       </div>
 
-      {/* VISUAL CANVAS — scrollable, self-contained */}
+      {/* VISUAL CANVAS */}
       <div className="flex-1 min-h-0 mx-4 mb-2 relative">
         <div className="h-full w-full overflow-y-auto rounded-2xl bg-white/60">
-          {/* Empty canvas — the LLM's SVG will render here later */}
           <div className="h-full w-full" />
         </div>
 
-        {/* Floating Share + Feedback */}
         <div className="absolute bottom-3 right-3 flex flex-col gap-3">
           <button
             onClick={handleShare}
@@ -162,7 +176,6 @@ export default function Player({ navigate }: PlayerProps) {
           </button>
         </div>
 
-        {/* Share toast */}
         {shareNotice && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-classoni-navy text-white text-xs px-3 py-1.5 rounded-full">
             {shareNotice}
@@ -237,6 +250,7 @@ export default function Player({ navigate }: PlayerProps) {
                 <X size={20} className="text-classoni-navy" />
               </button>
 
+              {/* APPLY SHEET */}
               {activeSheet === "apply" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Apply</h3>
@@ -256,18 +270,19 @@ export default function Player({ navigate }: PlayerProps) {
                   ) : (
                     <div className="bg-classoni-lavender rounded-xl p-4">
                       <p className="text-classoni-navy text-sm leading-relaxed">
-                        The nurse needs to recognize that concentration defines how much solute is in
-                        a given volume. Multiplying the target concentration (75 mmol/L) by the total
-                        volume (5 L) and the molar mass of NaCl (58.44 g/mol) yields approximately
-                        21.9 grams of salt to weigh out. Given the ward's time pressure, pre-measuring
-                        sachets during morning rounds removes the measuring step from the staff
-                        entirely.
+                        The nurse needs to recognize that concentration defines how much solute is
+                        in a given volume. Multiplying the target concentration (75 mmol/L) by the
+                        total volume (5 L) and the molar mass of NaCl (58.44 g/mol) yields
+                        approximately 21.9 grams of salt to weigh out. Given the ward's time
+                        pressure, pre-measuring sachets during morning rounds removes the measuring
+                        step from the staff entirely.
                       </p>
                     </div>
                   )}
                 </div>
               )}
 
+              {/* EXPLAIN SHEET */}
               {activeSheet === "explain" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Explain</h3>
@@ -298,38 +313,94 @@ export default function Player({ navigate }: PlayerProps) {
                 </div>
               )}
 
+              {/* QUIZ SHEET */}
               {activeSheet === "quiz" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Question 1 of 1</h3>
+
+                  {/* MCQ / Typed toggle */}
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      onClick={() => setQuizMode("mcq")}
+                      className={`flex-1 rounded-full py-2 text-xs font-semibold ${
+                        quizMode === "mcq"
+                          ? "bg-classoni-blue text-white"
+                          : "bg-classoni-lavender text-classoni-navy"
+                      }`}
+                    >
+                      MCQ
+                    </button>
+                    <button
+                      onClick={() => setQuizMode("typed")}
+                      className={`flex-1 rounded-full py-2 text-xs font-semibold ${
+                        quizMode === "typed"
+                          ? "bg-classoni-blue text-white"
+                          : "bg-classoni-lavender text-classoni-navy"
+                      }`}
+                    >
+                      Typed
+                    </button>
+                  </div>
+
                   <p className="text-classoni-navy text-sm font-semibold mb-4">
                     Which of the following best describes the mechanism by which a skeletal muscle
                     fiber shortens during contraction?
                   </p>
-                  <div className="space-y-2">
-                    {QUIZ_OPTIONS.map((opt, i) => {
-                      const letters = ["A", "B", "C", "D"];
-                      const isSelected = quizAnswer === i;
-                      const isCorrect = i === QUIZ_CORRECT_INDEX;
-                      let bg = "bg-classoni-lavender";
-                      if (quizAnswer !== null) {
-                        if (isSelected && isCorrect) bg = "bg-green-100 border-green-500";
-                        else if (isSelected && !isCorrect) bg = "bg-red-100 border-red-500";
-                        else if (isCorrect) bg = "bg-green-50 border-green-300";
-                      }
-                      return (
-                        <button
-                          key={i}
-                          disabled={quizAnswer !== null}
-                          onClick={() => setQuizAnswer(i)}
-                          className={`w-full text-left rounded-xl p-3 text-sm text-classoni-navy border-2 border-transparent transition-all ${bg}`}
-                        >
-                          <span className="font-bold mr-2">{letters[i]})</span>
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {quizAnswer !== null && (
+
+                  {quizMode === "mcq" && (
+                    <div className="space-y-2">
+                      {QUIZ_OPTIONS.map((opt, i) => {
+                        const letters = ["A", "B", "C", "D"];
+                        const isSelected = quizAnswer === i;
+                        const isCorrect = i === QUIZ_CORRECT_INDEX;
+                        let bg = "bg-classoni-lavender";
+                        if (quizAnswer !== null) {
+                          if (isSelected && isCorrect)
+                            bg = "bg-green-100 border-green-500";
+                          else if (isSelected && !isCorrect)
+                            bg = "bg-red-100 border-red-500";
+                          else if (isCorrect) bg = "bg-green-50 border-green-300";
+                        }
+                        return (
+                          <button
+                            key={i}
+                            disabled={quizAnswer !== null}
+                            onClick={() => setQuizAnswer(i)}
+                            className={`w-full text-left rounded-xl p-3 text-sm text-classoni-navy border-2 border-transparent transition-all ${bg}`}
+                          >
+                            <span className="font-bold mr-2">{letters[i]})</span>
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {quizMode === "typed" && (
+                    <div>
+                      <textarea
+                        value={typedAnswer}
+                        onChange={(e) => setTypedAnswer(e.target.value)}
+                        placeholder="Type your answer here..."
+                        inputMode="text"
+                        className="w-full h-28 border border-classoni-blue rounded-xl p-3 text-sm text-classoni-navy mb-3"
+                      />
+                      <button
+                        onClick={() => setTypedSubmitted(true)}
+                        className="w-full bg-classoni-blue text-white rounded-full py-3 font-semibold"
+                      >
+                        Submit Answer
+                      </button>
+                      {typedSubmitted && (
+                        <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-3">
+                          <p className="text-green-700 text-sm font-semibold">Correct!</p>
+                          <p className="text-green-700 text-xs mt-1">{QUIZ_EXPLANATION}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {quizAnswer !== null && quizMode === "mcq" && (
                     <div className="mt-4 bg-classoni-lavender rounded-xl p-3">
                       <p className="text-classoni-navy text-xs leading-relaxed">
                         {QUIZ_EXPLANATION}
@@ -339,6 +410,7 @@ export default function Player({ navigate }: PlayerProps) {
                 </div>
               )}
 
+              {/* POSTS SHEET */}
               {activeSheet === "posts" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">
@@ -463,4 +535,4 @@ export default function Player({ navigate }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-}
+    }
