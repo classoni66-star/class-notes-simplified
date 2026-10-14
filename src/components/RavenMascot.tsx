@@ -103,4 +103,4 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
       </svg>
     </Wrapper>
   );
-      }
+}
