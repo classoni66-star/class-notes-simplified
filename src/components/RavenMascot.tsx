@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
 
 interface Props {
   size?: number;
@@ -8,15 +8,15 @@ interface Props {
 export default function RavenMascot({ size = 80, animated = false }: Props) {
   const wrapperStyle: React.CSSProperties = {
     width: size,
-    height: 'auto',
-    display: 'inline-block',
+    height: "auto",
+    display: "inline-block",
   };
 
   const svg = (
     <svg
       viewBox="0 0 200 240"
       xmlns="http://www.w3.org/2000/svg"
-      style={{ width: '100%', height: 'auto', display: 'block' }}
+      style={{ width: "100%", height: "auto", display: "block" }}
     >
       <defs>
         <radialGradient id="bodyGrad" cx="50%" cy="40%" r="65%">
@@ -55,7 +55,7 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
       <circle cx="78" cy="100" r="22" fill="white" />
       <circle cx="122" cy="100" r="22" fill="white" />
 
-      {/* Pupils — centered, looking straight at the student */}
+      {/* Pupils — centered, looking straight at student */}
       <circle cx="78" cy="100" r="12" fill="#0A1F44" />
       <circle cx="122" cy="100" r="12" fill="#0A1F44" />
 
@@ -73,7 +73,7 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
     return (
       <motion.div
         animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         style={wrapperStyle}
       >
         {svg}
@@ -82,4 +82,4 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
   }
 
   return <div style={wrapperStyle}>{svg}</div>;
-        }
+      }
