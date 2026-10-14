@@ -1,13 +1,25 @@
 interface Props {
   setScreen: (s: string) => void;
+  navigate?: (s: string) => void;
 }
 
-export default function Rewards({ setScreen }: Props) {
+export default function Rewards({ setScreen, navigate }: Props) {
+  const goBack = () => {
+    if (navigate) navigate("player");
+    else setScreen("player");
+  };
+
+  const handleInvite = () => {
+    console.log("Invite tapped");
+    alert("Invite link copied! Share it with your classmates.");
+  };
+
   return (
     <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-4 pt-4">
       <button
-        onClick={() => setScreen('player')}
-        className="text-white text-2xl mb-2 self-start"
+        onClick={goBack}
+        className="text-white text-2xl mb-2 self-start w-10 h-10 flex items-center justify-center"
+        aria-label="Back"
       >
         ←
       </button>
@@ -49,11 +61,11 @@ export default function Rewards({ setScreen }: Props) {
       </div>
 
       <button
+        onClick={handleInvite}
         className="mt-auto mb-4 w-full bg-classoni-yellow text-classoni-navy rounded-2xl py-4 font-bold"
-        onClick={() => console.log('Invite tapped')}
       >
         Invite a friend and get my rewards when they create an account
       </button>
     </div>
   );
-          }
+}
