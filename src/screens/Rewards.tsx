@@ -1,5 +1,59 @@
-import { useState } from "react";
-import { Gift,Users,UserPlus } from "lucide-react";
-import { Back,Button,Notice } from "@/components/ScreenUI";
-import { darkScreen,type Navigate } from "@/lib/classoni";
-export default function Rewards({navigate}:{navigate:Navigate}) {const [notice,setNotice]=useState("");async function invite(){try{if(navigator.share){await navigator.share({title:"Join me on Classoni",text:"Learn with Raven on Classoni",url:window.location.href});setNotice("Invitation shared.")}else{await navigator.clipboard.writeText(window.location.href);setNotice("Invite link copied!")}}catch{setNotice("Invitation was not shared. Please try again.")}}return <main className={darkScreen}><Back navigate={navigate}/><div className="mt-5 flex items-center gap-3"><Gift className="text-classoni-yellow"/><h1 className="text-xl font-bold">Your rewards</h1></div><div className="mt-6 flex items-center gap-3 rounded-2xl bg-dark-surface p-5"><Users/><p>Students in your class: <strong>42</strong></p></div><div className="mt-3 flex items-center gap-3 rounded-2xl bg-dark-surface p-5"><UserPlus/><p>Friends you've invited: <strong>3</strong></p></div>{notice&&<Notice>{notice}</Notice>}<div className="flex-1"/><Button variant="premium" className="mb-4 h-auto whitespace-normal rounded-2xl py-4 text-base font-bold" onClick={invite}>Invite a friend, earn more rewards when they join and create an account</Button></main>}
+interface Props {
+  setScreen: (s: string) => void;
+}
+
+export default function Rewards({ setScreen }: Props) {
+  return (
+    <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-4 pt-4">
+      <button
+        onClick={() => setScreen('player')}
+        className="text-white text-2xl mb-2 self-start"
+      >
+        ←
+      </button>
+
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">🎁</span>
+        <h1 className="text-white font-bold text-xl">Your rewards</h1>
+      </div>
+
+      <div className="bg-white/10 rounded-2xl p-4 mb-3">
+        <p className="text-white/60 text-xs mb-1">Unlimited learning remaining</p>
+        <p className="text-white font-bold text-3xl">5 days</p>
+        <p className="text-white/60 text-xs mt-1">Keep inviting friends to add more days</p>
+      </div>
+
+      <div className="bg-white/10 rounded-2xl p-4 mb-3">
+        <p className="text-white font-bold text-sm">
+          Invite a friend and unlock more unlimited learning + points
+        </p>
+        <p className="text-white/60 text-xs mt-2">
+          24 hours of free unlimited learning per invited friend who joins, plus 2 pts free.
+        </p>
+      </div>
+
+      <div className="bg-white/10 rounded-2xl p-4 mb-3">
+        <p className="text-white/60 text-xs">Your points today</p>
+        <p className="text-classoni-yellow font-bold text-2xl mt-1">12 pts</p>
+      </div>
+
+      <div className="bg-white/10 rounded-2xl p-4 mb-3">
+        <div className="flex justify-between items-center mb-2">
+          <p className="text-white/60 text-sm">Students in your class</p>
+          <p className="text-white font-bold">42</p>
+        </div>
+        <div className="flex justify-between items-center">
+          <p className="text-white/60 text-sm">Friends you've invited</p>
+          <p className="text-white font-bold">3</p>
+        </div>
+      </div>
+
+      <button
+        className="mt-auto mb-4 w-full bg-classoni-yellow text-classoni-navy rounded-2xl py-4 font-bold"
+        onClick={() => console.log('Invite tapped')}
+      >
+        Invite a friend and get my rewards when they create an account
+      </button>
+    </div>
+  );
+          }
