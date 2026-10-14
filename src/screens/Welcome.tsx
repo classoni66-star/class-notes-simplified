@@ -1,72 +1,36 @@
+import RavenMascot from "../components/RavenMascot";
+
 interface Props {
   setScreen: (s: string) => void;
   navigate?: (s: string) => void;
 }
 
-export default function Rewards({ setScreen, navigate }: Props) {
-  const goBack = () => {
-    if (navigate) navigate("player");
-    else setScreen("player");
-  };
-
-  const handleInvite = () => {
-    console.log("Invite tapped");
-    // For now, just a console log. Real sharing will be added later.
-    alert("Invite link copied! Share it with your classmates.");
+export default function Welcome({ setScreen, navigate }: Props) {
+  const go = (screen: string) => {
+    if (navigate) navigate(screen);
+    else setScreen(screen);
   };
 
   return (
-    <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-4 pt-4">
-      <button
-        onClick={goBack}
-        className="text-white text-2xl mb-2 self-start w-10 h-10 flex items-center justify-center"
-        aria-label="Back"
-      >
-        ←
-      </button>
-
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-2xl">🎁</span>
-        <h1 className="text-white font-bold text-xl">Your rewards</h1>
-      </div>
-
-      <div className="bg-white/10 rounded-2xl p-4 mb-3">
-        <p className="text-white/60 text-xs mb-1">Unlimited learning remaining</p>
-        <p className="text-white font-bold text-3xl">5 days</p>
-        <p className="text-white/60 text-xs mt-1">Keep inviting friends to add more days</p>
-      </div>
-
-      <div className="bg-white/10 rounded-2xl p-4 mb-3">
-        <p className="text-white font-bold text-sm">
-          Invite a friend and unlock more unlimited learning + points
-        </p>
-        <p className="text-white/60 text-xs mt-2">
-          24 hours of free unlimited learning per invited friend who joins, plus 2 pts free.
+    <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
+        <RavenMascot size={180} animated={true} />
+        <h1 className="text-white font-bold text-3xl mt-6 text-center">
+          Hi, I'm Raven.
+        </h1>
+        <p className="text-white/80 text-base mt-4 text-center leading-relaxed">
+          I'm here to help you pass your course and graduate with less stress.
         </p>
       </div>
 
-      <div className="bg-white/10 rounded-2xl p-4 mb-3">
-        <p className="text-white/60 text-xs">Your points today</p>
-        <p className="text-classoni-yellow font-bold text-2xl mt-1">12 pts</p>
+      <div className="flex-shrink-0 px-6 pb-6">
+        <button
+          onClick={() => go("input")}
+          className="w-full bg-classoni-yellow text-classoni-navy rounded-full py-4 font-bold text-base"
+        >
+          Start Learning
+        </button>
       </div>
-
-      <div className="bg-white/10 rounded-2xl p-4 mb-3">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-white/60 text-sm">Students in your class</p>
-          <p className="text-white font-bold">42</p>
-        </div>
-        <div className="flex justify-between items-center">
-          <p className="text-white/60 text-sm">Friends you've invited</p>
-          <p className="text-white font-bold">3</p>
-        </div>
-      </div>
-
-      <button
-        onClick={handleInvite}
-        className="mt-auto mb-4 w-full bg-classoni-yellow text-classoni-navy rounded-2xl py-4 font-bold"
-      >
-        Invite a friend and get my rewards when they create an account
-      </button>
     </div>
   );
 }
