@@ -1,24 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import ClassoniApp from "@/components/ClassoniApp";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  component: ClassoniApp,
+  head: () => ({ meta: [
+    { title: "Classoni — Your course, made clear" },
+    { name: "description", content: "Learn with Raven. Turn notes into clear lessons, apply concepts and practice exam questions." },
+    { property: "og:title", content: "Classoni — Your course, made clear" },
+    { property: "og:description", content: "Understand your course with guided lessons, real-world applications and quizzes." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
 });
-
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
