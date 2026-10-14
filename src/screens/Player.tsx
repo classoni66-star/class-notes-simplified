@@ -24,6 +24,7 @@ const QUIZ_EXPLANATION =
   "During contraction, the actin and myosin filaments do not change length; they slide past each other, which shortens the sarcomere.";
 
 type Sheet = "apply" | "explain" | "quiz" | "posts" | null;
+type RatingVote = "helpful" | "more" | "very" | null;
 
 export default function Player({ navigate }: PlayerProps) {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -41,6 +42,9 @@ export default function Player({ navigate }: PlayerProps) {
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
   const [typedSubmitted, setTypedSubmitted] = useState(false);
+
+  // Posts rating
+  const [ratingVote, setRatingVote] = useState<RatingVote>(null);
 
   // Share
   const [shareNotice, setShareNotice] = useState("");
@@ -86,6 +90,7 @@ export default function Player({ navigate }: PlayerProps) {
     setTypedAnswer("");
     setTypedSubmitted(false);
     setQuizMode("mcq");
+    setRatingVote(null);
   };
 
   const handleShare = async () => {
@@ -431,14 +436,59 @@ export default function Player({ navigate }: PlayerProps) {
                       How did you find this explanation?
                     </p>
                     <div className="flex gap-4 flex-wrap items-center">
-                      <button className="text-classoni-navy text-xs font-medium">
-                        Helpful <span className="text-classoni-navy/40">· 3</span>
+                      <button
+                        onClick={() => setRatingVote("helpful")}
+                        className="flex items-center gap-1.5 text-xs font-medium"
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                        <span
+                          className={
+                            ratingVote === "helpful"
+                              ? "text-classoni-blue font-semibold"
+                              : "text-classoni-navy"
+                          }
+                        >
+                          Helpful
+                        </span>
+                        <span className="text-classoni-navy/40">
+                          · {ratingVote === "helpful" ? 4 : 3}
+                        </span>
                       </button>
-                      <button className="text-classoni-navy text-xs font-medium">
-                        More helpful <span className="text-classoni-navy/40">· 5</span>
+                      <button
+                        onClick={() => setRatingVote("more")}
+                        className="flex items-center gap-1.5 text-xs font-medium"
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                        <span
+                          className={
+                            ratingVote === "more"
+                              ? "text-green-700 font-semibold"
+                              : "text-classoni-navy"
+                          }
+                        >
+                          More helpful
+                        </span>
+                        <span className="text-classoni-navy/40">
+                          · {ratingVote === "more" ? 6 : 5}
+                        </span>
                       </button>
-                      <button className="text-classoni-navy text-xs font-medium">
-                        Very helpful <span className="text-classoni-navy/40">· 2</span>
+                      <button
+                        onClick={() => setRatingVote("very")}
+                        className="flex items-center gap-1.5 text-xs font-medium"
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                        <span
+                          className={
+                            ratingVote === "very"
+                              ? "text-purple-700 font-semibold"
+                              : "text-classoni-navy"
+                          }
+                        >
+                          Very helpful
+                        </span>
+                        <span className="text-classoni-navy/40">
+                          · {ratingVote === "very" ? 3 : 2}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -534,4 +584,4 @@ export default function Player({ navigate }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-         }
+}
