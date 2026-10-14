@@ -23,52 +23,71 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
     ? { animate: { y: [0, -4, 0] }, transition: { duration: 3, repeat: Infinity } }
     : {};
 
+
   return (
-    <Wrapper {...wrapperProps} style={{ width: size, height: 'auto' }}>
+    <Wrapper {...wrapperProps} style={{ width: size, height: 'auto', display: 'inline-block' }}>
       <svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: 'auto' }}>
-        <defs>
-          <radialGradient id="bodyGrad" cx="50%" cy="40%" r="65%">
-            <stop offset="0%" stopColor="#4DA6FF"/>
-            <stop offset="60%" stopColor="#0055FF"/>
-            <stop offset="100%" stopColor="#0033AA"/>
-          </radialGradient>
-          <linearGradient id="capGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#1A3A7A"/>
-            <stop offset="100%" stopColor="#0A1F44"/>
-          </linearGradient>
-        </defs>
-        <ellipse cx="68" cy="228" rx="13" ry="8" fill="#FF9900"/>
-        <ellipse cx="132" cy="228" rx="13" ry="8" fill="#FF9900"/>
-        <ellipse cx="32" cy="155" rx="18" ry="42" fill="#0033AA"/>
-        <ellipse cx="168" cy="155" rx="18" ry="42" fill="#0033AA"/>
-        <ellipse cx="100" cy="155" rx="78" ry="82" fill="url(#bodyGrad)"/>
-        <ellipse cx="100" cy="170" rx="48" ry="52" fill="#4DA6FF"/>
-        <circle cx="100" cy="90" r="68" fill="url(#bodyGrad)"/>
-        <polygon points="28,42 172,42 192,57 8,57" fill="url(#capGrad)"/>
-        <polygon points="55,22 145,22 168,42 32,42" fill="#001166"/>
-        <path d="M 22 52 Q 2 70 4 100" stroke="#FFD700" strokeWidth="4" fill="none"/>
-        <circle cx="4" cy="105" r="7" fill="#FFD700"/>
-        <path d="M -1 113 L 9 113 L 4 130 Z" fill="#FFD700"/>
+        {/* Feet */}
+        <ellipse cx="72" cy="222" rx="11" ry="7" fill="#FF9900" />
+        <ellipse cx="128" cy="222" rx="11" ry="7" fill="#FF9900" />
 
-        {/* Eyes - looking forward */}
-        <circle cx="74" cy="90" r="24" fill="white"/>
-        <circle cx="126" cy="90" r="24" fill="white"/>
-        <circle cx="74" cy="90" r="14" fill="#001133"/>
-        <circle cx="126" cy="90" r="14" fill="#001133"/>
-        <circle cx="78" cy="85" r="5" fill="white"/>
-        <circle cx="130" cy="85" r="5" fill="white"/>
+        {/* Left wing */}
+        <ellipse cx="26" cy="160" rx="16" ry="38" fill="#0033CC" />
+        
+        {/* Right wing */}
+        <ellipse cx="174" cy="160" rx="16" ry="38" fill="#0033CC" />
 
-        {/* Eyelids - animate on blink */}
+        {/* Body */}
+        <ellipse cx="100" cy="165" rx="72" ry="75" fill="#0055FF" />
+
+        {/* Belly */}
+        <ellipse cx="100" cy="180" rx="44" ry="48" fill="#4DA6FF" />
+
+        {/* Head */}
+        <circle cx="100" cy="95" r="62" fill="#0055FF" />
+
+        {/* Graduation cap — mortarboard */}
+        <polygon points="30,50 170,50 190,66 10,66" fill="#0A1F44" />
+        <polygon points="58,32 142,32 165,50 35,50" fill="#1A3A7A" />
+
+        {/* Cap band */}
+        <rect x="70" y="62" width="60" height="12" rx="4" fill="#0A1F44" />
+
+        {/* Tassel cord */}
+        <path d="M 30 62 Q 20 80 22 110" stroke="#FFD700" strokeWidth="4" fill="none" />
+        {/* Tassel knot */}
+        <circle cx="22" cy="115" r="6" fill="#FFD700" />
+        {/* Tassel threads */}
+        <rect x="18" y="120" width="8" height="22" rx="3" fill="#FFD700" />
+
+        {/* Left eye white */}
+        <circle cx="78" cy="100" r="22" fill="white" />
+        {/* Right eye white */}
+        <circle cx="122" cy="100" r="22" fill="white" />
+
+        {/* Left pupil — centered so Raven looks directly at student */}
+        <circle cx="78" cy="100" r="12" fill="#0A1F44" />
+        {/* Right pupil — centered */}
+        <circle cx="122" cy="100" r="12" fill="#0A1F44" />
+
+        {/* Eye highlights */}
+        <circle cx="82" cy="95" r="4" fill="white" />
+        <circle cx="126" cy="95" r="4" fill="white" />
+
+        {/* Eyelids — animate on blink */}
         <motion.g
           animate={{ opacity: blink ? 1 : 0 }}
           transition={{ duration: 0.1 }}
+          style={{ pointerEvents: 'none' }}
         >
-          <circle cx="74" cy="90" r="26" fill="#0055FF"/>
-          <circle cx="126" cy="90" r="26" fill="#0055FF"/>
+          <circle cx="78" cy="100" r="24" fill="#0055FF" />
+          <circle cx="122" cy="100" r="24" fill="#0055FF" />
         </motion.g>
 
-        <polygon points="100,108 87,128 113,128" fill="#FFD700"/>
-        <polygon points="100,120 91,128 109,128" fill="#FF9900"/>
+        {/* Beak — upper */}
+        <polygon points="100,120 88,138 112,138" fill="#FFD700" />
+        {/* Beak — lower */}
+        <polygon points="100,132 91,138 109,138" fill="#FF9900" />
       </svg>
     </Wrapper>
   );
