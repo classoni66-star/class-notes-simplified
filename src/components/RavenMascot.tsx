@@ -6,24 +6,24 @@ interface Props {
 }
 
 export default function RavenMascot({ size = 80, animated = false }: Props) {
-  const imgStyle: React.CSSProperties = {
+  const wrapperStyle: React.CSSProperties = {
     width: size,
     height: 'auto',
     display: 'inline-block',
   };
 
-  const svgContent = (
-    <svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: 'auto', display: 'block' }}>
+  const svg = (
+    <svg
+      viewBox="0 0 200 240"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ width: '100%', height: 'auto', display: 'block' }}
+    >
       <defs>
         <radialGradient id="bodyGrad" cx="50%" cy="40%" r="65%">
           <stop offset="0%" stopColor="#4DA6FF" />
           <stop offset="60%" stopColor="#0055FF" />
           <stop offset="100%" stopColor="#0033AA" />
         </radialGradient>
-        <linearGradient id="capGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#0A1F44" />
-          <stop offset="100%" stopColor="#001133" />
-        </linearGradient>
       </defs>
 
       {/* Body */}
@@ -42,7 +42,7 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
       <circle cx="100" cy="95" r="62" fill="url(#bodyGrad)" />
 
       {/* Graduation cap — mortarboard */}
-      <polygon points="30,50 170,50 190,66 10,66" fill="url(#capGrad)" />
+      <polygon points="30,50 170,50 190,66 10,66" fill="#0A1F44" />
       <polygon points="58,32 142,32 165,50 35,50" fill="#1A3A7A" />
       <rect x="70" y="62" width="60" height="12" rx="4" fill="#0A1F44" />
 
@@ -55,7 +55,7 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
       <circle cx="78" cy="100" r="22" fill="white" />
       <circle cx="122" cy="100" r="22" fill="white" />
 
-      {/* Pupils — CENTERED so the Raven looks directly at the student */}
+      {/* Pupils — centered, looking straight at the student */}
       <circle cx="78" cy="100" r="12" fill="#0A1F44" />
       <circle cx="122" cy="100" r="12" fill="#0A1F44" />
 
@@ -63,9 +63,8 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
       <circle cx="82" cy="95" r="4" fill="white" />
       <circle cx="126" cy="95" r="4" fill="white" />
 
-      {/* Beak — upper */}
+      {/* Beak */}
       <polygon points="100,120 88,138 112,138" fill="#FFD700" />
-      {/* Beak — lower */}
       <polygon points="100,132 91,138 109,138" fill="#FF9900" />
     </svg>
   );
@@ -75,12 +74,12 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
       <motion.div
         animate={{ y: [0, -4, 0] }}
         transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        style={imgStyle}
+        style={wrapperStyle}
       >
-        {svgContent}
+        {svg}
       </motion.div>
     );
   }
 
-  return <div style={imgStyle}>{svgContent}</div>;
+  return <div style={wrapperStyle}>{svg}</div>;
         }
