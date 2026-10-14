@@ -30,26 +30,20 @@ export default function Player({ navigate }: PlayerProps) {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [activeSheet, setActiveSheet] = useState<Sheet>(null);
 
-  // Apply
   const [applySolved, setApplySolved] = useState(false);
 
-  // Explain
   const [explainText, setExplainText] = useState("");
   const [explainSubmitted, setExplainSubmitted] = useState(false);
 
-  // Quiz
-  const [quizMode, setQuizMode] = useState<"mcq" | "typed">("mcq");
+  const [quizMode, setQuizMode] = useState<"mcq" | "type">("mcq");
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
   const [typedSubmitted, setTypedSubmitted] = useState(false);
 
-  // Posts rating
   const [ratingVote, setRatingVote] = useState<RatingVote>(null);
 
-  // Share
   const [shareNotice, setShareNotice] = useState("");
 
-  // Feedback
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState<"like" | "dislike" | null>(null);
   const [feedbackReason, setFeedbackReason] = useState("");
@@ -57,7 +51,6 @@ export default function Player({ navigate }: PlayerProps) {
 
   const words = CAPTION.split(" ");
 
-  // Word-by-word caption highlighting
   useEffect(() => {
     if (activeSheet || feedbackOpen) return;
     const timer = setInterval(() => {
@@ -66,7 +59,6 @@ export default function Player({ navigate }: PlayerProps) {
     return () => clearInterval(timer);
   }, [activeSheet, feedbackOpen, words.length]);
 
-  // Auto-hide share notice
   useEffect(() => {
     if (!shareNotice) return;
     const timer = setTimeout(() => setShareNotice(""), 2000);
@@ -128,7 +120,6 @@ export default function Player({ navigate }: PlayerProps) {
 
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden">
-      {/* TOP BAR */}
       <div className="flex-shrink-0">
         <TopBar
           title="Sliding Filament Theory"
@@ -140,7 +131,6 @@ export default function Player({ navigate }: PlayerProps) {
         />
       </div>
 
-      {/* CAPTIONS */}
       <div className="flex-shrink-0 px-4 py-2">
         <p className="text-center text-classoni-navy text-base leading-relaxed">
           {words.map((word, i) => (
@@ -158,7 +148,6 @@ export default function Player({ navigate }: PlayerProps) {
         </p>
       </div>
 
-      {/* VISUAL CANVAS */}
       <div className="flex-1 min-h-0 mx-4 mb-2 relative">
         <div className="h-full w-full overflow-y-auto rounded-2xl bg-white/60">
           <div className="h-full w-full" />
@@ -188,7 +177,6 @@ export default function Player({ navigate }: PlayerProps) {
         )}
       </div>
 
-      {/* PILL BUTTONS */}
       <div className="flex-shrink-0 px-4 pb-2 flex gap-2">
         <button
           onClick={() => openSheet("apply")}
@@ -216,7 +204,6 @@ export default function Player({ navigate }: PlayerProps) {
         </button>
       </div>
 
-      {/* BOTTOM NAV */}
       <div className="flex-shrink-0">
         <BottomNav
           active="courses"
@@ -228,7 +215,6 @@ export default function Player({ navigate }: PlayerProps) {
         />
       </div>
 
-      {/* BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet && (
           <>
@@ -335,14 +321,14 @@ export default function Player({ navigate }: PlayerProps) {
                       MCQ
                     </button>
                     <button
-                      onClick={() => setQuizMode("typed")}
+                      onClick={() => setQuizMode("type")}
                       className={`flex-1 rounded-full py-2 text-xs font-semibold ${
-                        quizMode === "typed"
+                        quizMode === "type"
                           ? "bg-classoni-blue text-white"
                           : "bg-classoni-lavender text-classoni-navy"
                       }`}
                     >
-                      Typed
+                      Type
                     </button>
                   </div>
 
@@ -380,7 +366,7 @@ export default function Player({ navigate }: PlayerProps) {
                     </div>
                   )}
 
-                  {quizMode === "typed" && (
+                  {quizMode === "type" && (
                     <div>
                       <textarea
                         value={typedAnswer}
@@ -432,10 +418,7 @@ export default function Player({ navigate }: PlayerProps) {
                       ATP comes in, they let go and reset. That's why muscles need energy to relax
                       too.
                     </p>
-                    <p className="text-classoni-navy/60 text-xs mb-3 font-medium">
-                      How did you find this explanation?
-                    </p>
-                    <div className="flex gap-4 flex-wrap items-center">
+                    <div className="flex gap-4 items-center justify-between">
                       <button
                         onClick={() => setRatingVote("helpful")}
                         className="flex items-center gap-1.5 text-xs font-medium"
@@ -499,7 +482,6 @@ export default function Player({ navigate }: PlayerProps) {
         )}
       </AnimatePresence>
 
-      {/* FEEDBACK MODAL */}
       <AnimatePresence>
         {feedbackOpen && (
           <>
@@ -584,4 +566,4 @@ export default function Player({ navigate }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-}
+    }
