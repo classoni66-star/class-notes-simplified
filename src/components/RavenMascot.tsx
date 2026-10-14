@@ -18,10 +18,11 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
     return () => clearInterval(interval);
   }, [animated]);
 
-  const Wrapper: any = animated ? motion.div : 'div';
-  const wrapperProps: any = animated
+  const Wrapper = animated ? motion.div : 'div';
+  const wrapperProps = animated
     ? { animate: { y: [0, -4, 0] }, transition: { duration: 3, repeat: Infinity } }
     : {};
+
 
   return (
     <Wrapper {...wrapperProps} style={{ width: size, height: 'auto', display: 'inline-block' }}>
