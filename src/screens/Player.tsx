@@ -47,6 +47,7 @@ export default function Player({ navigate }: { navigate: Navigate }) {
 
   function pauseLesson() { console.log("[Player] Lesson paused"); }
   function resumeLesson() { console.log("[Player] Lesson resumed from previous position"); }
+  function openSheet(id: Sheet) { setSheet(id); setIsSheetOpen(true); pauseLesson(); }
   function closeSheet() {
     setSheet(null); setIsSheetOpen(false); resumeLesson();
   }
