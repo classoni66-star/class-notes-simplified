@@ -26,7 +26,8 @@ const QUIZ_EXPLANATION =
 
 const SPEED_OPTIONS = [0.75, 0.85, 1.0, 1.25, 1.5];
 
-const CLIP_DURATION_SECONDS = 165;
+// Real clip length in seconds — this is what the progress bar fills to.
+const CLIP_DURATION_SECONDS = 30;
 
 type Sheet = "apply" | "explain" | "quiz" | "posts" | null;
 type RatingVote = "helpful" | "more" | "very" | null;
@@ -46,9 +47,6 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
   const [playbackSpeed, setPlaybackSpeed] = useState(0.85);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [progress, setProgress] = useState(initialProgress);
-
-  // Resume toast
-  const [showResumeToast, setShowResumeToast] = useState(initialProgress > 0.02);
 
   // Apply
   const [applySolved, setApplySolved] = useState(false);
@@ -87,13 +85,16 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
     progressRef.current = progress;
   }, [progress]);
 
-  // Progress advances while playing
+  // Progress advances while playing, at a rate tied to clip duration and speed
   useEffect(() => {
     if (!isPlaying || activeSheet || feedbackOpen) return;
     const timer = setInterval(() => {
       setProgress((p) => {
         if (p >= 1) return 0;
-        return Math.min(1, p + 0.003 * playbackSpeed);
+        // At 1.0x speed, the bar fills in exactly CLIP_DURATION_SECONDS.
+        // Higher speed → faster fill. Lower speed → slower fill.
+        const perTick = (playbackSpeed / CLIP_DURATION_SECONDS) * 0.1;
+        return Math.min(1, p + perTick);
       });
     }, 100);
     return () => clearInterval(timer);
@@ -135,13 +136,6 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
     const timer = setTimeout(() => setShareNotice(""), 2000);
     return () => clearTimeout(timer);
   }, [shareNotice]);
-
-  // Auto-hide resume toast
-  useEffect(() => {
-    if (!showResumeToast) return;
-    const timer = setTimeout(() => setShowResumeToast(false), 3000);
-    return () => clearTimeout(timer);
-  }, [showResumeToast]);
 
   const togglePlay = () => {
     setSpeedMenuOpen(false);
@@ -295,20 +289,6 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
           </AnimatePresence>
         </div>
 
-        {/* RESUME TOAST */}
-        <AnimatePresence>
-          {showResumeToast && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="absolute top-3 left-1/2 -translate-x-1/2 bg-classoni-navy text-white text-xs px-3 py-1.5 rounded-full shadow-md z-10"
-            >
-              Resuming from where you left off
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -434,7 +414,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
         />
       </div>
 
-      {/* BOTTOM SHEETS — same as before */}
+      {/* BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet && (
           <>
