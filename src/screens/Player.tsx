@@ -77,28 +77,33 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
   const didSwipeRef = useRef(false);
   const lastSavedRef = useRef(0);
   const progressRef = useRef(progress);
+  const speedRef = useRef(playbackSpeed);
 
   const words = CAPTION.split(" ");
 
-  // Keep ref in sync for save handlers
+  // Keep refs in sync so the interval always reads the LATEST values,
+  // regardless of when the effect last re-ran.
   useEffect(() => {
     progressRef.current = progress;
   }, [progress]);
 
-  // Progress advances while playing, at a rate tied to clip duration and speed
+  useEffect(() => {
+    speedRef.current = playbackSpeed;
+  }, [playbackSpeed]);
+
+  // Progress advances while playing. Uses refs so changing speed
+  // takes effect immediately without needing to restart the interval.
   useEffect(() => {
     if (!isPlaying || activeSheet || feedbackOpen) return;
     const timer = setInterval(() => {
       setProgress((p) => {
         if (p >= 1) return 0;
-        // At 1.0x speed, the bar fills in exactly CLIP_DURATION_SECONDS.
-        // Higher speed → faster fill. Lower speed → slower fill.
-        const perTick = (playbackSpeed / CLIP_DURATION_SECONDS) * 0.1;
+        const perTick = (speedRef.current / CLIP_DURATION_SECONDS) * 0.1;
         return Math.min(1, p + perTick);
       });
     }, 100);
     return () => clearInterval(timer);
-  }, [isPlaying, playbackSpeed, activeSheet, feedbackOpen]);
+  }, [isPlaying, activeSheet, feedbackOpen]);
 
   // Word-by-word caption highlighting synced to progress
   useEffect(() => {
@@ -165,6 +170,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
   const selectSpeed = (s: number) => {
     setPlaybackSpeed(s);
     setSpeedMenuOpen(false);
+    console.log("[Player] Speed set to", s);
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -294,7 +300,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
             e.stopPropagation();
             setSpeedMenuOpen((open) => !open);
           }}
-          className="absolute top-3 right-3 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full shadow-md text-xs font-semibold text-classoni-navy"
+          className="absolute top-3 right-3 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full shadow-md text-xs font-semibold text-classoni-navy z-30"
         >
           {playbackSpeed.toFixed(2)}x
         </button>
@@ -305,7 +311,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              className="absolute top-14 right-3 bg-white rounded-xl shadow-lg p-1 z-20"
+              className="absolute top-14 right-3 bg-white rounded-xl shadow-lg p-1 z-40"
             >
               {SPEED_OPTIONS.map((s) => (
                 <button
@@ -357,7 +363,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
         )}
       </div>
 
-      {/* PROGRESS BAR — yellow */}
+      {/* PROGRESS BAR */}
       <div className="flex-shrink-0 px-4 pt-1 pb-2">
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9 text-right">
