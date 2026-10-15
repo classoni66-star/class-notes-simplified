@@ -1,17 +1,36 @@
+import { useState } from "react";
+
 interface Props {
   setScreen: (s: string) => void;
   navigate?: (s: string) => void;
 }
 
 export default function Rewards({ setScreen, navigate }: Props) {
+  const [notice, setNotice] = useState("");
+
   const goBack = () => {
     if (navigate) navigate("player");
     else setScreen("player");
   };
 
-  const handleInvite = () => {
-    console.log("Invite tapped");
-    alert("Invite link copied! Share it with your classmates.");
+  const handleInvite = async () => {
+    const shareData = {
+      title: "Join Classoni",
+      text: "Join me on Classoni — the study app that turns notes into animated lessons. Use my link to get free unlimited learning days.",
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        setNotice("Invite link copied!");
+        setTimeout(() => setNotice(""), 2000);
+      }
+    } catch {
+      // User cancelled the share sheet — no error, just do nothing
+    }
   };
 
   return (
@@ -40,7 +59,7 @@ export default function Rewards({ setScreen, navigate }: Props) {
           Invite a friend and unlock more unlimited learning + points
         </p>
         <p className="text-white/60 text-xs mt-2">
-          24 hours of free unlimited learning per invited friend who joins, plus 2 pts free.
+          1 free day of unlimited learning per invited friend plus 2 pts and climb the leaderboard
         </p>
       </div>
 
@@ -66,6 +85,12 @@ export default function Rewards({ setScreen, navigate }: Props) {
       >
         Invite a friend and get my rewards when they create an account
       </button>
+
+      {notice && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 bg-classoni-navy text-white text-xs px-4 py-2 rounded-full shadow-md z-50">
+          {notice}
+        </div>
+      )}
     </div>
   );
-}
+          }
