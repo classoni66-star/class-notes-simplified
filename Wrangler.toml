@@ -1,3 +1,6 @@
 name = "classoni-api"
 main = "worker.js"
 compatibility_date = "2024-11-01"
+
+# Secrets are stored on the worker itself (via Cloudflare Dashboard),
+# not in this file. This keeps API keys out of Git history.
