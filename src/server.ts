@@ -1,12 +1,29 @@
 import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { env as cfEnv } from "cloudflare:workers";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
-async function handleApi(request: Request, env: any): Promise<Response | null> {
+// Cloudflare provides env via this import — TanStack Start's wrapper
+// doesn't forward the function parameter reliably.
+function getSecret(name: string): string | undefined {
+  try {
+    // Try the imported env first (Cloudflare Workers native pattern)
+    if (cfEnv && (cfEnv as any)[name]) return (cfEnv as any)[name];
+  } catch {
+    // ignore
+  }
+  // Fallbacks in case Cloudflare injects them elsewhere
+  const g: any = globalThis as any;
+  if (g?.env?.[name]) return g.env[name];
+  if (g?.process?.env?.[name]) return g.process.env[name];
+  return undefined;
+}
+
+async function handleApi(request: Request, _env: any): Promise<Response | null> {
   const url = new URL(request.url);
 
   const cors = {
@@ -21,64 +38,40 @@ async function handleApi(request: Request, env: any): Promise<Response | null> {
 
   if (url.pathname === "/api/health") {
     const topic = url.searchParams.get("topic") || "general studies";
+    const key = getSecret("DEEPINFRA_API_KEY");
     let deepseekResult: any;
-    try {
-      const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + env.DEEPINFRA_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "deepseek-ai/DeepSeek-V4.1-Flash",
-          messages: [
-            { role: "user", content: "Say exactly: Classoni is alive. Topic: " + topic },
-          ],
-        }),
-      });
-      deepseekResult = await r.json();
-    } catch (err) {
-      deepseekResult = { error: String(err) };
+    if (!key) {
+      deepseekResult = { error: "DEEPINFRA_API_KEY secret is not set on this worker" };
+    } else {
+      try {
+        const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + key,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "deepseek-ai/DeepSeek-V4.1-Flash",
+            messages: [
+              { role: "user", content: "Say exactly: Classoni is alive. Topic: " + topic },
+            ],
+          }),
+        });
+        deepseekResult = await r.json();
+      } catch (err) {
+        deepseekResult = { error: String(err) };
+      }
     }
 
     return new Response(
       JSON.stringify({
         status: "alive",
         models: ["DeepSeek-V4.1-Flash", "Kokoro-82M"],
+        keyPresent: !!key,
         deepseek: deepseekResult,
       }),
       { headers: { ...cors, "Content-Type": "application/json" } }
     );
-  }
-
-  if (url.pathname === "/api/test-kokoro" && request.method === "POST") {
-    try {
-      const body: any = await request.json().catch(() => ({}));
-      const text = body.text || "Hello, this is Classoni.";
-      const r = await fetch("https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M", {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + env.DEEPINFRA_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: text,
-          voice: "am_liam",
-          speed: 0.85,
-          output_format: "mp3",
-          return_timestamps: true,
-        }),
-      });
-      const data = await r.json();
-      return new Response(JSON.stringify(data), {
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    } catch (err) {
-      return new Response(JSON.stringify({ error: String(err) }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
   }
 
   return null;
