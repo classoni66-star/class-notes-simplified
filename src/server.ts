@@ -1,29 +1,23 @@
 import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { env as cfEnv } from "cloudflare:workers";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
-// Cloudflare provides env via this import — TanStack Start's wrapper
-// doesn't forward the function parameter reliably.
+// Module-level holder for the Cloudflare env, refreshed on every request.
+let CF_ENV: any = undefined;
+
 function getSecret(name: string): string | undefined {
-  try {
-    // Try the imported env first (Cloudflare Workers native pattern)
-    if (cfEnv && (cfEnv as any)[name]) return (cfEnv as any)[name];
-  } catch {
-    // ignore
-  }
-  // Fallbacks in case Cloudflare injects them elsewhere
+  if (CF_ENV && CF_ENV[name]) return CF_ENV[name];
   const g: any = globalThis as any;
-  if (g?.env?.[name]) return g.env[name];
-  if (g?.process?.env?.[name]) return g.process.env[name];
+  if (g && g.env && g.env[name]) return g.env[name];
+  if (g && g.process && g.process.env && g.process.env[name]) return g.process.env[name];
   return undefined;
 }
 
-async function handleApi(request: Request, _env: any): Promise<Response | null> {
+async function handleApi(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
 
   const cors = {
@@ -68,6 +62,7 @@ async function handleApi(request: Request, _env: any): Promise<Response | null> 
         status: "alive",
         models: ["DeepSeek-V4.1-Flash", "Kokoro-82M"],
         keyPresent: !!key,
+        envVisible: !!CF_ENV,
         deepseek: deepseekResult,
       }),
       { headers: { ...cors, "Content-Type": "application/json" } }
@@ -90,11 +85,13 @@ async function getServerEntry(): Promise<ServerEntry> {
 
 async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
   if (response.status < 500) return response;
-  const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) return response;
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.indexOf("application/json") !== -1) return response;
+
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+
+  console.error(consumeLastCapturedError() || new Error("h3 swallowed SSR error: " + body));
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -112,7 +109,10 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: any, ctx: unknown) {
-    const apiResponse = await handleApi(request, env);
+    // Stash env so getSecret() can reach it from handleApi
+    CF_ENV = env;
+
+    const apiResponse = await handleApi(request);
     if (apiResponse) return apiResponse;
 
     try {
