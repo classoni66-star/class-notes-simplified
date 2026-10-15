@@ -6,6 +6,7 @@ import BottomNav from "../components/BottomNav";
 
 interface PlayerProps {
   navigate: (screen: string) => void;
+  initialProgress?: number;
 }
 
 const CAPTION =
@@ -25,7 +26,6 @@ const QUIZ_EXPLANATION =
 
 const SPEED_OPTIONS = [0.75, 0.85, 1.0, 1.25, 1.5];
 
-// Simulated clip length (seconds). Will be replaced by real audio duration later.
 const CLIP_DURATION_SECONDS = 165;
 
 type Sheet = "apply" | "explain" | "quiz" | "posts" | null;
@@ -37,7 +37,7 @@ const formatTime = (seconds: number) => {
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
 
-export default function Player({ navigate }: PlayerProps) {
+export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [activeSheet, setActiveSheet] = useState<Sheet>(null);
 
@@ -45,7 +45,10 @@ export default function Player({ navigate }: PlayerProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [playbackSpeed, setPlaybackSpeed] = useState(0.85);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
-  const [progress, setProgress] = useState(0); // 0 to 1
+  const [progress, setProgress] = useState(initialProgress);
+
+  // Resume toast
+  const [showResumeToast, setShowResumeToast] = useState(initialProgress > 0.02);
 
   // Apply
   const [applySolved, setApplySolved] = useState(false);
@@ -72,11 +75,17 @@ export default function Player({ navigate }: PlayerProps) {
   const [feedbackReason, setFeedbackReason] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
 
-  // Swipe tracking
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const didSwipeRef = useRef(false);
+  const lastSavedRef = useRef(0);
+  const progressRef = useRef(progress);
 
   const words = CAPTION.split(" ");
+
+  // Keep ref in sync for save handlers
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
 
   // Progress advances while playing
   useEffect(() => {
@@ -93,12 +102,32 @@ export default function Player({ navigate }: PlayerProps) {
   // Word-by-word caption highlighting synced to progress
   useEffect(() => {
     if (activeSheet || feedbackOpen) return;
-    const newIndex = Math.min(
-      words.length - 1,
-      Math.floor(progress * words.length)
-    );
+    const newIndex = Math.min(words.length - 1, Math.floor(progress * words.length));
     setHighlightedIndex(newIndex);
   }, [progress, words.length, activeSheet, feedbackOpen]);
+
+  // Throttled save of progress to localStorage
+  useEffect(() => {
+    const now = Date.now();
+    if (now - lastSavedRef.current > 800) {
+      localStorage.setItem("classoni_lastProgress", progress.toFixed(4));
+      lastSavedRef.current = now;
+    }
+  }, [progress]);
+
+  // Save on app hide / page hide so we don't lose state when they close
+  useEffect(() => {
+    const save = () => {
+      localStorage.setItem("classoni_lastProgress", progressRef.current.toFixed(4));
+    };
+    document.addEventListener("visibilitychange", save);
+    window.addEventListener("pagehide", save);
+    return () => {
+      save();
+      document.removeEventListener("visibilitychange", save);
+      window.removeEventListener("pagehide", save);
+    };
+  }, []);
 
   // Auto-hide share notice
   useEffect(() => {
@@ -106,6 +135,13 @@ export default function Player({ navigate }: PlayerProps) {
     const timer = setTimeout(() => setShareNotice(""), 2000);
     return () => clearTimeout(timer);
   }, [shareNotice]);
+
+  // Auto-hide resume toast
+  useEffect(() => {
+    if (!showResumeToast) return;
+    const timer = setTimeout(() => setShowResumeToast(false), 3000);
+    return () => clearTimeout(timer);
+  }, [showResumeToast]);
 
   const togglePlay = () => {
     setSpeedMenuOpen(false);
@@ -137,7 +173,6 @@ export default function Player({ navigate }: PlayerProps) {
     setSpeedMenuOpen(false);
   };
 
-  // SWIPE HANDLERS — scroll right = forward, scroll left = back
   const handleTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
     touchStartRef.current = { x: t.clientX, y: t.clientY };
@@ -152,10 +187,9 @@ export default function Player({ navigate }: PlayerProps) {
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
 
-    // Horizontal swipe: absDx must be significant and dominate over absDy
     if (absDx > 50 && absDx > absDy * 1.5) {
       didSwipeRef.current = true;
-      const delta = dx > 0 ? 0.1 : -0.1; // right = forward, left = back
+      const delta = dx > 0 ? 0.1 : -0.1;
       setProgress((p) => Math.max(0, Math.min(1, p + delta)));
     }
 
@@ -163,7 +197,6 @@ export default function Player({ navigate }: PlayerProps) {
   };
 
   const handleCanvasClick = () => {
-    // If a swipe just happened, don't toggle play
     if (didSwipeRef.current) {
       didSwipeRef.current = false;
       return;
@@ -219,7 +252,6 @@ export default function Player({ navigate }: PlayerProps) {
         />
       </div>
 
-      {/* CAPTIONS — word-level highlighting synced to progress */}
       <div className="flex-shrink-0 px-4 py-2">
         <p className="text-center text-classoni-navy text-base leading-relaxed">
           {words.map((word, i) => (
@@ -237,7 +269,7 @@ export default function Player({ navigate }: PlayerProps) {
         </p>
       </div>
 
-      {/* VISUAL CANVAS — tap to pause/play, swipe L/R to seek, scroll vertically for long visuals */}
+      {/* VISUAL CANVAS */}
       <div className="flex-1 min-h-0 mx-4 mb-2 relative">
         <div
           onClick={handleCanvasClick}
@@ -247,7 +279,6 @@ export default function Player({ navigate }: PlayerProps) {
         >
           <div className="h-full w-full" />
 
-          {/* Paused overlay */}
           <AnimatePresence>
             {!isPlaying && (
               <motion.div
@@ -264,7 +295,20 @@ export default function Player({ navigate }: PlayerProps) {
           </AnimatePresence>
         </div>
 
-        {/* SPEED PILL — top right of visual */}
+        {/* RESUME TOAST */}
+        <AnimatePresence>
+          {showResumeToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="absolute top-3 left-1/2 -translate-x-1/2 bg-classoni-navy text-white text-xs px-3 py-1.5 rounded-full shadow-md z-10"
+            >
+              Resuming from where you left off
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -275,7 +319,6 @@ export default function Player({ navigate }: PlayerProps) {
           {playbackSpeed.toFixed(2)}x
         </button>
 
-        {/* SPEED MENU */}
         <AnimatePresence>
           {speedMenuOpen && (
             <motion.div
@@ -304,7 +347,6 @@ export default function Player({ navigate }: PlayerProps) {
           )}
         </AnimatePresence>
 
-        {/* FLOATING SHARE + FEEDBACK */}
         <div className="absolute bottom-3 right-3 flex flex-col gap-3">
           <button
             onClick={(e) => {
@@ -335,7 +377,7 @@ export default function Player({ navigate }: PlayerProps) {
         )}
       </div>
 
-      {/* PROGRESS BAR — yellow, between visual and pill buttons */}
+      {/* PROGRESS BAR — yellow */}
       <div className="flex-shrink-0 px-4 pt-1 pb-2">
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9 text-right">
@@ -392,7 +434,7 @@ export default function Player({ navigate }: PlayerProps) {
         />
       </div>
 
-      {/* BOTTOM SHEETS */}
+      {/* BOTTOM SHEETS — same as before */}
       <AnimatePresence>
         {activeSheet && (
           <>
@@ -483,7 +525,6 @@ export default function Player({ navigate }: PlayerProps) {
               {activeSheet === "quiz" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Question 1 of 1</h3>
-
                   <div className="flex gap-2 mb-4">
                     <button
                       onClick={() => setQuizMode("mcq")}
@@ -506,12 +547,10 @@ export default function Player({ navigate }: PlayerProps) {
                       Type
                     </button>
                   </div>
-
                   <p className="text-classoni-navy text-sm font-semibold mb-4">
                     Which of the following best describes the mechanism by which a skeletal muscle
                     fiber shortens during contraction?
                   </p>
-
                   {quizMode === "mcq" && (
                     <div className="space-y-2">
                       {QUIZ_OPTIONS.map((opt, i) => {
@@ -540,7 +579,6 @@ export default function Player({ navigate }: PlayerProps) {
                       })}
                     </div>
                   )}
-
                   {quizMode === "type" && (
                     <div>
                       <textarea
@@ -564,7 +602,6 @@ export default function Player({ navigate }: PlayerProps) {
                       )}
                     </div>
                   )}
-
                   {quizAnswer !== null && quizMode === "mcq" && (
                     <div className="mt-4 bg-classoni-lavender rounded-xl p-3">
                       <p className="text-classoni-navy text-xs leading-relaxed">
