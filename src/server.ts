@@ -122,3 +122,36 @@ export default {
     }
   },
 };
+if (url.pathname === "/api/test-kokoro") {
+  const text = url.searchParams.get("text") || "Hello, this is Classoni.";
+  const key = getSecret("DEEPINFRA_API_KEY");
+  if (!key) {
+    return new Response(JSON.stringify({ error: "no key" }), {
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  const r = await fetch("https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + key,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text: text,
+      voice: "am_liam",
+      speed: 0.85,
+      output_format: "mp3",
+      return_timestamps: true,
+    }),
+  });
+  const data: any = await r.json();
+  return new Response(
+    JSON.stringify({
+      success: true,
+      audio_bytes: (data.audio || "").length,
+      total_words: (data.words || []).length,
+      first_5_words: (data.words || []).slice(0, 5),
+    }, null, 2),
+    { headers: { ...cors, "Content-Type": "application/json" } }
+  );
+    }
