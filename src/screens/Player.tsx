@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Share2, ThumbsUp, X } from "lucide-react";
+import { Share2, ThumbsUp, X, Play } from "lucide-react";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 
@@ -23,50 +23,97 @@ const QUIZ_CORRECT_INDEX = 1;
 const QUIZ_EXPLANATION =
   "During contraction, the actin and myosin filaments do not change length; they slide past each other, which shortens the sarcomere.";
 
+const SPEED_OPTIONS = [0.75, 0.85, 1.0, 1.25, 1.5];
+
+// Simulated clip length (seconds). Will be replaced by real audio duration later.
+const CLIP_DURATION_SECONDS = 165;
+
 type Sheet = "apply" | "explain" | "quiz" | "posts" | null;
 type RatingVote = "helpful" | "more" | "very" | null;
+
+const formatTime = (seconds: number) => {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
 
 export default function Player({ navigate }: PlayerProps) {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [activeSheet, setActiveSheet] = useState<Sheet>(null);
 
+  // Playback state
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [playbackSpeed, setPlaybackSpeed] = useState(0.85);
+  const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
+  const [progress, setProgress] = useState(0); // 0 to 1
+
+  // Apply
   const [applySolved, setApplySolved] = useState(false);
 
+  // Explain
   const [explainText, setExplainText] = useState("");
   const [explainSubmitted, setExplainSubmitted] = useState(false);
 
+  // Quiz
   const [quizMode, setQuizMode] = useState<"mcq" | "type">("mcq");
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
   const [typedSubmitted, setTypedSubmitted] = useState(false);
 
+  // Posts rating
   const [ratingVote, setRatingVote] = useState<RatingVote>(null);
 
+  // Share
   const [shareNotice, setShareNotice] = useState("");
 
+  // Feedback
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState<"like" | "dislike" | null>(null);
   const [feedbackReason, setFeedbackReason] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
 
+  // Swipe tracking
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const didSwipeRef = useRef(false);
+
   const words = CAPTION.split(" ");
 
+  // Progress advances while playing
+  useEffect(() => {
+    if (!isPlaying || activeSheet || feedbackOpen) return;
+    const timer = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 1) return 0;
+        return Math.min(1, p + 0.003 * playbackSpeed);
+      });
+    }, 100);
+    return () => clearInterval(timer);
+  }, [isPlaying, playbackSpeed, activeSheet, feedbackOpen]);
+
+  // Word-by-word caption highlighting synced to progress
   useEffect(() => {
     if (activeSheet || feedbackOpen) return;
-    const timer = setInterval(() => {
-      setHighlightedIndex((i) => (i + 1) % words.length);
-    }, 400);
-    return () => clearInterval(timer);
-  }, [activeSheet, feedbackOpen, words.length]);
+    const newIndex = Math.min(
+      words.length - 1,
+      Math.floor(progress * words.length)
+    );
+    setHighlightedIndex(newIndex);
+  }, [progress, words.length, activeSheet, feedbackOpen]);
 
+  // Auto-hide share notice
   useEffect(() => {
     if (!shareNotice) return;
     const timer = setTimeout(() => setShareNotice(""), 2000);
     return () => clearTimeout(timer);
   }, [shareNotice]);
 
+  const togglePlay = () => {
+    setSpeedMenuOpen(false);
+    setIsPlaying((p) => !p);
+  };
+
   const pauseLesson = () => console.log("[Player] Lesson paused");
-  const resumeLesson = () => console.log("[Player] Lesson resumed from previous position");
+  const resumeLesson = () => console.log("[Player] Lesson resumed at speed", playbackSpeed);
 
   const openSheet = (id: Exclude<Sheet, null>) => {
     setActiveSheet(id);
@@ -83,6 +130,45 @@ export default function Player({ navigate }: PlayerProps) {
     setTypedSubmitted(false);
     setQuizMode("mcq");
     setRatingVote(null);
+  };
+
+  const selectSpeed = (s: number) => {
+    setPlaybackSpeed(s);
+    setSpeedMenuOpen(false);
+  };
+
+  // SWIPE HANDLERS — scroll right = forward, scroll left = back
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+    didSwipeRef.current = false;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartRef.current.x;
+    const dy = t.clientY - touchStartRef.current.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    // Horizontal swipe: absDx must be significant and dominate over absDy
+    if (absDx > 50 && absDx > absDy * 1.5) {
+      didSwipeRef.current = true;
+      const delta = dx > 0 ? 0.1 : -0.1; // right = forward, left = back
+      setProgress((p) => Math.max(0, Math.min(1, p + delta)));
+    }
+
+    touchStartRef.current = null;
+  };
+
+  const handleCanvasClick = () => {
+    // If a swipe just happened, don't toggle play
+    if (didSwipeRef.current) {
+      didSwipeRef.current = false;
+      return;
+    }
+    togglePlay();
   };
 
   const handleShare = async () => {
@@ -118,6 +204,8 @@ export default function Player({ navigate }: PlayerProps) {
     }, 1500);
   };
 
+  const currentSeconds = progress * CLIP_DURATION_SECONDS;
+
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden">
       <div className="flex-shrink-0">
@@ -131,6 +219,7 @@ export default function Player({ navigate }: PlayerProps) {
         />
       </div>
 
+      {/* CAPTIONS — word-level highlighting synced to progress */}
       <div className="flex-shrink-0 px-4 py-2">
         <p className="text-center text-classoni-navy text-base leading-relaxed">
           {words.map((word, i) => (
@@ -148,21 +237,90 @@ export default function Player({ navigate }: PlayerProps) {
         </p>
       </div>
 
+      {/* VISUAL CANVAS — tap to pause/play, swipe L/R to seek, scroll vertically for long visuals */}
       <div className="flex-1 min-h-0 mx-4 mb-2 relative">
-        <div className="h-full w-full overflow-y-auto rounded-2xl bg-white/60">
+        <div
+          onClick={handleCanvasClick}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="h-full w-full overflow-y-auto rounded-2xl bg-white/60 relative cursor-pointer"
+        >
           <div className="h-full w-full" />
+
+          {/* Paused overlay */}
+          <AnimatePresence>
+            {!isPlaying && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-2xl pointer-events-none"
+              >
+                <div className="w-20 h-20 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                  <Play size={34} className="text-classoni-navy ml-1" fill="currentColor" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
+        {/* SPEED PILL — top right of visual */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setSpeedMenuOpen((open) => !open);
+          }}
+          className="absolute top-3 right-3 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full shadow-md text-xs font-semibold text-classoni-navy"
+        >
+          {playbackSpeed.toFixed(2)}x
+        </button>
+
+        {/* SPEED MENU */}
+        <AnimatePresence>
+          {speedMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="absolute top-14 right-3 bg-white rounded-xl shadow-lg p-1 z-20"
+            >
+              {SPEED_OPTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    selectSpeed(s);
+                  }}
+                  className={`block w-full px-4 py-2 text-xs text-left rounded-lg whitespace-nowrap ${
+                    playbackSpeed === s
+                      ? "bg-classoni-blue text-white font-semibold"
+                      : "text-classoni-navy"
+                  }`}
+                >
+                  {s.toFixed(2)}x
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* FLOATING SHARE + FEEDBACK */}
         <div className="absolute bottom-3 right-3 flex flex-col gap-3">
           <button
-            onClick={handleShare}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShare();
+            }}
             className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center"
             aria-label="Share"
           >
             <Share2 size={18} className="text-classoni-navy" />
           </button>
           <button
-            onClick={() => setFeedbackOpen(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setFeedbackOpen(true);
+            }}
             className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center"
             aria-label="Feedback"
           >
@@ -177,6 +335,25 @@ export default function Player({ navigate }: PlayerProps) {
         )}
       </div>
 
+      {/* PROGRESS BAR — yellow, between visual and pill buttons */}
+      <div className="flex-shrink-0 px-4 pt-1 pb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-classoni-navy/60 font-medium w-9 text-right">
+            {formatTime(currentSeconds)}
+          </span>
+          <div className="flex-1 h-1 bg-classoni-navy/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-classoni-yellow transition-all duration-100"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+          <span className="text-[10px] text-classoni-navy/60 font-medium w-9">
+            {formatTime(CLIP_DURATION_SECONDS)}
+          </span>
+        </div>
+      </div>
+
+      {/* PILL BUTTONS */}
       <div className="flex-shrink-0 px-4 pb-2 flex gap-2">
         <button
           onClick={() => openSheet("apply")}
@@ -215,6 +392,7 @@ export default function Player({ navigate }: PlayerProps) {
         />
       </div>
 
+      {/* BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet && (
           <>
@@ -241,7 +419,6 @@ export default function Player({ navigate }: PlayerProps) {
                 <X size={20} className="text-classoni-navy" />
               </button>
 
-              {/* APPLY SHEET */}
               {activeSheet === "apply" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Apply</h3>
@@ -273,7 +450,6 @@ export default function Player({ navigate }: PlayerProps) {
                 </div>
               )}
 
-              {/* EXPLAIN SHEET */}
               {activeSheet === "explain" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Explain</h3>
@@ -304,7 +480,6 @@ export default function Player({ navigate }: PlayerProps) {
                 </div>
               )}
 
-              {/* QUIZ SHEET */}
               {activeSheet === "quiz" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Question 1 of 1</h3>
@@ -400,7 +575,6 @@ export default function Player({ navigate }: PlayerProps) {
                 </div>
               )}
 
-              {/* POSTS SHEET */}
               {activeSheet === "posts" && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">
@@ -482,6 +656,7 @@ export default function Player({ navigate }: PlayerProps) {
         )}
       </AnimatePresence>
 
+      {/* FEEDBACK MODAL */}
       <AnimatePresence>
         {feedbackOpen && (
           <>
@@ -566,4 +741,4 @@ export default function Player({ navigate }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-    }
+  }
