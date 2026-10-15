@@ -1,5 +1,4 @@
 import "./lib/error-capture";
-
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
@@ -7,11 +6,6 @@ type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
-// ─────────────────────────────────────────────────────────
-// CLASSONI API ROUTES
-// These run BEFORE the frontend. If a request hits /api/*,
-// we handle it here. Otherwise, we pass through to the app.
-// ─────────────────────────────────────────────────────────
 async function handleApi(request: Request, env: any): Promise<Response | null> {
   const url = new URL(request.url);
 
@@ -25,22 +19,10 @@ async function handleApi(request: Request, env: any): Promise<Response | null> {
     return new Response(null, { headers: cors });
   }
 
-  // Health check
   if (url.pathname === "/api/health") {
-    return new Response(
-      JSON.stringify({
-        status: "alive",
-        models: ["DeepSeek-V4.1-Flash", "Kokoro-82M"],
-      }),
-      { headers: { ...cors, "Content-Type": "application/json" } }
-    );
-  }
-
-  // DeepSeek test
-  if (url.pathname === "/api/test-deepseek" && request.method === "POST") {
+    const topic = url.searchParams.get("topic") || "general studies";
+    let deepseekResult: any;
     try {
-      const body: any = await request.json().catch(() => ({}));
-      const topic = body.topic || "general studies";
       const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
         method: "POST",
         headers: {
@@ -54,19 +36,21 @@ async function handleApi(request: Request, env: any): Promise<Response | null> {
           ],
         }),
       });
-      const data = await r.json();
-      return new Response(JSON.stringify(data), {
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+      deepseekResult = await r.json();
     } catch (err) {
-      return new Response(JSON.stringify({ error: String(err) }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+      deepseekResult = { error: String(err) };
     }
+
+    return new Response(
+      JSON.stringify({
+        status: "alive",
+        models: ["DeepSeek-V4.1-Flash", "Kokoro-82M"],
+        deepseek: deepseekResult,
+      }),
+      { headers: { ...cors, "Content-Type": "application/json" } }
+    );
   }
 
-  // Kokoro test
   if (url.pathname === "/api/test-kokoro" && request.method === "POST") {
     try {
       const body: any = await request.json().catch(() => ({}));
@@ -97,7 +81,7 @@ async function handleApi(request: Request, env: any): Promise<Response | null> {
     }
   }
 
-  return null; // Not an API route — pass through to the frontend
+  return null;
 }
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
@@ -111,16 +95,12 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-// h3 swallows in-handler throws into a normal 500 Response with body
-// "{"unhandled":true,"message":"HTTPError"}" — try/catch alone never fires for those.
 async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) return response;
-
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
-
   console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
   return new Response(renderErrorPage(), {
     status: 500,
@@ -139,11 +119,9 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: any, ctx: unknown) {
-    // 1. Handle Classoni API routes first
     const apiResponse = await handleApi(request, env);
     if (apiResponse) return apiResponse;
 
-    // 2. Otherwise, hand off to the TanStack Start frontend
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
