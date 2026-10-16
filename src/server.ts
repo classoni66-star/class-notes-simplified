@@ -23,6 +23,31 @@ function stripDataUrl(audio: string): string {
   return audio;
 }
 
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  concurrency: number,
+): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let nextIdx = 0;
+  async function worker() {
+    while (true) {
+      const i = nextIdx++;
+      if (i >= tasks.length) return;
+      try {
+        results[i] = await tasks[i]();
+      } catch (err) {
+        results[i] = err as any;
+      }
+    }
+  }
+  const workers = Array.from(
+    { length: Math.min(concurrency, tasks.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni, a mobile-first university learning platform. Take the notes or curriculum topic and produce ONE fully choreographed keypoint lesson as strict JSON.
 
 Your Ethos: Speed is mastery (1–2 minutes). Surgical precision. Fidelity above all. Visual-first. Seamless narrative.
@@ -104,7 +129,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     return json({ status: "alive", keyPresent: !!key });
   }
 
-  // ─── GENERATE AUDIO CHUNKS — one audio per 40-word chunk, no merging ───
+  // ─── GENERATE AUDIO CHUNKS — parallel generation ───
   if (url.pathname === "/api/generate-full-audio" && request.method === "POST") {
     const body: any = await request.json();
     const sections = body.sections || [];
@@ -116,8 +141,16 @@ async function handleApi(request: Request): Promise<Response | null> {
     if (!key) return json({ error: "no key" }, 500);
 
     const CHUNK_SIZE = 40;
-    const chunks: any[] = [];
-    const errors: string[] = [];
+
+    // Build the plan: one task per (section, piece) pair
+    type Piece = {
+      section_index: number;
+      section_id: string;
+      piece_index: number;
+      is_last_piece_of_section: boolean;
+      text: string;
+    };
+    const pieces: Piece[] = [];
 
     for (let si = 0; si < sections.length; si++) {
       const section = sections[si];
@@ -125,45 +158,56 @@ async function handleApi(request: Request): Promise<Response | null> {
       if (!text) continue;
 
       const wordsInSection = text.split(/\s+/).filter(Boolean);
-      const pieces: string[] = [];
+      const textPieces: string[] = [];
       for (let i = 0; i < wordsInSection.length; i += CHUNK_SIZE) {
-        pieces.push(wordsInSection.slice(i, i + CHUNK_SIZE).join(" "));
+        textPieces.push(wordsInSection.slice(i, i + CHUNK_SIZE).join(" "));
       }
 
-      for (let pi = 0; pi < pieces.length; pi++) {
-        try {
-          const r = await fetch(
-            "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
-            {
-              method: "POST",
-              headers: {
-                Authorization: "Bearer " + key,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                text: pieces[pi],
-                preset_voice: "am_liam",
-                speed: 1.0,
-                output_format: "mp3",
-                return_timestamps: true,
-              }),
-            }
-          );
+      textPieces.forEach((piece, pi) => {
+        pieces.push({
+          section_index: si,
+          section_id: section.id,
+          piece_index: pi,
+          is_last_piece_of_section: pi === textPieces.length - 1,
+          text: piece,
+        });
+      });
+    }
 
-          if (!r.ok) {
-            errors.push(`sec ${si} piece ${pi} HTTP ${r.status}`);
-            continue;
+    // Fire all Kokoro calls in parallel with limited concurrency
+    const tasks = pieces.map((p) => async () => {
+      try {
+        const r = await fetch(
+          "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
+          {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + key,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: p.text,
+              preset_voice: "am_liam",
+              speed: 1.0,
+              output_format: "mp3",
+              return_timestamps: true,
+            }),
           }
+        );
 
-          const data: any = await r.json();
-          const audioRaw = data.audio || "";
-          if (!audioRaw || audioRaw.length < 100) {
-            errors.push(`sec ${si} piece ${pi} no audio`);
-            continue;
-          }
+        if (!r.ok) {
+          return { ok: false, error: `HTTP ${r.status}` } as any;
+        }
 
-          // Each chunk gets its own audio and its own word list — no offsets
-          chunks.push({
+        const data: any = await r.json();
+        const audioRaw = data.audio || "";
+        if (!audioRaw || audioRaw.length < 100) {
+          return { ok: false, error: "no audio" } as any;
+        }
+
+        return {
+          ok: true,
+          chunk: {
             audio: "data:audio/mpeg;base64," + stripDataUrl(audioRaw),
             words: (data.words || []).map((w: any, i: number) => ({
               id: i,
@@ -171,24 +215,43 @@ async function handleApi(request: Request): Promise<Response | null> {
               end: w.end,
               text: w.text,
             })),
-            section_id: section.id,
-            section_index: si,
-            piece_index: pi,
-            is_last_piece_of_section: pi === pieces.length - 1,
-          });
-        } catch (err) {
-          errors.push(`sec ${si} piece ${pi}: ${String(err).slice(0, 100)}`);
-        }
+            section_id: p.section_id,
+            section_index: p.section_index,
+            piece_index: p.piece_index,
+            is_last_piece_of_section: p.is_last_piece_of_section,
+          },
+        };
+      } catch (err) {
+        return { ok: false, error: String(err).slice(0, 100) } as any;
       }
-    }
+    });
 
-    if (chunks.length === 0) {
+    // Concurrency 4 — fast enough, avoids rate limits
+    const results = await runWithConcurrency(tasks, 4);
+
+    const goodChunks: any[] = [];
+    const errors: string[] = [];
+    results.forEach((r: any, i) => {
+      if (r && r.ok) {
+        goodChunks.push(r.chunk);
+      } else {
+        errors.push(`piece ${i}: ${r?.error || "unknown"}`);
+      }
+    });
+
+    if (goodChunks.length === 0) {
       return json({ error: "All chunks failed", details: errors }, 500);
     }
 
+    // Sort chunks by section + piece order (parallel may have kept order, but enforce)
+    goodChunks.sort((a, b) => {
+      if (a.section_index !== b.section_index) return a.section_index - b.section_index;
+      return a.piece_index - b.piece_index;
+    });
+
     return json({
-      chunks,
-      totalChunks: chunks.length,
+      chunks: goodChunks,
+      totalChunks: goodChunks.length,
       errors: errors.length ? errors : undefined,
     });
   }
@@ -290,4 +353,4 @@ export default {
       });
     }
   },
-};
+};.
