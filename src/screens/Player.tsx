@@ -9,199 +9,348 @@ interface PlayerProps {
   initialProgress?: number;
 }
 
-const CAPTION =
-  "During muscle contraction, the myosin heads pull on actin filaments, causing them to slide inward.";
-
-const QUIZ_OPTIONS = [
-  "The actin and myosin filaments both shorten in length.",
-  "The myosin filaments slide past the actin filaments, pulling the Z-lines closer together.",
-  "The sarcomere membrane folds inward, reducing its overall length.",
-  "The actin filaments dissolve and reassemble in a more compact form.",
-];
-
-const QUIZ_CORRECT_INDEX = 1;
-
-const QUIZ_EXPLANATION =
-  "During contraction, the actin and myosin filaments do not change length; they slide past each other, which shortens the sarcomere.";
-
-const SPEED_OPTIONS = [0.75, 0.85, 1.0, 1.25, 1.5];
-
-// Real clip length in seconds — this is what the progress bar fills to.
-const CLIP_DURATION_SECONDS = 30;
-
 type Sheet = "apply" | "explain" | "quiz" | "posts" | null;
 type RatingVote = "helpful" | "more" | "very" | null;
 
-const formatTime = (seconds: number) => {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
+interface VisualObject {
+  svg_code: string;
+  trigger_phrase: string;
+  fade_out_trigger: string | null;
+  caption: string;
+  type: string;
+  highlight: string | null;
+  role: string;
+}
+
+interface Section {
+  id: string;
+  narration_text: string;
+  visuals: VisualObject[];
+}
+
+interface Lesson {
+  keypoint_title: string;
+  sections: Section[];
+  apply: { scenario: string; skeleton: string | null; solution: string };
+  quiz: {
+    type: string;
+    question: string;
+    options: string[] | null;
+    correct_answer: string;
+    explanation: string;
+  };
+}
+
+interface AudioData {
+  audio: string;
+  words: { id: number; start: number; end: number; text: string }[];
+}
+
+const SPEED_OPTIONS = [0.75, 0.85, 1.0, 1.25, 1.5];
+
+const FALLBACK_LESSON: Lesson = {
+  keypoint_title: "Sliding Filament Theory",
+  sections: [
+    {
+      id: "curiosity_question",
+      narration_text:
+        "During muscle contraction, the myosin heads pull on actin filaments, causing them to slide inward. Let's find out why!",
+      visuals: [],
+    },
+    {
+      id: "keypoint_identity",
+      narration_text: "Keypoint: Sliding Filament Theory",
+      visuals: [],
+    },
+    {
+      id: "emotional_hook",
+      narration_text:
+        "This is the concept that lets you lift a hand to wave. It powers every step you take. It is how your heart pumps blood without you thinking about it.",
+      visuals: [],
+    },
+    {
+      id: "walkthrough",
+      narration_text:
+        "The sarcomere is the basic unit of muscle contraction. The sarcomere contains thin actin filaments and thick myosin filaments. When a nerve signal arrives, calcium is released and exposes binding sites on the actin. The myosin heads attach and pull, then detach, re-cock, and attach again. Each cycle pulls the actin filaments closer together, shortening the sarcomere. The muscle does not squeeze itself. The filaments just slide past each other.",
+      visuals: [],
+    },
+    {
+      id: "mental_anchor",
+      narration_text:
+        "Here is a way to remember the four pillars of muscle contraction: MAPS. Myosin, Actin, Power stroke, Sarcomere.",
+      visuals: [],
+    },
+    {
+      id: "common_confusion",
+      narration_text:
+        "One thing to watch out for is thinking the filaments themselves shorten. The actin and myosin filaments do not change length; they slide past each other, which shortens the sarcomere.",
+      visuals: [],
+    },
+  ],
+  apply: {
+    scenario:
+      "A physiotherapist at Mulago Hospital in Kampala is explaining to a post-surgery patient why muscles stiffen after prolonged immobility. Since you have studied the sliding filament theory, help the physiotherapist describe the mechanism clearly to the patient.",
+    skeleton: null,
+    solution:
+      "The physiotherapist needs to explain that prolonged immobility keeps the myosin heads stuck in their bound state, preventing the filaments from sliding back to their resting length. Because ATP is required to detach the myosin heads, muscle relaxation also requires energy. Guiding the patient through gentle range-of-motion exercises helps restore ATP-driven detachment and lets the sarcomeres return to their resting length, reducing stiffness.",
+  },
+  quiz: {
+    type: "mcq",
+    question:
+      "Which of the following best describes the mechanism by which a skeletal muscle fiber shortens during contraction?",
+    options: [
+      "The actin and myosin filaments both shorten in length.",
+      "The myosin filaments slide past the actin filaments, pulling the Z-lines closer together.",
+      "The sarcomere membrane folds inward, reducing its overall length.",
+      "The actin filaments dissolve and reassemble in a more compact form.",
+    ],
+    correct_answer: "B",
+    explanation:
+      "During contraction, the actin and myosin filaments do not change length; they slide past each other, which shortens the sarcomere.",
+  },
 };
 
-export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [activeSheet, setActiveSheet] = useState<Sheet>(null);
+function resolveTriggerPhrase(
+  phrase: string,
+  words: { start: number; end: number; text: string }[],
+): number | null {
+  if (!phrase || !words.length) return null;
+  const target = phrase
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!target.length) return null;
 
-  // Playback state
-  const [isPlaying, setIsPlaying] = useState(true);
+  for (let i = 0; i <= words.length - target.length; i++) {
+    let match = true;
+    for (let j = 0; j < target.length; j++) {
+      const w = words[i + j].text
+        .toLowerCase()
+        .replace(/[^\w\s]/g, "");
+      if (w !== target[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return words[i].start;
+  }
+  return null;
+}
+
+export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [loadingLesson, setLoadingLesson] = useState(true);
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [currentAudio, setCurrentAudio] = useState<AudioData | null>(null);
+  const [loadingAudio, setLoadingAudio] = useState(false);
+  const [activeVisualIndex, setActiveVisualIndex] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(0.85);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [progress, setProgress] = useState(initialProgress);
-
-  // Apply
+  const [activeSheet, setActiveSheet] = useState<Sheet>(null);
   const [applySolved, setApplySolved] = useState(false);
-
-  // Explain
   const [explainText, setExplainText] = useState("");
   const [explainSubmitted, setExplainSubmitted] = useState(false);
-
-  // Quiz
-  const [quizMode, setQuizMode] = useState<"mcq" | "type">("mcq");
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
-  const [typedAnswer, setTypedAnswer] = useState("");
-  const [typedSubmitted, setTypedSubmitted] = useState(false);
-
-  // Posts rating
   const [ratingVote, setRatingVote] = useState<RatingVote>(null);
-
-  // Share
   const [shareNotice, setShareNotice] = useState("");
-
-  // Feedback
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState<"like" | "dislike" | null>(null);
   const [feedbackReason, setFeedbackReason] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
 
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const didSwipeRef = useRef(false);
-  const lastSavedRef = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef(progress);
-  const speedRef = useRef(playbackSpeed);
+  const visualTimersRef = useRef<number[]>([]);
 
-  const words = CAPTION.split(" ");
-
-  // Keep refs in sync so the interval always reads the LATEST values,
-  // regardless of when the effect last re-ran.
+  // Fetch the lesson on mount
   useEffect(() => {
-    progressRef.current = progress;
-  }, [progress]);
-
-  useEffect(() => {
-    speedRef.current = playbackSpeed;
-  }, [playbackSpeed]);
-
-  // Progress advances while playing. Uses refs so changing speed
-  // takes effect immediately without needing to restart the interval.
-  useEffect(() => {
-    if (!isPlaying || activeSheet || feedbackOpen) return;
-    const timer = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 1) return 0;
-        const perTick = (speedRef.current / CLIP_DURATION_SECONDS) * 0.1;
-        return Math.min(1, p + perTick);
-      });
-    }, 100);
-    return () => clearInterval(timer);
-  }, [isPlaying, activeSheet, feedbackOpen]);
-
-  // Word-by-word caption highlighting synced to progress
-  useEffect(() => {
-    if (activeSheet || feedbackOpen) return;
-    const newIndex = Math.min(words.length - 1, Math.floor(progress * words.length));
-    setHighlightedIndex(newIndex);
-  }, [progress, words.length, activeSheet, feedbackOpen]);
-
-  // Throttled save of progress to localStorage
-  useEffect(() => {
-    const now = Date.now();
-    if (now - lastSavedRef.current > 800) {
-      localStorage.setItem("classoni_lastProgress", progress.toFixed(4));
-      lastSavedRef.current = now;
+    let mounted = true;
+    async function loadLesson() {
+      try {
+        const topic = encodeURIComponent("Sliding Filament Theory");
+        const res = await fetch(
+          "https://classoni.classoni66.workers.dev/api/generate-lesson?topic=" + topic
+        );
+        const data = await res.json();
+        if (mounted && data && data.sections) {
+          setLesson(data);
+        } else if (mounted) {
+          setLesson(FALLBACK_LESSON);
+        }
+      } catch {
+        if (mounted) setLesson(FALLBACK_LESSON);
+      } finally {
+        if (mounted) setLoadingLesson(false);
+      }
     }
-  }, [progress]);
-
-  // Save on app hide / page hide so we don't lose state when they close
-  useEffect(() => {
-    const save = () => {
-      localStorage.setItem("classoni_lastProgress", progressRef.current.toFixed(4));
-    };
-    document.addEventListener("visibilitychange", save);
-    window.addEventListener("pagehide", save);
+    loadLesson();
     return () => {
-      save();
-      document.removeEventListener("visibilitychange", save);
-      window.removeEventListener("pagehide", save);
+      mounted = false;
     };
   }, []);
 
-  // Auto-hide share notice
+  // Fetch audio for the current section
   useEffect(() => {
-    if (!shareNotice) return;
-    const timer = setTimeout(() => setShareNotice(""), 2000);
-    return () => clearTimeout(timer);
-  }, [shareNotice]);
+    if (!lesson) return;
+    const section = lesson.sections[currentSectionIndex];
+    if (!section) return;
+
+    let mounted = true;
+    async function loadAudio() {
+      setLoadingAudio(true);
+      setCurrentAudio(null);
+      setActiveVisualIndex(null);
+      try {
+        const res = await fetch(
+          "https://classoni.classoni66.workers.dev/api/generate-tts?text=" +
+            encodeURIComponent(section.narration_text)
+        );
+        const data = await res.json();
+        if (mounted && data.audio) {
+          setCurrentAudio(data);
+        }
+      } catch {
+        // silent fail
+      } finally {
+        if (mounted) setLoadingAudio(false);
+      }
+    }
+    loadAudio();
+    return () => {
+      mounted = false;
+    };
+  }, [lesson, currentSectionIndex]);
+
+  // Play audio and sync visuals
+  useEffect(() => {
+    if (!currentAudio || !lesson) return;
+    const section = lesson.sections[currentSectionIndex];
+    if (!section) return;
+
+    // Clear any pending visual timers
+    visualTimersRef.current.forEach((t) => window.clearTimeout(t));
+    visualTimersRef.current = [];
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Build the visual timeline from trigger phrases
+    const timeline: { at: number; visualIndex: number }[] = [];
+    const fadeOuts: { at: number; visualIndex: number }[] = [];
+
+    section.visuals.forEach((v, i) => {
+      const startMs = resolveTriggerPhrase(v.trigger_phrase, currentAudio.words);
+      if (startMs !== null) timeline.push({ at: startMs * 1000, visualIndex: i });
+      if (v.fade_out_trigger) {
+        const endMs = resolveTriggerPhrase(v.fade_out_trigger, currentAudio.words);
+        if (endMs !== null) fadeOuts.push({ at: endMs * 1000, visualIndex: i });
+      }
+    });
+
+    timeline.sort((a, b) => a.at - b.at);
+    fadeOuts.sort((a, b) => a.at - b.at);
+
+    // If no visuals could be resolved, show the first one anyway
+    if (timeline.length === 0 && section.visuals.length > 0) {
+      setActiveVisualIndex(0);
+    }
+
+    // Schedule visual changes
+    timeline.forEach((entry) => {
+      const t = window.setTimeout(() => {
+        setActiveVisualIndex(entry.visualIndex);
+      }, entry.at);
+      visualTimersRef.current.push(t);
+    });
+
+    fadeOuts.forEach((entry) => {
+      const t = window.setTimeout(() => {
+        setActiveVisualIndex((current) =>
+          current === entry.visualIndex ? null : current
+        );
+      }, entry.at);
+      visualTimersRef.current.push(t);
+    });
+
+    // Play the audio
+    audio.src = "data:audio/mp3;base64," + currentAudio.audio;
+    audio.playbackRate = playbackSpeed;
+    audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+
+    return () => {
+      visualTimersRef.current.forEach((t) => window.clearTimeout(t));
+      visualTimersRef.current = [];
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentAudio, lesson]);
+
+  // Update playback speed
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = playbackSpeed;
+  }, [playbackSpeed]);
+
+  // Track progress
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onTime = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setProgress(audio.currentTime / audio.duration);
+      }
+    };
+    const onEnded = () => {
+      // Move to next section
+      if (lesson && currentSectionIndex < lesson.sections.length - 1) {
+        setCurrentSectionIndex((i) => i + 1);
+      } else {
+        setIsPlaying(false);
+      }
+    };
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("ended", onEnded);
+    return () => {
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, [lesson, currentSectionIndex]);
+
+  // Persist progress
+  useEffect(() => {
+    progressRef.current = progress;
+    try {
+      localStorage.setItem("classoni_lastProgress", progress.toFixed(4));
+    } catch {
+      // ignore
+    }
+  }, [progress]);
 
   const togglePlay = () => {
     setSpeedMenuOpen(false);
-    setIsPlaying((p) => !p);
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      audio.play().then(() => setIsPlaying(true)).catch(() => {});
+    }
   };
 
-  const pauseLesson = () => console.log("[Player] Lesson paused");
-  const resumeLesson = () => console.log("[Player] Lesson resumed at speed", playbackSpeed);
-
   const openSheet = (id: Exclude<Sheet, null>) => {
+    if (audioRef.current) audioRef.current.pause();
+    setIsPlaying(false);
     setActiveSheet(id);
-    pauseLesson();
   };
 
   const closeSheet = () => {
     setActiveSheet(null);
-    resumeLesson();
     setApplySolved(false);
     setExplainSubmitted(false);
     setQuizAnswer(null);
-    setTypedAnswer("");
-    setTypedSubmitted(false);
-    setQuizMode("mcq");
     setRatingVote(null);
-  };
-
-  const selectSpeed = (s: number) => {
-    setPlaybackSpeed(s);
-    setSpeedMenuOpen(false);
-    console.log("[Player] Speed set to", s);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    touchStartRef.current = { x: t.clientX, y: t.clientY };
-    didSwipeRef.current = false;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStartRef.current.x;
-    const dy = t.clientY - touchStartRef.current.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    if (absDx > 50 && absDx > absDy * 1.5) {
-      didSwipeRef.current = true;
-      const delta = dx > 0 ? 0.1 : -0.1;
-      setProgress((p) => Math.max(0, Math.min(1, p + delta)));
-    }
-
-    touchStartRef.current = null;
-  };
-
-  const handleCanvasClick = () => {
-    if (didSwipeRef.current) {
-      didSwipeRef.current = false;
-      return;
-    }
-    togglePlay();
   };
 
   const handleShare = async () => {
@@ -214,14 +363,16 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
       if (navigator.share) {
         await navigator.share(shareData);
       } else {
-        throw new Error("Share not supported");
+        throw new Error("no share");
       }
     } catch {
       try {
         await navigator.clipboard.writeText(window.location.href);
         setShareNotice("Link copied!");
+        setTimeout(() => setShareNotice(""), 2000);
       } catch {
-        setShareNotice("Could not copy link");
+        setShareNotice("Could not copy");
+        setTimeout(() => setShareNotice(""), 2000);
       }
     }
   };
@@ -237,13 +388,29 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
     }, 1500);
   };
 
-  const currentSeconds = progress * CLIP_DURATION_SECONDS;
+  const currentSection = lesson?.sections[currentSectionIndex];
+  const currentVisual =
+    currentSection && activeVisualIndex !== null
+      ? currentSection.visuals[activeVisualIndex]
+      : null;
+
+  const formatTime = (seconds: number) => {
+    if (!isFinite(seconds) || seconds < 0) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const audioDuration = audioRef.current?.duration || 0;
+  const audioCurrent = audioRef.current?.currentTime || 0;
 
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden">
+      <audio ref={audioRef} hidden />
+
       <div className="flex-shrink-0">
         <TopBar
-          title="Sliding Filament Theory"
+          title={lesson?.keypoint_title || "Loading..."}
           uploader="By You"
           points={12}
           onProfileTap={() => navigate("profile")}
@@ -252,53 +419,59 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
         />
       </div>
 
+      {/* CAPTION */}
       <div className="flex-shrink-0 px-4 py-2">
         <p className="text-center text-classoni-navy text-base leading-relaxed">
-          {words.map((word, i) => (
-            <span
-              key={i}
-              className={
-                i === highlightedIndex
-                  ? "bg-classoni-yellow text-classoni-navy rounded-md px-1 transition-all duration-150"
-                  : "transition-all duration-150"
-              }
-            >
-              {word}{" "}
-            </span>
-          ))}
+          {loadingLesson
+            ? "Generating your lesson..."
+            : currentSection?.narration_text || ""}
         </p>
       </div>
 
       {/* VISUAL CANVAS */}
       <div className="flex-1 min-h-0 mx-4 mb-2 relative">
         <div
-          onClick={handleCanvasClick}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          className="h-full w-full overflow-y-auto rounded-2xl bg-white/60 relative cursor-pointer"
+          onClick={togglePlay}
+          className="h-full w-full overflow-y-auto rounded-2xl bg-white/60 relative cursor-pointer flex items-center justify-center"
         >
-          <div className="h-full w-full" />
+          {loadingAudio && (
+            <div className="text-classoni-navy/60 text-xs">
+              Generating narrator...
+            </div>
+          )}
+
+          {!loadingAudio && currentVisual && (
+            <div
+              className="w-full h-full flex items-center justify-center p-4"
+              dangerouslySetInnerHTML={{ __html: currentVisual.svg_code }}
+            />
+          )}
+
+          {!loadingAudio && !currentVisual && currentSection && (
+            <div className="text-classoni-navy/40 text-xs">—</div>
+          )}
 
           <AnimatePresence>
-            {!isPlaying && (
+            {!isPlaying && !loadingAudio && currentVisual && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-2xl pointer-events-none"
+                className="absolute inset-0 flex items-center justify-center bg-black/15 rounded-2xl pointer-events-none"
               >
-                <div className="w-20 h-20 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                  <Play size={34} className="text-classoni-navy ml-1" fill="currentColor" />
+                <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                  <Play size={28} className="text-classoni-navy ml-1" fill="currentColor" />
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
+        {/* Speed pill */}
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setSpeedMenuOpen((open) => !open);
+            setSpeedMenuOpen((o) => !o);
           }}
           className="absolute top-3 right-3 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full shadow-md text-xs font-semibold text-classoni-navy z-30"
         >
@@ -318,7 +491,8 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
                   key={s}
                   onClick={(e) => {
                     e.stopPropagation();
-                    selectSpeed(s);
+                    setPlaybackSpeed(s);
+                    setSpeedMenuOpen(false);
                   }}
                   className={`block w-full px-4 py-2 text-xs text-left rounded-lg whitespace-nowrap ${
                     playbackSpeed === s
@@ -340,7 +514,6 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
               handleShare();
             }}
             className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center"
-            aria-label="Share"
           >
             <Share2 size={18} className="text-classoni-navy" />
           </button>
@@ -350,7 +523,6 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
               setFeedbackOpen(true);
             }}
             className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center"
-            aria-label="Feedback"
           >
             <ThumbsUp size={18} className="text-classoni-navy" />
           </button>
@@ -367,7 +539,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
       <div className="flex-shrink-0 px-4 pt-1 pb-2">
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9 text-right">
-            {formatTime(currentSeconds)}
+            {formatTime(audioCurrent)}
           </span>
           <div className="flex-1 h-1 bg-classoni-navy/10 rounded-full overflow-hidden">
             <div
@@ -376,7 +548,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
             />
           </div>
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9">
-            {formatTime(CLIP_DURATION_SECONDS)}
+            {formatTime(audioDuration)}
           </span>
         </div>
       </div>
@@ -442,19 +614,15 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
               <button
                 onClick={closeSheet}
                 className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center"
-                aria-label="Close"
               >
                 <X size={20} className="text-classoni-navy" />
               </button>
 
-              {activeSheet === "apply" && (
+              {activeSheet === "apply" && lesson && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Apply</h3>
                   <p className="text-classoni-navy text-sm leading-relaxed mb-4">
-                    A nurse in Mulago Hospital is preparing oral rehydration solution for a cholera
-                    outbreak and needs to calculate the exact sodium concentration. The ward has run
-                    out of pre-measured sachets, and the nursing staff are unsure of the correct
-                    ratio.
+                    {lesson.apply.scenario}
                   </p>
                   {!applySolved ? (
                     <button
@@ -466,12 +634,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
                   ) : (
                     <div className="bg-classoni-lavender rounded-xl p-4">
                       <p className="text-classoni-navy text-sm leading-relaxed">
-                        The nurse needs to recognize that concentration defines how much solute is
-                        in a given volume. Multiplying the target concentration (75 mmol/L) by the
-                        total volume (5 L) and the molar mass of NaCl (58.44 g/mol) yields
-                        approximately 21.9 grams of salt to weigh out. Given the ward's time
-                        pressure, pre-measuring sachets during morning rounds removes the measuring
-                        step from the staff entirely.
+                        {lesson.apply.solution}
                       </p>
                     </div>
                   )}
@@ -508,47 +671,22 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
                 </div>
               )}
 
-              {activeSheet === "quiz" && (
+              {activeSheet === "quiz" && lesson && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Question 1 of 1</h3>
-                  <div className="flex gap-2 mb-4">
-                    <button
-                      onClick={() => setQuizMode("mcq")}
-                      className={`flex-1 rounded-full py-2 text-xs font-semibold ${
-                        quizMode === "mcq"
-                          ? "bg-classoni-blue text-white"
-                          : "bg-classoni-lavender text-classoni-navy"
-                      }`}
-                    >
-                      MCQ
-                    </button>
-                    <button
-                      onClick={() => setQuizMode("type")}
-                      className={`flex-1 rounded-full py-2 text-xs font-semibold ${
-                        quizMode === "type"
-                          ? "bg-classoni-blue text-white"
-                          : "bg-classoni-lavender text-classoni-navy"
-                      }`}
-                    >
-                      Type
-                    </button>
-                  </div>
                   <p className="text-classoni-navy text-sm font-semibold mb-4">
-                    Which of the following best describes the mechanism by which a skeletal muscle
-                    fiber shortens during contraction?
+                    {lesson.quiz.question}
                   </p>
-                  {quizMode === "mcq" && (
+                  {lesson.quiz.options && (
                     <div className="space-y-2">
-                      {QUIZ_OPTIONS.map((opt, i) => {
+                      {lesson.quiz.options.map((opt, i) => {
                         const letters = ["A", "B", "C", "D"];
                         const isSelected = quizAnswer === i;
-                        const isCorrect = i === QUIZ_CORRECT_INDEX;
+                        const isCorrect = letters[i] === lesson.quiz.correct_answer;
                         let bg = "bg-classoni-lavender";
                         if (quizAnswer !== null) {
-                          if (isSelected && isCorrect)
-                            bg = "bg-green-100 border-green-500";
-                          else if (isSelected && !isCorrect)
-                            bg = "bg-red-100 border-red-500";
+                          if (isSelected && isCorrect) bg = "bg-green-100 border-green-500";
+                          else if (isSelected && !isCorrect) bg = "bg-red-100 border-red-500";
                           else if (isCorrect) bg = "bg-green-50 border-green-300";
                         }
                         return (
@@ -565,33 +703,10 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
                       })}
                     </div>
                   )}
-                  {quizMode === "type" && (
-                    <div>
-                      <textarea
-                        value={typedAnswer}
-                        onChange={(e) => setTypedAnswer(e.target.value)}
-                        placeholder="Type your answer here..."
-                        inputMode="text"
-                        className="w-full h-28 border border-classoni-blue rounded-xl p-3 text-sm text-classoni-navy mb-3"
-                      />
-                      <button
-                        onClick={() => setTypedSubmitted(true)}
-                        className="w-full bg-classoni-blue text-white rounded-full py-3 font-semibold"
-                      >
-                        Submit Answer
-                      </button>
-                      {typedSubmitted && (
-                        <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-3">
-                          <p className="text-green-700 text-sm font-semibold">Correct!</p>
-                          <p className="text-green-700 text-xs mt-1">{QUIZ_EXPLANATION}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {quizAnswer !== null && quizMode === "mcq" && (
+                  {quizAnswer !== null && (
                     <div className="mt-4 bg-classoni-lavender rounded-xl p-3">
                       <p className="text-classoni-navy text-xs leading-relaxed">
-                        {QUIZ_EXPLANATION}
+                        {lesson.quiz.explanation}
                       </p>
                     </div>
                   )}
@@ -600,20 +715,15 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
 
               {activeSheet === "posts" && (
                 <div className="pt-6">
-                  <h3 className="text-classoni-navy font-bold text-lg mb-3">
-                    Class Contributions
-                  </h3>
+                  <h3 className="text-classoni-navy font-bold text-lg mb-3">Class Contributions</h3>
                   <p className="text-classoni-navy text-sm text-center mb-4">
                     No contributions from your class for this concept yet. You can be the first!
                   </p>
                   <div className="bg-classoni-lavender rounded-2xl p-4">
-                    <p className="text-classoni-navy font-bold text-sm mb-2">
-                      Explained by Amina K.
-                    </p>
+                    <p className="text-classoni-navy font-bold text-sm mb-2">Explained by Amina K.</p>
                     <p className="text-classoni-navy text-sm mb-4 leading-relaxed">
                       The myosin heads grab the actin and pull it inward, like rowing a boat. When
-                      ATP comes in, they let go and reset. That's why muscles need energy to relax
-                      too.
+                      ATP comes in, they let go and reset.
                     </p>
                     <div className="flex gap-4 items-center justify-between">
                       <button
@@ -700,11 +810,9 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
               <button
                 onClick={() => setFeedbackOpen(false)}
                 className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center"
-                aria-label="Close"
               >
                 <X size={20} className="text-classoni-navy" />
               </button>
-
               {!feedbackSent ? (
                 <>
                   <h3 className="text-classoni-navy font-bold text-lg mb-4 pt-2">
@@ -764,4 +872,4 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-  }
+}
