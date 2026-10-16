@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Share2, ThumbsUp, X, Play, RotateCcw, RotateCw } from "lucide-react";
+import { Share2, ThumbsUp, X, Play } from "lucide-react";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 
@@ -80,7 +80,6 @@ export default function Player({
   firstAudio = null,
 }: PlayerProps) {
   const [audioData] = useState<FullAudioData | null>(firstAudio);
-  const [scaledWords, setScaledWords] = useState<any[]>(firstAudio?.words || []);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPausedOverlay, setShowPausedOverlay] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
@@ -109,6 +108,7 @@ export default function Player({
   const didSwipeRef = useRef(false);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
+  // Section detection from accurate boundaries
   const currentSectionIndex = (() => {
     if (!audioData) return 0;
     for (let i = 0; i < audioData.sectionBoundaries.length; i++) {
@@ -120,7 +120,7 @@ export default function Player({
 
   const currentSection = lesson?.sections[currentSectionIndex];
 
-  // Load audio + measure actual duration, rescale words to match
+  // Load audio — NO client-side scaling
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !audioData) return;
@@ -132,26 +132,11 @@ export default function Player({
       .catch(() => setIsPlaying(false));
 
     const onLoaded = () => {
-      const estimated =
-        audioData.words.length > 0
-          ? audioData.words[audioData.words.length - 1].end
-          : 0;
-      const actual = audio.duration;
-      if (estimated > 0 && actual > 0) {
-        const scale = actual / estimated;
-        setScaledWords(
-          audioData.words.map((w) => ({
-            ...w,
-            start: w.start * scale,
-            end: w.end * scale,
-          }))
-        );
-      } else {
-        setScaledWords(audioData.words);
+      if (audio.duration && isFinite(audio.duration)) {
+        setAudioDuration(audio.duration);
       }
-      setAudioDuration(actual);
-      if (initialProgress > 0 && initialProgress < 1) {
-        audio.currentTime = initialProgress * actual;
+      if (initialProgress > 0 && initialProgress < 1 && audio.duration) {
+        audio.currentTime = initialProgress * audio.duration;
       }
     };
     audio.addEventListener("loadedmetadata", onLoaded);
@@ -159,14 +144,15 @@ export default function Player({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioData]);
 
-  // Schedule visuals for the current section
+  // Schedule visuals for the current section using RAW word timings
   useEffect(() => {
     if (!audioData || !lesson || !currentSection) return;
     visualTimersRef.current.forEach((t) => window.clearTimeout(t));
     visualTimersRef.current = [];
 
-    const sectionWords = scaledWords.filter((w) => w.section === currentSectionIndex);
+    const sectionWords = audioData.words.filter((w) => w.section === currentSectionIndex);
     if (!sectionWords.length) return;
+
     const sectionStart = audioData.sectionBoundaries[currentSectionIndex]?.start || 0;
 
     const timeline: { at: number; visualIndex: number }[] = [];
@@ -207,7 +193,7 @@ export default function Player({
       visualTimersRef.current.forEach((t) => window.clearTimeout(t));
       visualTimersRef.current = [];
     };
-  }, [currentSectionIndex, audioData, lesson, scaledWords, currentSection]);
+  }, [currentSectionIndex, audioData, lesson, currentSection]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = playbackSpeed;
@@ -220,6 +206,7 @@ export default function Player({
       if (isDragging) return;
       setAudioCurrent(audio.currentTime);
       if (audio.duration && isFinite(audio.duration)) {
+        setAudioDuration(audio.duration);
         setProgress(audio.currentTime / audio.duration);
       }
     };
@@ -256,15 +243,6 @@ export default function Player({
     } else {
       audio.play().then(() => setIsPlaying(true)).catch(() => {});
     }
-  };
-
-  const seekBy = (seconds: number) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const newTime = Math.max(0, Math.min(audio.duration || 0, audio.currentTime + seconds));
-    audio.currentTime = newTime;
-    setAudioCurrent(newTime);
-    if (audio.duration) setProgress(newTime / audio.duration);
   };
 
   // Drag handling for the yellow dot
@@ -354,7 +332,16 @@ export default function Player({
     const dy = t.clientY - touchStartRef.current.y;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       didSwipeRef.current = true;
-      seekBy(dx > 0 ? 5 : -5);
+      const audio = audioRef.current;
+      if (audio) {
+        const newTime = Math.max(
+          0,
+          Math.min(audio.duration || 0, audio.currentTime + (dx > 0 ? 5 : -5))
+        );
+        audio.currentTime = newTime;
+        setAudioCurrent(newTime);
+        if (audio.duration) setProgress(newTime / audio.duration);
+      }
     }
     touchStartRef.current = null;
   };
@@ -372,7 +359,8 @@ export default function Player({
       ? currentSection.visuals[activeVisualIndex]
       : null;
 
-  const sectionWords = scaledWords.filter((w) => w.section === currentSectionIndex);
+  const sectionWords = audioData?.words.filter((w) => w.section === currentSectionIndex) || [];
+
   const currentWordIndex = (() => {
     if (!sectionWords.length) return -1;
     for (let i = 0; i < sectionWords.length; i++) {
@@ -540,17 +528,9 @@ export default function Player({
         )}
       </div>
 
+      {/* PROGRESS BAR WITH DRAGGABLE YELLOW DOT */}
       <div className="flex-shrink-0 px-4 pt-1 pb-2">
         <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              seekBy(-5);
-            }}
-            className="w-7 h-7 flex items-center justify-center text-classoni-navy/70"
-          >
-            <RotateCcw size={16} />
-          </button>
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9 text-right">
             {formatTime(audioCurrent)}
           </span>
@@ -573,15 +553,6 @@ export default function Player({
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9">
             {formatTime(audioDuration)}
           </span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              seekBy(5);
-            }}
-            className="w-7 h-7 flex items-center justify-center text-classoni-navy/70"
-          >
-            <RotateCw size={16} />
-          </button>
         </div>
       </div>
 
@@ -806,4 +777,4 @@ export default function Player({
       </AnimatePresence>
     </div>
   );
-  }
+    }
