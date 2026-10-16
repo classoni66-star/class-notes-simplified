@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Share2, ThumbsUp, X, Play } from "lucide-react";
+import { Share2, ThumbsUp, X, Play, RotateCcw, RotateCw } from "lucide-react";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 
@@ -49,6 +49,7 @@ interface AudioData {
 }
 
 const SPEED_OPTIONS = [0.75, 0.85, 1.0, 1.25, 1.5];
+const CAPTION_WORDS_PER_BLOCK = 20;
 
 const FALLBACK_LESSON: Lesson = {
   keypoint_title: "Sliding Filament Theory",
@@ -56,7 +57,7 @@ const FALLBACK_LESSON: Lesson = {
     {
       id: "curiosity_question",
       narration_text:
-        "During muscle contraction, the myosin heads pull on actin filaments, causing them to slide inward. Let's find out why!",
+        "Why does a muscle shorten without any of its protein threads actually getting shorter? Let's find out why!",
       visuals: [],
     },
     {
@@ -73,7 +74,7 @@ const FALLBACK_LESSON: Lesson = {
     {
       id: "walkthrough",
       narration_text:
-        "The sarcomere is the basic unit of muscle contraction. The sarcomere contains thin actin filaments and thick myosin filaments. When a nerve signal arrives, calcium is released and exposes binding sites on the actin. The myosin heads attach and pull, then detach, re-cock, and attach again. Each cycle pulls the actin filaments closer together, shortening the sarcomere. The muscle does not squeeze itself. The filaments just slide past each other.",
+        "The sarcomere is the basic unit of muscle contraction. It contains thin actin filaments and thick myosin filaments. When a nerve signal arrives, calcium is released and exposes binding sites on the actin. The myosin heads attach and pull, then detach, re-cock, and attach again. Each cycle pulls the actin filaments closer together, shortening the sarcomere. The muscle does not squeeze itself. The filaments just slide past each other.",
       visuals: [],
     },
     {
@@ -94,7 +95,7 @@ const FALLBACK_LESSON: Lesson = {
       "A physiotherapist at Mulago Hospital in Kampala is explaining to a post-surgery patient why muscles stiffen after prolonged immobility. Since you have studied the sliding filament theory, help the physiotherapist describe the mechanism clearly to the patient.",
     skeleton: null,
     solution:
-      "The physiotherapist needs to explain that prolonged immobility keeps the myosin heads stuck in their bound state, preventing the filaments from sliding back to their resting length. Because ATP is required to detach the myosin heads, muscle relaxation also requires energy. Guiding the patient through gentle range-of-motion exercises helps restore ATP-driven detachment and lets the sarcomeres return to their resting length, reducing stiffness.",
+      "The physiotherapist needs to explain that prolonged immobility keeps the myosin heads stuck in their bound state, preventing the filaments from sliding back to their resting length. Because ATP is required to detach the myosin heads, muscle relaxation also requires energy.",
   },
   quiz: {
     type: "mcq",
@@ -153,9 +154,12 @@ export default function Player({
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [activeVisualIndex, setActiveVisualIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showPausedOverlay, setShowPausedOverlay] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [progress, setProgress] = useState(initialProgress);
+  const [audioCurrent, setAudioCurrent] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
   const [activeSheet, setActiveSheet] = useState<Sheet>(null);
   const [applySolved, setApplySolved] = useState(false);
   const [explainText, setExplainText] = useState("");
@@ -171,6 +175,9 @@ export default function Player({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef(progress);
   const visualTimersRef = useRef<number[]>([]);
+  const overlayTimerRef = useRef<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; startedAt: number } | null>(null);
+  const didSwipeRef = useRef(false);
 
   // Fetch the lesson on mount (skip if passed in)
   useEffect(() => {
@@ -186,11 +193,8 @@ export default function Player({
           "https://classoni.classoni66.workers.dev/api/generate-lesson?topic=" + topic
         );
         const data = await res.json();
-        if (mounted && data && data.sections) {
-          setLesson(data);
-        } else if (mounted) {
-          setLesson(FALLBACK_LESSON);
-        }
+        if (mounted && data && data.sections) setLesson(data);
+        else if (mounted) setLesson(FALLBACK_LESSON);
       } catch {
         if (mounted) setLesson(FALLBACK_LESSON);
       } finally {
@@ -231,9 +235,7 @@ export default function Player({
           }
         );
         const data = await res.json();
-        if (mounted && data.audio) {
-          setCurrentAudio(data);
-        }
+        if (mounted && data.audio) setCurrentAudio(data);
       } catch {
         // silent fail
       } finally {
@@ -247,7 +249,7 @@ export default function Player({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson, currentSectionIndex, firstAudio]);
 
-  // Play audio and schedule visuals
+  // Play audio + schedule visuals
   useEffect(() => {
     if (!currentAudio || !lesson) return;
     const section = lesson.sections[currentSectionIndex];
@@ -274,9 +276,7 @@ export default function Player({
     timeline.sort((a, b) => a.at - b.at);
     fadeOuts.sort((a, b) => a.at - b.at);
 
-    if (timeline.length === 0 && section.visuals.length > 0) {
-      setActiveVisualIndex(0);
-    }
+    if (timeline.length === 0 && section.visuals.length > 0) setActiveVisualIndex(0);
 
     timeline.forEach((entry) => {
       const t = window.setTimeout(() => {
@@ -294,7 +294,6 @@ export default function Player({
       visualTimersRef.current.push(t);
     });
 
-    // Audio comes from the worker as a full data URL already
     audio.src = currentAudio.audio;
     audio.playbackRate = playbackSpeed;
     audio
@@ -309,7 +308,7 @@ export default function Player({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAudio, lesson]);
 
-  // Update playback speed
+  // Playback speed
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = playbackSpeed;
   }, [playbackSpeed]);
@@ -319,7 +318,9 @@ export default function Player({
     const audio = audioRef.current;
     if (!audio) return;
     const onTime = () => {
+      setAudioCurrent(audio.currentTime);
       if (audio.duration && isFinite(audio.duration)) {
+        setAudioDuration(audio.duration);
         setProgress(audio.currentTime / audio.duration);
       }
     };
@@ -330,11 +331,16 @@ export default function Player({
         setIsPlaying(false);
       }
     };
+    const onLoaded = () => {
+      if (audio.duration && isFinite(audio.duration)) setAudioDuration(audio.duration);
+    };
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("loadedmetadata", onLoaded);
     return () => {
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("loadedmetadata", onLoaded);
     };
   }, [lesson, currentSectionIndex]);
 
@@ -347,6 +353,22 @@ export default function Player({
       // ignore
     }
   }, [progress]);
+
+  // Auto-hide the paused overlay after 1.5s so the student can study the visual
+  useEffect(() => {
+    if (overlayTimerRef.current) window.clearTimeout(overlayTimerRef.current);
+    if (!isPlaying && !loadingAudio && currentAudio) {
+      setShowPausedOverlay(true);
+      overlayTimerRef.current = window.setTimeout(() => {
+        setShowPausedOverlay(false);
+      }, 1500);
+    } else {
+      setShowPausedOverlay(false);
+    }
+    return () => {
+      if (overlayTimerRef.current) window.clearTimeout(overlayTimerRef.current);
+    };
+  }, [isPlaying, loadingAudio, currentAudio]);
 
   const togglePlay = () => {
     setSpeedMenuOpen(false);
@@ -361,6 +383,24 @@ export default function Player({
         .then(() => setIsPlaying(true))
         .catch(() => {});
     }
+  };
+
+  const seekBy = (seconds: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const newTime = Math.max(0, Math.min(audio.duration || 0, audio.currentTime + seconds));
+    audio.currentTime = newTime;
+    setAudioCurrent(newTime);
+    if (audio.duration) setProgress(newTime / audio.duration);
+  };
+
+  const seekToFraction = (fraction: number) => {
+    const audio = audioRef.current;
+    if (!audio || !audio.duration) return;
+    const newTime = fraction * audio.duration;
+    audio.currentTime = newTime;
+    setAudioCurrent(newTime);
+    setProgress(fraction);
   };
 
   const openSheet = (id: Exclude<Sheet, null>) => {
@@ -412,11 +452,62 @@ export default function Player({
     }, 1500);
   };
 
+  // Swipe gestures on the visual canvas
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY, startedAt: Date.now() };
+    didSwipeRef.current = false;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartRef.current.x;
+    const dy = t.clientY - touchStartRef.current.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    if (absDx > 50 && absDx > absDy * 1.5) {
+      didSwipeRef.current = true;
+      // Right swipe = forward 5s, left swipe = back 5s
+      seekBy(dx > 0 ? 5 : -5);
+    }
+    touchStartRef.current = null;
+  };
+
+  const handleCanvasClick = () => {
+    if (didSwipeRef.current) {
+      didSwipeRef.current = false;
+      return;
+    }
+    togglePlay();
+  };
+
   const currentSection = lesson?.sections[currentSectionIndex];
   const currentVisual =
     currentSection && activeVisualIndex !== null
       ? currentSection.visuals[activeVisualIndex]
       : null;
+
+  // Compute the caption block (20 words at a time) and the active word index
+  const wordTimings = currentAudio?.words || [];
+  const totalWords = wordTimings.length;
+  const currentWordIndex = (() => {
+    if (!totalWords) return -1;
+    for (let i = 0; i < totalWords; i++) {
+      const w = wordTimings[i];
+      if (audioCurrent >= w.start && audioCurrent < w.end) return i;
+    }
+    // If past the last word, stay on the last
+    if (audioCurrent >= wordTimings[totalWords - 1]?.end) return totalWords - 1;
+    return -1;
+  })();
+
+  const blockStartIndex =
+    currentWordIndex >= 0
+      ? Math.floor(currentWordIndex / CAPTION_WORDS_PER_BLOCK) * CAPTION_WORDS_PER_BLOCK
+      : 0;
+  const blockEndIndex = Math.min(blockStartIndex + CAPTION_WORDS_PER_BLOCK, totalWords);
+  const currentBlockWords = wordTimings.slice(blockStartIndex, blockEndIndex);
 
   const formatTime = (seconds: number) => {
     if (!isFinite(seconds) || seconds < 0) return "0:00";
@@ -424,9 +515,6 @@ export default function Player({
     const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
-
-  const audioDuration = audioRef.current?.duration || 0;
-  const audioCurrent = audioRef.current?.currentTime || 0;
 
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden">
@@ -443,17 +531,48 @@ export default function Player({
         />
       </div>
 
-      <div className="flex-shrink-0 px-4 py-2">
-        <p className="text-center text-classoni-navy text-base leading-relaxed">
-          {loadingLesson
-            ? "Generating your lesson..."
-            : currentSection?.narration_text || ""}
-        </p>
+      {/* CAPTION — one 20-word block at a time with word-level highlight */}
+      <div className="flex-shrink-0 px-4 py-2 min-h-[64px] flex items-center justify-center">
+        {loadingLesson ? (
+          <p className="text-center text-classoni-navy/60 text-sm">
+            Generating your lesson...
+          </p>
+        ) : loadingAudio ? (
+          <p className="text-center text-classoni-navy/60 text-sm">
+            Preparing narrator...
+          </p>
+        ) : currentBlockWords.length > 0 ? (
+          <p className="text-center text-classoni-navy text-base leading-relaxed">
+            {currentBlockWords.map((w, i) => {
+              const globalIndex = blockStartIndex + i;
+              const isActive = globalIndex === currentWordIndex;
+              return (
+                <span
+                  key={globalIndex}
+                  className={
+                    isActive
+                      ? "bg-classoni-yellow text-classoni-navy rounded-md px-1 transition-all duration-100"
+                      : "transition-all duration-100"
+                  }
+                >
+                  {w.text}{" "}
+                </span>
+              );
+            })}
+          </p>
+        ) : (
+          <p className="text-center text-classoni-navy text-base leading-relaxed">
+            {currentSection?.narration_text || ""}
+          </p>
+        )}
       </div>
 
+      {/* VISUAL CANVAS */}
       <div className="flex-1 min-h-0 mx-4 mb-2 relative">
         <div
-          onClick={togglePlay}
+          onClick={handleCanvasClick}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           className="h-full w-full overflow-y-auto rounded-2xl bg-white/60 relative cursor-pointer flex items-center justify-center"
         >
           {loadingAudio && (
@@ -474,12 +593,13 @@ export default function Player({
           )}
 
           <AnimatePresence>
-            {!isPlaying && !loadingAudio && currentVisual && (
+            {showPausedOverlay && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 flex items-center justify-center bg-black/15 rounded-2xl pointer-events-none"
+                transition={{ duration: 0.2 }}
+                className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-2xl pointer-events-none"
               >
                 <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
                   <Play
@@ -493,6 +613,7 @@ export default function Player({
           </AnimatePresence>
         </div>
 
+        {/* Speed pill */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -560,23 +681,63 @@ export default function Player({
         )}
       </div>
 
+      {/* PROGRESS BAR + SEEK BUTTONS */}
       <div className="flex-shrink-0 px-4 pt-1 pb-2">
         <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              seekBy(-5);
+            }}
+            className="w-7 h-7 flex items-center justify-center text-classoni-navy/70"
+            aria-label="Back 5 seconds"
+          >
+            <RotateCcw size={16} />
+          </button>
+
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9 text-right">
             {formatTime(audioCurrent)}
           </span>
-          <div className="flex-1 h-1 bg-classoni-navy/10 rounded-full overflow-hidden">
+
+          <div
+            className="flex-1 relative h-3 flex items-center cursor-pointer"
+            onClick={(e) => {
+              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+              const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+              seekToFraction(frac);
+            }}
+          >
+            <div className="w-full h-1 bg-classoni-navy/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-classoni-yellow transition-all duration-100"
+                style={{ width: `${progress * 100}%` }}
+              />
+            </div>
+            {/* Yellow draggable dot */}
             <div
-              className="h-full bg-classoni-yellow transition-all duration-100"
-              style={{ width: `${progress * 100}%` }}
+              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-classoni-yellow border-2 border-white shadow-md transition-all duration-100"
+              style={{ left: `calc(${progress * 100}% - 6px)` }}
             />
           </div>
+
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9">
             {formatTime(audioDuration)}
           </span>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              seekBy(5);
+            }}
+            className="w-7 h-7 flex items-center justify-center text-classoni-navy/70"
+            aria-label="Forward 5 seconds"
+          >
+            <RotateCw size={16} />
+          </button>
         </div>
       </div>
 
+      {/* PILL BUTTONS */}
       <div className="flex-shrink-0 px-4 pb-2 flex gap-2">
         <button
           onClick={() => openSheet("apply")}
@@ -615,6 +776,7 @@ export default function Player({
         />
       </div>
 
+      {/* BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet && (
           <>
@@ -820,6 +982,7 @@ export default function Player({
         )}
       </AnimatePresence>
 
+      {/* FEEDBACK MODAL */}
       <AnimatePresence>
         {feedbackOpen && (
           <>
@@ -902,4 +1065,4 @@ export default function Player({
       </AnimatePresence>
     </div>
   );
-  }
+    }
