@@ -295,7 +295,8 @@ export default function Player({
       visualTimersRef.current.push(t);
     });
 
-    audio.src = "data:audio/mp3;base64," + currentAudio.audio;
+    // MIME type fixed: audio/mpeg (not audio/mp3)
+    audio.src = "data:audio/mpeg;base64," + currentAudio.audio;
     audio.playbackRate = playbackSpeed;
     audio
       .play()
@@ -909,4 +910,4 @@ export default function Player({
       </AnimatePresence>
     </div>
   );
-      }
+        }
