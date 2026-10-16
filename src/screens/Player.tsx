@@ -7,6 +7,8 @@ import BottomNav from "../components/BottomNav";
 interface PlayerProps {
   navigate: (screen: string) => void;
   initialProgress?: number;
+  lesson?: Lesson | null;
+  firstAudio?: AudioData | null;
 }
 
 type Sheet = "apply" | "explain" | "quiz" | "posts" | null;
@@ -138,15 +140,20 @@ function resolveTriggerPhrase(
   return null;
 }
 
-export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
-  const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [loadingLesson, setLoadingLesson] = useState(true);
+export default function Player({
+  navigate,
+  initialProgress = 0,
+  lesson: lessonProp = null,
+  firstAudio = null,
+}: PlayerProps) {
+  const [lesson, setLesson] = useState<Lesson | null>(lessonProp);
+  const [loadingLesson, setLoadingLesson] = useState(!lessonProp);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
-  const [currentAudio, setCurrentAudio] = useState<AudioData | null>(null);
+  const [currentAudio, setCurrentAudio] = useState<AudioData | null>(firstAudio);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [activeVisualIndex, setActiveVisualIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(0.85);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [progress, setProgress] = useState(initialProgress);
   const [activeSheet, setActiveSheet] = useState<Sheet>(null);
@@ -165,8 +172,12 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
   const progressRef = useRef(progress);
   const visualTimersRef = useRef<number[]>([]);
 
-  // Fetch the lesson on mount
+  // Fetch the lesson on mount (skip if passed in)
   useEffect(() => {
+    if (lessonProp) {
+      setLoadingLesson(false);
+      return;
+    }
     let mounted = true;
     async function loadLesson() {
       try {
@@ -190,11 +201,19 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [lessonProp]);
 
-  // Fetch audio for the current section
+  // Fetch audio for the current section (skip section 0 if firstAudio passed in)
   useEffect(() => {
     if (!lesson) return;
+
+    // Section 0 audio was pre-fetched on the Loading screen
+    if (currentSectionIndex === 0 && firstAudio) {
+      setCurrentAudio(firstAudio);
+      setLoadingAudio(false);
+      return;
+    }
+
     const section = lesson.sections[currentSectionIndex];
     if (!section) return;
 
@@ -205,15 +224,19 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
       setActiveVisualIndex(null);
       try {
         const res = await fetch(
-          "https://classoni.classoni66.workers.dev/api/generate-tts?text=" +
-            encodeURIComponent(section.narration_text)
+          "https://classoni.classoni66.workers.dev/api/generate-tts",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: section.narration_text }),
+          }
         );
         const data = await res.json();
         if (mounted && data.audio) {
           setCurrentAudio(data);
         }
       } catch {
-        // silent fail
+        // silent fail — visuals remain blank, audio section skipped
       } finally {
         if (mounted) setLoadingAudio(false);
       }
@@ -222,22 +245,21 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
     return () => {
       mounted = false;
     };
-  }, [lesson, currentSectionIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson, currentSectionIndex, firstAudio]);
 
-  // Play audio and sync visuals
+  // Play audio and schedule visuals
   useEffect(() => {
     if (!currentAudio || !lesson) return;
     const section = lesson.sections[currentSectionIndex];
     if (!section) return;
 
-    // Clear any pending visual timers
     visualTimersRef.current.forEach((t) => window.clearTimeout(t));
     visualTimersRef.current = [];
 
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Build the visual timeline from trigger phrases
     const timeline: { at: number; visualIndex: number }[] = [];
     const fadeOuts: { at: number; visualIndex: number }[] = [];
 
@@ -253,12 +275,10 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
     timeline.sort((a, b) => a.at - b.at);
     fadeOuts.sort((a, b) => a.at - b.at);
 
-    // If no visuals could be resolved, show the first one anyway
     if (timeline.length === 0 && section.visuals.length > 0) {
       setActiveVisualIndex(0);
     }
 
-    // Schedule visual changes
     timeline.forEach((entry) => {
       const t = window.setTimeout(() => {
         setActiveVisualIndex(entry.visualIndex);
@@ -275,10 +295,12 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
       visualTimersRef.current.push(t);
     });
 
-    // Play the audio
     audio.src = "data:audio/mp3;base64," + currentAudio.audio;
     audio.playbackRate = playbackSpeed;
-    audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+    audio
+      .play()
+      .then(() => setIsPlaying(true))
+      .catch(() => setIsPlaying(false));
 
     return () => {
       visualTimersRef.current.forEach((t) => window.clearTimeout(t));
@@ -292,7 +314,7 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
     if (audioRef.current) audioRef.current.playbackRate = playbackSpeed;
   }, [playbackSpeed]);
 
-  // Track progress
+  // Track progress + advance sections
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -302,7 +324,6 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
       }
     };
     const onEnded = () => {
-      // Move to next section
       if (lesson && currentSectionIndex < lesson.sections.length - 1) {
         setCurrentSectionIndex((i) => i + 1);
       } else {
@@ -335,7 +356,10 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
       audio.pause();
       setIsPlaying(false);
     } else {
-      audio.play().then(() => setIsPlaying(true)).catch(() => {});
+      audio
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {});
     }
   };
 
@@ -460,7 +484,11 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
                 className="absolute inset-0 flex items-center justify-center bg-black/15 rounded-2xl pointer-events-none"
               >
                 <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                  <Play size={28} className="text-classoni-navy ml-1" fill="currentColor" />
+                  <Play
+                    size={28}
+                    className="text-classoni-navy ml-1"
+                    fill="currentColor"
+                  />
                 </div>
               </motion.div>
             )}
@@ -645,8 +673,8 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Explain</h3>
                   <p className="text-classoni-navy text-sm leading-relaxed mb-4">
-                    Explain this concept in your own words, score 8/10 or more to unlock teacher
-                    mode and more rewards...
+                    Explain this concept in your own words, score 8/10 or more to unlock
+                    teacher mode and more rewards...
                   </p>
                   <textarea
                     value={explainText}
@@ -673,7 +701,9 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
 
               {activeSheet === "quiz" && lesson && (
                 <div className="pt-6">
-                  <h3 className="text-classoni-navy font-bold text-lg mb-3">Question 1 of 1</h3>
+                  <h3 className="text-classoni-navy font-bold text-lg mb-3">
+                    Question 1 of 1
+                  </h3>
                   <p className="text-classoni-navy text-sm font-semibold mb-4">
                     {lesson.quiz.question}
                   </p>
@@ -685,8 +715,10 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
                         const isCorrect = letters[i] === lesson.quiz.correct_answer;
                         let bg = "bg-classoni-lavender";
                         if (quizAnswer !== null) {
-                          if (isSelected && isCorrect) bg = "bg-green-100 border-green-500";
-                          else if (isSelected && !isCorrect) bg = "bg-red-100 border-red-500";
+                          if (isSelected && isCorrect)
+                            bg = "bg-green-100 border-green-500";
+                          else if (isSelected && !isCorrect)
+                            bg = "bg-red-100 border-red-500";
                           else if (isCorrect) bg = "bg-green-50 border-green-300";
                         }
                         return (
@@ -715,15 +747,20 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
 
               {activeSheet === "posts" && (
                 <div className="pt-6">
-                  <h3 className="text-classoni-navy font-bold text-lg mb-3">Class Contributions</h3>
+                  <h3 className="text-classoni-navy font-bold text-lg mb-3">
+                    Class Contributions
+                  </h3>
                   <p className="text-classoni-navy text-sm text-center mb-4">
-                    No contributions from your class for this concept yet. You can be the first!
+                    No contributions from your class for this concept yet. You can be the
+                    first!
                   </p>
                   <div className="bg-classoni-lavender rounded-2xl p-4">
-                    <p className="text-classoni-navy font-bold text-sm mb-2">Explained by Amina K.</p>
+                    <p className="text-classoni-navy font-bold text-sm mb-2">
+                      Explained by Amina K.
+                    </p>
                     <p className="text-classoni-navy text-sm mb-4 leading-relaxed">
-                      The myosin heads grab the actin and pull it inward, like rowing a boat. When
-                      ATP comes in, they let go and reset.
+                      The myosin heads grab the actin and pull it inward, like rowing a boat.
+                      When ATP comes in, they let go and reset.
                     </p>
                     <div className="flex gap-4 items-center justify-between">
                       <button
@@ -872,4 +909,4 @@ export default function Player({ navigate, initialProgress = 0 }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-}
+      }
