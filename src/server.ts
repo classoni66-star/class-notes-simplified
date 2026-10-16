@@ -23,24 +23,6 @@ function stripDataUrl(audio: string): string {
   return audio;
 }
 
-function b64ToBytes(b64: string): Uint8Array {
-  const clean = b64.replace(/\s+/g, "");
-  const bin = atob(clean);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-
-function bytesToB64(bytes: Uint8Array): string {
-  let bin = "";
-  const CHUNK = 8192;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    const sub = bytes.subarray(i, i + CHUNK);
-    bin += String.fromCharCode.apply(null, Array.from(sub));
-  }
-  return btoa(bin);
-}
-
 const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni, a mobile-first university learning platform. Take the notes or curriculum topic and produce ONE fully choreographed keypoint lesson as strict JSON.
 
 Your Ethos: Speed is mastery (1–2 minutes). Surgical precision. Fidelity above all. Visual-first. Seamless narrative.
@@ -122,7 +104,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     return json({ status: "alive", keyPresent: !!key });
   }
 
-  // ─── GENERATE FULL AUDIO ───
+  // ─── GENERATE AUDIO CHUNKS — one audio per 40-word chunk, no merging ───
   if (url.pathname === "/api/generate-full-audio" && request.method === "POST") {
     const body: any = await request.json();
     const sections = body.sections || [];
@@ -133,33 +115,22 @@ async function handleApi(request: Request): Promise<Response | null> {
     const key = getSecret("DEEPINFRA_API_KEY");
     if (!key) return json({ error: "no key" }, 500);
 
-    const allBytes: Uint8Array[] = [];
-    const allWords: any[] = [];
-    const sectionBoundaries: any[] = [];
-    const errors: string[] = [];
-    let cumulativeOffset = 0;
-    let wordId = 0;
-    const CHUNK_GAP = 0.9;
-    const SECTION_GAP = 0.4;
     const CHUNK_SIZE = 40;
+    const chunks: any[] = [];
+    const errors: string[] = [];
 
     for (let si = 0; si < sections.length; si++) {
       const section = sections[si];
       const text = (section.narration_text || "").trim();
-      if (!text) {
-        sectionBoundaries.push({ id: section.id, start: cumulativeOffset, end: cumulativeOffset });
-        continue;
-      }
+      if (!text) continue;
 
       const wordsInSection = text.split(/\s+/).filter(Boolean);
-      const chunks: string[] = [];
+      const pieces: string[] = [];
       for (let i = 0; i < wordsInSection.length; i += CHUNK_SIZE) {
-        chunks.push(wordsInSection.slice(i, i + CHUNK_SIZE).join(" "));
+        pieces.push(wordsInSection.slice(i, i + CHUNK_SIZE).join(" "));
       }
 
-      const sectionStart = cumulativeOffset;
-
-      for (let ci = 0; ci < chunks.length; ci++) {
+      for (let pi = 0; pi < pieces.length; pi++) {
         try {
           const r = await fetch(
             "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
@@ -170,7 +141,7 @@ async function handleApi(request: Request): Promise<Response | null> {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                text: chunks[ci],
+                text: pieces[pi],
                 preset_voice: "am_liam",
                 speed: 1.0,
                 output_format: "mp3",
@@ -180,156 +151,45 @@ async function handleApi(request: Request): Promise<Response | null> {
           );
 
           if (!r.ok) {
-            errors.push(`sec ${si} chunk ${ci} HTTP ${r.status}`);
+            errors.push(`sec ${si} piece ${pi} HTTP ${r.status}`);
             continue;
           }
 
           const data: any = await r.json();
           const audioRaw = data.audio || "";
           if (!audioRaw || audioRaw.length < 100) {
-            errors.push(`sec ${si} chunk ${ci} no audio`);
+            errors.push(`sec ${si} piece ${pi} no audio`);
             continue;
           }
 
-          allBytes.push(b64ToBytes(stripDataUrl(audioRaw)));
-
-          let lastEnd = 0;
-          for (const w of data.words || []) {
-            allWords.push({
-              id: wordId++,
-              start: w.start + cumulativeOffset,
-              end: w.end + cumulativeOffset,
+          // Each chunk gets its own audio and its own word list — no offsets
+          chunks.push({
+            audio: "data:audio/mpeg;base64," + stripDataUrl(audioRaw),
+            words: (data.words || []).map((w: any, i: number) => ({
+              id: i,
+              start: w.start,
+              end: w.end,
               text: w.text,
-              section: si,
-            });
-            if (w.end > lastEnd) lastEnd = w.end;
-          }
-
-          cumulativeOffset += lastEnd + CHUNK_GAP;
-        } catch (err) {
-          errors.push(`sec ${si} chunk ${ci}: ${String(err).slice(0, 100)}`);
-        }
-      }
-
-      sectionBoundaries.push({
-        id: section.id,
-        start: sectionStart,
-        end: cumulativeOffset,
-      });
-      cumulativeOffset += SECTION_GAP;
-    }
-
-    if (allBytes.length === 0) {
-      return json({ error: "All chunks failed", details: errors }, 500);
-    }
-
-    const totalLen = allBytes.reduce((s, b) => s + b.length, 0);
-    const merged = new Uint8Array(totalLen);
-    let pos = 0;
-    for (const b of allBytes) {
-      merged.set(b, pos);
-      pos += b.length;
-    }
-
-    return json({
-      audio: "data:audio/mpeg;base64," + bytesToB64(merged),
-      words: allWords,
-      sectionBoundaries,
-      totalChunks: allBytes.length,
-      estimatedDuration: cumulativeOffset,
-      chunkGapUsed: CHUNK_GAP,
-      errors: errors.length ? errors : undefined,
-    });
-  }
-
-  // ─── LEGACY: single-section TTS ───
-  if (url.pathname === "/api/generate-tts") {
-    let text = "";
-    if (request.method === "GET") text = url.searchParams.get("text") || "";
-    else if (request.method === "POST") {
-      try {
-        const body: any = await request.json();
-        text = body.text || "";
-      } catch {}
-    }
-    if (!text) return json({ error: "text is required" }, 400);
-    const key = getSecret("DEEPINFRA_API_KEY");
-    if (!key) return json({ error: "no key" }, 500);
-
-    const words = text.split(/\s+/).filter(Boolean);
-    const CHUNK_SIZE = 40;
-    const chunks: string[] = [];
-    for (let i = 0; i < words.length; i += CHUNK_SIZE)
-      chunks.push(words.slice(i, i + CHUNK_SIZE).join(" "));
-
-    const allBytes: Uint8Array[] = [];
-    const allWords: any[] = [];
-    const errors: string[] = [];
-    let cumulativeOffset = 0;
-    let wordId = 0;
-
-    for (let ci = 0; ci < chunks.length; ci++) {
-      try {
-        const r = await fetch(
-          "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
-          {
-            method: "POST",
-            headers: {
-              Authorization: "Bearer " + key,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              text: chunks[ci],
-              preset_voice: "am_liam",
-              speed: 1.0,
-              output_format: "mp3",
-              return_timestamps: true,
-            }),
-          }
-        );
-        if (!r.ok) {
-          errors.push(`chunk ${ci} HTTP ${r.status}`);
-          continue;
-        }
-        const data: any = await r.json();
-        const audioRaw = data.audio || "";
-        if (!audioRaw || audioRaw.length < 100) {
-          errors.push(`chunk ${ci} no audio`);
-          continue;
-        }
-        allBytes.push(b64ToBytes(stripDataUrl(audioRaw)));
-        let lastEnd = 0;
-        for (const w of data.words || []) {
-          allWords.push({
-            id: wordId++,
-            start: w.start + cumulativeOffset,
-            end: w.end + cumulativeOffset,
-            text: w.text,
+            })),
+            section_id: section.id,
+            section_index: si,
+            piece_index: pi,
+            is_last_piece_of_section: pi === pieces.length - 1,
           });
-          if (w.end > lastEnd) lastEnd = w.end;
+        } catch (err) {
+          errors.push(`sec ${si} piece ${pi}: ${String(err).slice(0, 100)}`);
         }
-        cumulativeOffset += lastEnd + 0.9;
-      } catch (err) {
-        errors.push(`chunk ${ci}: ${String(err).slice(0, 100)}`);
       }
     }
 
-    if (allBytes.length === 0)
+    if (chunks.length === 0) {
       return json({ error: "All chunks failed", details: errors }, 500);
-
-    const totalLen = allBytes.reduce((s, b) => s + b.length, 0);
-    const merged = new Uint8Array(totalLen);
-    let pos = 0;
-    for (const b of allBytes) {
-      merged.set(b, pos);
-      pos += b.length;
     }
 
     return json({
-      audio: "data:audio/mpeg;base64," + bytesToB64(merged),
-      words: allWords,
-      chunks_used: allBytes.length,
-      chunks_failed: errors.length,
+      chunks,
+      totalChunks: chunks.length,
+      errors: errors.length ? errors : undefined,
     });
   }
 
