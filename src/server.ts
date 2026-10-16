@@ -41,53 +41,6 @@ function bytesToB64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-// Compute the real duration of an MP3 file from its header + size
-function mp3DurationSeconds(bytes: Uint8Array): number {
-  let offset = 0;
-  // Skip ID3v2 tag if present
-  if (bytes.length >= 10 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) {
-    const size =
-      ((bytes[6] & 0x7f) << 21) |
-      ((bytes[7] & 0x7f) << 14) |
-      ((bytes[8] & 0x7f) << 7) |
-      (bytes[9] & 0x7f);
-    offset = 10 + size;
-  }
-  // Find first MP3 frame sync
-  while (offset < bytes.length - 1) {
-    if (bytes[offset] === 0xff && (bytes[offset + 1] & 0xe0) === 0xe0) break;
-    offset++;
-  }
-  if (offset >= bytes.length - 4) return 0;
-
-  const b1 = bytes[offset + 1];
-  const b2 = bytes[offset + 2];
-  const mpegVersion = (b1 >> 3) & 0x03;
-  const layer = (b1 >> 1) & 0x03;
-  const bitrateIndex = (b2 >> 4) & 0x0f;
-  const sampleRateIndex = (b2 >> 2) & 0x03;
-
-  const bitratesV1L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
-  const bitratesV2L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
-  const sampleRatesV1 = [44100, 48000, 32000, 0];
-  const sampleRatesV2 = [22050, 24000, 16000, 0];
-
-  let bitrate = 0;
-  let sampleRate = 0;
-  if (mpegVersion === 3) {
-    bitrate = bitratesV1L3[bitrateIndex] || 128;
-    sampleRate = sampleRatesV1[sampleRateIndex] || 44100;
-  } else {
-    bitrate = bitratesV2L3[bitrateIndex] || 32;
-    sampleRate = sampleRatesV2[sampleRateIndex] || 24000;
-  }
-  if (bitrate === 0 || sampleRate === 0) return 0;
-
-  // CBR estimate: duration = (total_bytes - header) * 8 / (bitrate_kbps * 1000)
-  const dataBytes = bytes.length - offset;
-  return (dataBytes * 8) / (bitrate * 1000);
-}
-
 const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni, a mobile-first university learning platform. Take the notes or curriculum topic and produce ONE fully choreographed keypoint lesson as strict JSON.
 
 Your Ethos: Speed is mastery (1–2 minutes). Surgical precision. Fidelity above all. Visual-first. Seamless narrative.
@@ -164,93 +117,12 @@ async function handleApi(request: Request): Promise<Response | null> {
     return new Response(null, { headers: cors });
   }
 
-  // ─── HEALTH ───
   if (url.pathname === "/api/health") {
     const key = getSecret("DEEPINFRA_API_KEY");
     return json({ status: "alive", keyPresent: !!key });
   }
 
-  // ─── DIAGNOSTIC: VOICE NAMES ───
-  if (url.pathname === "/api/debug-voice") {
-    const key = getSecret("DEEPINFRA_API_KEY");
-    if (!key) return json({ error: "no key" }, 500);
-
-    const results: any[] = [];
-    // Try several parameter names
-    for (const paramName of ["voice", "preset_voice", "speaker", "voice_id"]) {
-      const payload: any = {
-        text: "Testing voice parameter",
-        speed: 1.0,
-        output_format: "mp3",
-        return_timestamps: false,
-      };
-      payload[paramName] = "am_liam";
-
-      try {
-        const r = await fetch(
-          "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
-          {
-            method: "POST",
-            headers: {
-              Authorization: "Bearer " + key,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          }
-        );
-        const data: any = await r.json();
-        results.push({
-          param_used: paramName,
-          status: r.status,
-          response_keys: Object.keys(data).slice(0, 12),
-          audio_bytes: (data.audio || "").length,
-        });
-      } catch (err) {
-        results.push({
-          param_used: paramName,
-          status: "error",
-          error: String(err).slice(0, 100),
-        });
-      }
-    }
-    return json({ results });
-  }
-
-  // ─── DIAGNOSTIC: KOKORO RAW ───
-  if (url.pathname === "/api/debug-kokoro2") {
-    const key = getSecret("DEEPINFRA_API_KEY");
-    if (!key) return json({ error: "no key" }, 500);
-
-    const r = await fetch(
-      "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + key,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: "Hello world",
-          preset_voice: "am_liam",
-          speed: 1.0,
-          output_format: "mp3",
-          return_timestamps: true,
-        }),
-      }
-    );
-    const data: any = await r.json();
-    const audioBytes = stripDataUrl(data.audio || "").length;
-    return json({
-      response_keys: Object.keys(data),
-      words_count: (data.words || []).length,
-      last_word_end: data.words?.[data.words.length - 1]?.end,
-      audio_data_url_bytes: (data.audio || "").length,
-      audio_raw_b64_bytes: audioBytes,
-      first_word: data.words?.[0],
-    });
-  }
-
-  // ─── GENERATE FULL AUDIO — continuous ───
+  // ─── GENERATE FULL AUDIO ───
   if (url.pathname === "/api/generate-full-audio" && request.method === "POST") {
     const body: any = await request.json();
     const sections = body.sections || [];
@@ -267,6 +139,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     const errors: string[] = [];
     let cumulativeOffset = 0;
     let wordId = 0;
+    const CHUNK_GAP = 0.9;
     const SECTION_GAP = 0.4;
     const CHUNK_SIZE = 40;
 
@@ -318,13 +191,9 @@ async function handleApi(request: Request): Promise<Response | null> {
             continue;
           }
 
-          const chunkBytes = b64ToBytes(stripDataUrl(audioRaw));
-          allBytes.push(chunkBytes);
+          allBytes.push(b64ToBytes(stripDataUrl(audioRaw)));
 
-          // Measure the actual chunk duration from MP3 bytes
-          const measuredDuration = mp3DurationSeconds(chunkBytes);
-
-          // Kokoro's word timings are relative to chunk start (already include lead silence)
+          let lastEnd = 0;
           for (const w of data.words || []) {
             allWords.push({
               id: wordId++,
@@ -333,14 +202,10 @@ async function handleApi(request: Request): Promise<Response | null> {
               text: w.text,
               section: si,
             });
+            if (w.end > lastEnd) lastEnd = w.end;
           }
 
-          // Advance cumulative offset by the ACTUAL chunk duration
-          const lastWordEnd = (data.words || []).length
-            ? data.words[data.words.length - 1].end
-            : 0;
-          const advance = Math.max(measuredDuration, lastWordEnd + 0.5);
-          cumulativeOffset += advance;
+          cumulativeOffset += lastEnd + CHUNK_GAP;
         } catch (err) {
           errors.push(`sec ${si} chunk ${ci}: ${String(err).slice(0, 100)}`);
         }
@@ -372,6 +237,7 @@ async function handleApi(request: Request): Promise<Response | null> {
       sectionBoundaries,
       totalChunks: allBytes.length,
       estimatedDuration: cumulativeOffset,
+      chunkGapUsed: CHUNK_GAP,
       errors: errors.length ? errors : undefined,
     });
   }
@@ -431,10 +297,8 @@ async function handleApi(request: Request): Promise<Response | null> {
           errors.push(`chunk ${ci} no audio`);
           continue;
         }
-        const chunkBytes = b64ToBytes(stripDataUrl(audioRaw));
-        allBytes.push(chunkBytes);
-
-        const measuredDuration = mp3DurationSeconds(chunkBytes);
+        allBytes.push(b64ToBytes(stripDataUrl(audioRaw)));
+        let lastEnd = 0;
         for (const w of data.words || []) {
           allWords.push({
             id: wordId++,
@@ -442,11 +306,9 @@ async function handleApi(request: Request): Promise<Response | null> {
             end: w.end + cumulativeOffset,
             text: w.text,
           });
+          if (w.end > lastEnd) lastEnd = w.end;
         }
-        const lastWordEnd = (data.words || []).length
-          ? data.words[data.words.length - 1].end
-          : 0;
-        cumulativeOffset += Math.max(measuredDuration, lastWordEnd + 0.5);
+        cumulativeOffset += lastEnd + 0.9;
       } catch (err) {
         errors.push(`chunk ${ci}: ${String(err).slice(0, 100)}`);
       }
