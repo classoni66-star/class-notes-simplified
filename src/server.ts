@@ -165,6 +165,80 @@ async function handleApi(request: Request): Promise<Response | null> {
     }
   }
 
+  // ─── DEBUG: CHUNKED TTS WORDS ONLY (no audio blob) ───
+  if (url.pathname === "/api/debug-tts-words") {
+    const text =
+      url.searchParams.get("text") || "Hello, this is Classoni. Let us learn.";
+    const key = getSecret("DEEPINFRA_API_KEY");
+    if (!key) return json({ error: "no key" }, 500);
+
+    const words = text.split(/\s+/).filter(Boolean);
+    const CHUNK_SIZE = 40;
+    const chunks: string[] = [];
+    for (let i = 0; i < words.length; i += CHUNK_SIZE) {
+      chunks.push(words.slice(i, i + CHUNK_SIZE).join(" "));
+    }
+
+    const allWords: any[] = [];
+    let cumulativeOffset = 0;
+    let wordId = 0;
+    const chunkSummaries: any[] = [];
+
+    for (let ci = 0; ci < chunks.length; ci++) {
+      try {
+        const r = await fetch(
+          "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
+          {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + key,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: chunks[ci],
+              voice: "am_liam",
+              speed: 1.0,
+              output_format: "mp3",
+              return_timestamps: true,
+            }),
+          }
+        );
+        const data: any = await r.json();
+        const chunkWords = data.words || [];
+        let lastEnd = 0;
+        for (const w of chunkWords) {
+          allWords.push({
+            id: wordId++,
+            start: w.start + cumulativeOffset,
+            end: w.end + cumulativeOffset,
+            text: w.text,
+          });
+          if (w.end > lastEnd) lastEnd = w.end;
+        }
+        chunkSummaries.push({
+          chunk_index: ci,
+          word_count: chunkWords.length,
+          audio_length: (data.audio || "").length,
+          last_end: lastEnd,
+        });
+        cumulativeOffset += lastEnd + 0.15;
+      } catch (err) {
+        chunkSummaries.push({
+          chunk_index: ci,
+          error: String(err).slice(0, 150),
+        });
+      }
+    }
+
+    return json({
+      total_chunks: chunks.length,
+      total_words: allWords.length,
+      chunks: chunkSummaries,
+      first_10_words: allWords.slice(0, 10),
+      last_3_words: allWords.slice(-3),
+    });
+  }
+
   // ─── GENERATE TTS (chunked, merged audio + word timestamps) ───
   if (url.pathname === "/api/generate-tts") {
     let text = "";
@@ -220,13 +294,14 @@ async function handleApi(request: Request): Promise<Response | null> {
 
         if (!r.ok) {
           const errText = await r.text();
-          errors.push("chunk " + ci + " HTTP " + r.status + ": " + errText.slice(0, 150));
+          errors.push(
+            "chunk " + ci + " HTTP " + r.status + ": " + errText.slice(0, 150)
+          );
           continue;
         }
 
         const data: any = await r.json();
 
-        // Try multiple possible keys for the audio payload
         const audioRaw = data.audio || data.output || data.audio_url || "";
         if (!audioRaw || typeof audioRaw !== "string" || audioRaw.length < 100) {
           errors.push("chunk " + ci + " returned no audio");
@@ -241,7 +316,6 @@ async function handleApi(request: Request): Promise<Response | null> {
 
         allBytes.push(b64ToBytes(rawB64));
 
-        // Try multiple possible keys for the word timestamps
         const chunkWords =
           data.words ||
           data.timestamps ||
@@ -252,8 +326,9 @@ async function handleApi(request: Request): Promise<Response | null> {
         let lastEnd = 0;
         if (Array.isArray(chunkWords)) {
           for (const w of chunkWords) {
-            const start = typeof w.start === "number" ? w.start : (w.start_time || 0);
-            const end = typeof w.end === "number" ? w.end : (w.end_time || 0);
+            const start =
+              typeof w.start === "number" ? w.start : w.start_time || 0;
+            const end = typeof w.end === "number" ? w.end : w.end_time || 0;
             const wtext = w.text || w.word || "";
             allWords.push({
               id: wordId++,
@@ -361,13 +436,18 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+async function normalizeCatastrophicSsrResponse(
+  response: Response,
+): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") || "";
   if (contentType.indexOf("application/json") !== -1) return response;
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
-  console.error(consumeLastCapturedError() || new Error("h3 swallowed SSR error: " + body));
+  console.error(
+    consumeLastCapturedError() ||
+      new Error("h3 swallowed SSR error: " + body),
+  );
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -376,7 +456,10 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 function isH3SwallowedErrorBody(body: string): boolean {
   try {
-    const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
+    const payload = JSON.parse(body) as {
+      unhandled?: unknown;
+      message?: unknown;
+    };
     return payload.unhandled === true && payload.message === "HTTPError";
   } catch {
     return false;
