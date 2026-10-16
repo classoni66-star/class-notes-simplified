@@ -57,13 +57,8 @@ function resolveTriggerPhrase(
   words: { start: number; end: number; text: string }[],
 ): number | null {
   if (!phrase || !words.length) return null;
-  const target = phrase
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .split(/\s+/)
-    .filter(Boolean);
+  const target = phrase.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean);
   if (!target.length) return null;
-
   for (let i = 0; i <= words.length - target.length; i++) {
     let match = true;
     for (let j = 0; j < target.length; j++) {
@@ -105,14 +100,15 @@ export default function Player({
   const [feedbackType, setFeedbackType] = useState<"like" | "dislike" | null>(null);
   const [feedbackReason, setFeedbackReason] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const visualTimersRef = useRef<number[]>([]);
   const overlayTimerRef = useRef<number | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const didSwipeRef = useRef(false);
+  const trackRef = useRef<HTMLDivElement | null>(null);
 
-  // Determine current section from boundaries
   const currentSectionIndex = (() => {
     if (!audioData) return 0;
     for (let i = 0; i < audioData.sectionBoundaries.length; i++) {
@@ -124,36 +120,7 @@ export default function Player({
 
   const currentSection = lesson?.sections[currentSectionIndex];
 
-  // Measure actual audio duration and scale word timings to match
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !audioData) return;
-    const onLoaded = () => {
-      const estimated =
-        audioData.words.length > 0
-          ? audioData.words[audioData.words.length - 1].end
-          : 0;
-      const actual = audio.duration;
-      if (estimated > 0 && actual > 0 && Math.abs(actual - estimated) > 0.3) {
-        const scale = actual / estimated;
-        setScaledWords(
-          audioData.words.map((w) => ({
-            ...w,
-            start: w.start * scale,
-            end: w.end * scale,
-          })),
-        );
-      } else {
-        setScaledWords(audioData.words);
-      }
-      setAudioDuration(actual);
-      audio.currentTime = initialProgress * actual;
-    };
-    audio.addEventListener("loadedmetadata", onLoaded);
-    return () => audio.removeEventListener("loadedmetadata", onLoaded);
-  }, [audioData, initialProgress]);
-
-  // Load audio src once
+  // Load audio + measure actual duration, rescale words to match
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !audioData) return;
@@ -163,19 +130,43 @@ export default function Player({
       .play()
       .then(() => setIsPlaying(true))
       .catch(() => setIsPlaying(false));
+
+    const onLoaded = () => {
+      const estimated =
+        audioData.words.length > 0
+          ? audioData.words[audioData.words.length - 1].end
+          : 0;
+      const actual = audio.duration;
+      if (estimated > 0 && actual > 0) {
+        const scale = actual / estimated;
+        setScaledWords(
+          audioData.words.map((w) => ({
+            ...w,
+            start: w.start * scale,
+            end: w.end * scale,
+          }))
+        );
+      } else {
+        setScaledWords(audioData.words);
+      }
+      setAudioDuration(actual);
+      if (initialProgress > 0 && initialProgress < 1) {
+        audio.currentTime = initialProgress * actual;
+      }
+    };
+    audio.addEventListener("loadedmetadata", onLoaded);
+    return () => audio.removeEventListener("loadedmetadata", onLoaded);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioData]);
 
-  // Schedule visual timeline based on scaled words + current section
+  // Schedule visuals for the current section
   useEffect(() => {
     if (!audioData || !lesson || !currentSection) return;
-
     visualTimersRef.current.forEach((t) => window.clearTimeout(t));
     visualTimersRef.current = [];
 
     const sectionWords = scaledWords.filter((w) => w.section === currentSectionIndex);
     if (!sectionWords.length) return;
-
     const sectionStart = audioData.sectionBoundaries[currentSectionIndex]?.start || 0;
 
     const timeline: { at: number; visualIndex: number }[] = [];
@@ -202,9 +193,7 @@ export default function Player({
     }
 
     timeline.forEach((entry) => {
-      const t = window.setTimeout(() => {
-        setActiveVisualIndex(entry.visualIndex);
-      }, entry.at);
+      const t = window.setTimeout(() => setActiveVisualIndex(entry.visualIndex), entry.at);
       visualTimersRef.current.push(t);
     });
     fadeOuts.forEach((entry) => {
@@ -220,16 +209,15 @@ export default function Player({
     };
   }, [currentSectionIndex, audioData, lesson, scaledWords, currentSection]);
 
-  // Playback speed
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = playbackSpeed;
   }, [playbackSpeed]);
 
-  // Track progress
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     const onTime = () => {
+      if (isDragging) return;
       setAudioCurrent(audio.currentTime);
       if (audio.duration && isFinite(audio.duration)) {
         setProgress(audio.currentTime / audio.duration);
@@ -237,23 +225,19 @@ export default function Player({
     };
     audio.addEventListener("timeupdate", onTime);
     return () => audio.removeEventListener("timeupdate", onTime);
-  }, []);
+  }, [isDragging]);
 
-  // Persist progress
   useEffect(() => {
     try {
       localStorage.setItem("classoni_lastProgress", progress.toFixed(4));
     } catch {}
   }, [progress]);
 
-  // Auto-hide paused overlay after 1.5s
   useEffect(() => {
     if (overlayTimerRef.current) window.clearTimeout(overlayTimerRef.current);
     if (!isPlaying) {
       setShowPausedOverlay(true);
-      overlayTimerRef.current = window.setTimeout(() => {
-        setShowPausedOverlay(false);
-      }, 1500);
+      overlayTimerRef.current = window.setTimeout(() => setShowPausedOverlay(false), 1500);
     } else {
       setShowPausedOverlay(false);
     }
@@ -283,13 +267,36 @@ export default function Player({
     if (audio.duration) setProgress(newTime / audio.duration);
   };
 
-  const seekToFraction = (frac: number) => {
-    const audio = audioRef.current;
-    if (!audio || !audio.duration) return;
-    const newTime = frac * audio.duration;
-    audio.currentTime = newTime;
-    setAudioCurrent(newTime);
+  // Drag handling for the yellow dot
+  const computeFractionFromX = (clientX: number): number => {
+    if (!trackRef.current) return 0;
+    const rect = trackRef.current.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  };
+
+  const handleDotDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setIsDragging(true);
+    if (audioRef.current) audioRef.current.pause();
+    setIsPlaying(false);
+  };
+
+  const handleDotMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    e.stopPropagation();
+    const frac = computeFractionFromX(e.clientX);
     setProgress(frac);
+    if (audioRef.current && audioRef.current.duration) {
+      audioRef.current.currentTime = frac * audioRef.current.duration;
+      setAudioCurrent(frac * audioRef.current.duration);
+    }
+  };
+
+  const handleDotUp = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    setIsDragging(false);
+    if (audioRef.current) audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
   };
 
   const openSheet = (id: Exclude<Sheet, null>) => {
@@ -307,15 +314,10 @@ export default function Player({
   };
 
   const handleShare = async () => {
-    const shareData = {
-      title: "Classoni",
-      text: "Check out this lesson!",
-      url: window.location.href,
-    };
+    const shareData = { title: "Classoni", text: "Check out this lesson!", url: window.location.href };
     try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else throw new Error("no share");
+      if (navigator.share) await navigator.share(shareData);
+      else throw new Error("no share");
     } catch {
       try {
         await navigator.clipboard.writeText(window.location.href);
@@ -370,7 +372,6 @@ export default function Player({
       ? currentSection.visuals[activeVisualIndex]
       : null;
 
-  // Word-level caption with 20-word blocks
   const sectionWords = scaledWords.filter((w) => w.section === currentSectionIndex);
   const currentWordIndex = (() => {
     if (!sectionWords.length) return -1;
@@ -412,7 +413,6 @@ export default function Player({
         />
       </div>
 
-      {/* CAPTION */}
       <div className="flex-shrink-0 px-4 py-2 min-h-[64px] flex items-center justify-center">
         {blockWords.length > 0 ? (
           <p className="text-center text-classoni-navy text-base leading-relaxed">
@@ -440,7 +440,6 @@ export default function Player({
         )}
       </div>
 
-      {/* VISUAL CANVAS */}
       <div className="flex-1 min-h-0 mx-4 mb-2 relative">
         <div
           onClick={handleCanvasClick}
@@ -541,7 +540,6 @@ export default function Player({
         )}
       </div>
 
-      {/* PROGRESS BAR */}
       <div className="flex-shrink-0 px-4 pt-1 pb-2">
         <div className="flex items-center gap-2">
           <button
@@ -556,23 +554,20 @@ export default function Player({
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9 text-right">
             {formatTime(audioCurrent)}
           </span>
-          <div
-            className="flex-1 relative h-3 flex items-center cursor-pointer"
-            onClick={(e) => {
-              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-              const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-              seekToFraction(frac);
-            }}
-          >
-            <div className="w-full h-1 bg-classoni-navy/10 rounded-full overflow-hidden">
+          <div ref={trackRef} className="flex-1 relative h-6 flex items-center">
+            <div className="w-full h-1 bg-classoni-navy/10 rounded-full overflow-hidden pointer-events-none">
               <div
                 className="h-full bg-classoni-yellow transition-all duration-100"
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
             <div
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-classoni-yellow border-2 border-white shadow-md"
-              style={{ left: `calc(${progress * 100}% - 6px)` }}
+              onPointerDown={handleDotDown}
+              onPointerMove={handleDotMove}
+              onPointerUp={handleDotUp}
+              onPointerCancel={handleDotUp}
+              className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-classoni-yellow border-2 border-white shadow-md cursor-grab active:cursor-grabbing touch-none"
+              style={{ left: `calc(${progress * 100}% - 10px)` }}
             />
           </div>
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9">
@@ -590,20 +585,11 @@ export default function Player({
         </div>
       </div>
 
-      {/* PILL BUTTONS */}
       <div className="flex-shrink-0 px-4 pb-2 flex gap-2">
-        <button onClick={() => openSheet("apply")} className="flex-1 bg-classoni-blue text-white rounded-full py-3 font-semibold text-sm">
-          Apply
-        </button>
-        <button onClick={() => openSheet("explain")} className="flex-1 bg-white border border-classoni-blue text-classoni-blue rounded-full py-3 font-semibold text-sm">
-          Explain
-        </button>
-        <button onClick={() => openSheet("quiz")} className="flex-1 bg-white border border-classoni-blue text-classoni-blue rounded-full py-3 font-semibold text-sm">
-          Quiz
-        </button>
-        <button onClick={() => openSheet("posts")} className="flex-1 bg-white border border-classoni-blue text-classoni-blue rounded-full py-3 font-semibold text-sm">
-          Posts
-        </button>
+        <button onClick={() => openSheet("apply")} className="flex-1 bg-classoni-blue text-white rounded-full py-3 font-semibold text-sm">Apply</button>
+        <button onClick={() => openSheet("explain")} className="flex-1 bg-white border border-classoni-blue text-classoni-blue rounded-full py-3 font-semibold text-sm">Explain</button>
+        <button onClick={() => openSheet("quiz")} className="flex-1 bg-white border border-classoni-blue text-classoni-blue rounded-full py-3 font-semibold text-sm">Quiz</button>
+        <button onClick={() => openSheet("posts")} className="flex-1 bg-white border border-classoni-blue text-classoni-blue rounded-full py-3 font-semibold text-sm">Posts</button>
       </div>
 
       <div className="flex-shrink-0">
@@ -617,7 +603,6 @@ export default function Player({
         />
       </div>
 
-      {/* BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet && (
           <>
@@ -650,17 +635,10 @@ export default function Player({
                     {lesson.apply.scenario}
                   </p>
                   {!applySolved ? (
-                    <button
-                      onClick={() => setApplySolved(true)}
-                      className="w-full bg-classoni-blue text-white rounded-full py-3 font-semibold"
-                    >
-                      Solve
-                    </button>
+                    <button onClick={() => setApplySolved(true)} className="w-full bg-classoni-blue text-white rounded-full py-3 font-semibold">Solve</button>
                   ) : (
                     <div className="bg-classoni-lavender rounded-xl p-4">
-                      <p className="text-classoni-navy text-sm leading-relaxed">
-                        {lesson.apply.solution}
-                      </p>
+                      <p className="text-classoni-navy text-sm leading-relaxed">{lesson.apply.solution}</p>
                     </div>
                   )}
                 </div>
@@ -678,18 +656,11 @@ export default function Player({
                     placeholder="Type your explanation..."
                     className="w-full h-28 border border-classoni-blue rounded-xl p-3 text-sm text-classoni-navy mb-3"
                   />
-                  <button
-                    onClick={() => setExplainSubmitted(true)}
-                    className="w-full bg-classoni-blue text-white rounded-full py-3 font-semibold"
-                  >
-                    Submit
-                  </button>
+                  <button onClick={() => setExplainSubmitted(true)} className="w-full bg-classoni-blue text-white rounded-full py-3 font-semibold">Submit</button>
                   {explainSubmitted && (
                     <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3">
                       <p className="text-red-700 text-sm font-semibold">7/10</p>
-                      <p className="text-red-700 text-xs mt-1">
-                        You missed the role of ATP in myosin detachment. Try again.
-                      </p>
+                      <p className="text-red-700 text-xs mt-1">You missed the role of ATP in myosin detachment. Try again.</p>
                     </div>
                   )}
                 </div>
@@ -698,9 +669,7 @@ export default function Player({
               {activeSheet === "quiz" && lesson && (
                 <div className="pt-6">
                   <h3 className="text-classoni-navy font-bold text-lg mb-3">Question 1 of 1</h3>
-                  <p className="text-classoni-navy text-sm font-semibold mb-4">
-                    {lesson.quiz.question}
-                  </p>
+                  <p className="text-classoni-navy text-sm font-semibold mb-4">{lesson.quiz.question}</p>
                   {lesson.quiz.options && (
                     <div className="space-y-2">
                       {lesson.quiz.options.map((opt, i) => {
@@ -729,9 +698,7 @@ export default function Player({
                   )}
                   {quizAnswer !== null && (
                     <div className="mt-4 bg-classoni-lavender rounded-xl p-3">
-                      <p className="text-classoni-navy text-xs leading-relaxed">
-                        {lesson.quiz.explanation}
-                      </p>
+                      <p className="text-classoni-navy text-xs leading-relaxed">{lesson.quiz.explanation}</p>
                     </div>
                   )}
                 </div>
@@ -749,34 +716,19 @@ export default function Player({
                       The myosin heads grab the actin and pull it inward, like rowing a boat. When ATP comes in, they let go and reset.
                     </p>
                     <div className="flex gap-4 items-center justify-between">
-                      <button
-                        onClick={() => setRatingVote("helpful")}
-                        className="flex items-center gap-1.5 text-xs font-medium"
-                      >
+                      <button onClick={() => setRatingVote("helpful")} className="flex items-center gap-1.5 text-xs font-medium">
                         <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                        <span className={ratingVote === "helpful" ? "text-classoni-blue font-semibold" : "text-classoni-navy"}>
-                          Helpful
-                        </span>
+                        <span className={ratingVote === "helpful" ? "text-classoni-blue font-semibold" : "text-classoni-navy"}>Helpful</span>
                         <span className="text-classoni-navy/40">· {ratingVote === "helpful" ? 4 : 3}</span>
                       </button>
-                      <button
-                        onClick={() => setRatingVote("more")}
-                        className="flex items-center gap-1.5 text-xs font-medium"
-                      >
+                      <button onClick={() => setRatingVote("more")} className="flex items-center gap-1.5 text-xs font-medium">
                         <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                        <span className={ratingVote === "more" ? "text-green-700 font-semibold" : "text-classoni-navy"}>
-                          More helpful
-                        </span>
+                        <span className={ratingVote === "more" ? "text-green-700 font-semibold" : "text-classoni-navy"}>More helpful</span>
                         <span className="text-classoni-navy/40">· {ratingVote === "more" ? 6 : 5}</span>
                       </button>
-                      <button
-                        onClick={() => setRatingVote("very")}
-                        className="flex items-center gap-1.5 text-xs font-medium"
-                      >
+                      <button onClick={() => setRatingVote("very")} className="flex items-center gap-1.5 text-xs font-medium">
                         <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                        <span className={ratingVote === "very" ? "text-purple-700 font-semibold" : "text-classoni-navy"}>
-                          Very helpful
-                        </span>
+                        <span className={ratingVote === "very" ? "text-purple-700 font-semibold" : "text-classoni-navy"}>Very helpful</span>
                         <span className="text-classoni-navy/40">· {ratingVote === "very" ? 3 : 2}</span>
                       </button>
                     </div>
@@ -788,7 +740,6 @@ export default function Player({
         )}
       </AnimatePresence>
 
-      {/* FEEDBACK MODAL */}
       <AnimatePresence>
         {feedbackOpen && (
           <>
@@ -806,17 +757,12 @@ export default function Player({
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 220 }}
             >
-              <button
-                onClick={() => setFeedbackOpen(false)}
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center"
-              >
+              <button onClick={() => setFeedbackOpen(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center">
                 <X size={20} className="text-classoni-navy" />
               </button>
               {!feedbackSent ? (
                 <>
-                  <h3 className="text-classoni-navy font-bold text-lg mb-4 pt-2">
-                    How was this explanation?
-                  </h3>
+                  <h3 className="text-classoni-navy font-bold text-lg mb-4 pt-2">How was this explanation?</h3>
                   <div className="flex gap-3 mb-4">
                     <button
                       onClick={() => setFeedbackType("like")}
@@ -844,26 +790,15 @@ export default function Player({
                       <textarea
                         value={feedbackReason}
                         onChange={(e) => setFeedbackReason(e.target.value)}
-                        placeholder={
-                          feedbackType === "like"
-                            ? "Tell us more (optional)"
-                            : "Please tell us what went wrong"
-                        }
+                        placeholder={feedbackType === "like" ? "Tell us more (optional)" : "Please tell us what went wrong"}
                         className="w-full h-24 border border-classoni-blue rounded-xl p-3 text-sm text-classoni-navy mb-3"
                       />
-                      <button
-                        onClick={submitFeedback}
-                        className="w-full bg-classoni-blue text-white rounded-full py-3 font-semibold"
-                      >
-                        Submit
-                      </button>
+                      <button onClick={submitFeedback} className="w-full bg-classoni-blue text-white rounded-full py-3 font-semibold">Submit</button>
                     </>
                   )}
                 </>
               ) : (
-                <p className="text-classoni-navy text-center py-8 font-semibold">
-                  Thank you! Your feedback has been sent.
-                </p>
+                <p className="text-classoni-navy text-center py-8 font-semibold">Thank you! Your feedback has been sent.</p>
               )}
             </motion.div>
           </>
@@ -871,4 +806,4 @@ export default function Player({
       </AnimatePresence>
     </div>
   );
-    }
+  }
