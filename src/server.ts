@@ -127,62 +127,157 @@ async function handleApi(request: Request): Promise<Response | null> {
     });
   }
 
-  // ─── DEBUG: RAW KOKORO RESPONSE ───
-  if (url.pathname === "/api/debug-kokoro") {
-    const text = url.searchParams.get("text") || "Hello, this is Classoni.";
+  // ─── GENERATE FULL AUDIO — all sections in one continuous MP3 ───
+  if (url.pathname === "/api/generate-full-audio" && request.method === "POST") {
+    const body: any = await request.json();
+    const sections = body.sections || [];
+
+    if (!Array.isArray(sections) || sections.length === 0) {
+      return json({ error: "sections array is required" }, 400);
+    }
+
     const key = getSecret("DEEPINFRA_API_KEY");
     if (!key) return json({ error: "no key" }, 500);
 
-    try {
-      const r = await fetch(
-        "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
-        {
-          method: "POST",
-          headers: {
-            Authorization: "Bearer " + key,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text,
-            voice: "am_liam",
-            speed: 1.0,
-            output_format: "mp3",
-            return_timestamps: true,
-          }),
+    const allBytes: Uint8Array[] = [];
+    const allWords: any[] = [];
+    const sectionBoundaries: any[] = [];
+    const errors: string[] = [];
+    let cumulativeOffset = 0;
+    let wordId = 0;
+    const SECTION_GAP = 0.35;
+    const CHUNK_SIZE = 40;
+
+    for (let si = 0; si < sections.length; si++) {
+      const section = sections[si];
+      const text = (section.narration_text || "").trim();
+      if (!text) {
+        sectionBoundaries.push({
+          id: section.id,
+          start: cumulativeOffset,
+          end: cumulativeOffset,
+        });
+        continue;
+      }
+
+      const wordsInSection = text.split(/\s+/).filter(Boolean);
+      const chunks: string[] = [];
+      for (let i = 0; i < wordsInSection.length; i += CHUNK_SIZE) {
+        chunks.push(wordsInSection.slice(i, i + CHUNK_SIZE).join(" "));
+      }
+
+      const sectionStart = cumulativeOffset;
+
+      for (let ci = 0; ci < chunks.length; ci++) {
+        try {
+          const r = await fetch(
+            "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
+            {
+              method: "POST",
+              headers: {
+                Authorization: "Bearer " + key,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                text: chunks[ci],
+                voice: "am_liam",
+                speed: 1.0,
+                output_format: "mp3",
+                return_timestamps: true,
+              }),
+            }
+          );
+
+          if (!r.ok) {
+            errors.push(`sec ${si} chunk ${ci} HTTP ${r.status}`);
+            continue;
+          }
+
+          const data: any = await r.json();
+          const audioRaw = data.audio || "";
+          if (!audioRaw || audioRaw.length < 100) {
+            errors.push(`sec ${si} chunk ${ci} no audio`);
+            continue;
+          }
+
+          allBytes.push(b64ToBytes(stripDataUrl(audioRaw)));
+
+          let lastEnd = 0;
+          const chunkWords = data.words || [];
+          for (const w of chunkWords) {
+            allWords.push({
+              id: wordId++,
+              start: w.start + cumulativeOffset,
+              end: w.end + cumulativeOffset,
+              text: w.text,
+              section: si,
+            });
+            if (w.end > lastEnd) lastEnd = w.end;
+          }
+          cumulativeOffset += lastEnd + 0.15;
+        } catch (err) {
+          errors.push(`sec ${si} chunk ${ci}: ${String(err).slice(0, 100)}`);
         }
-      );
+      }
 
-      const raw = await r.text();
-
-      return json({
-        status: r.status,
-        contentType: r.headers.get("content-type"),
-        response_preview: raw.slice(0, 800),
-        response_length: raw.length,
+      sectionBoundaries.push({
+        id: section.id,
+        start: sectionStart,
+        end: cumulativeOffset,
       });
-    } catch (err) {
-      return json({ error: String(err) }, 500);
+      cumulativeOffset += SECTION_GAP;
     }
+
+    if (allBytes.length === 0) {
+      return json(
+        { error: "All chunks failed", details: errors },
+        500
+      );
+    }
+
+    const totalLen = allBytes.reduce((s, b) => s + b.length, 0);
+    const merged = new Uint8Array(totalLen);
+    let pos = 0;
+    for (const b of allBytes) {
+      merged.set(b, pos);
+      pos += b.length;
+    }
+
+    return json({
+      audio: "data:audio/mpeg;base64," + bytesToB64(merged),
+      words: allWords,
+      sectionBoundaries,
+      totalChunks: allBytes.length,
+      totalDurationEstimate: cumulativeOffset,
+      errors: errors.length ? errors : undefined,
+    });
   }
 
-  // ─── DEBUG: CHUNKED TTS WORDS ONLY (no audio blob) ───
-  if (url.pathname === "/api/debug-tts-words") {
-    const text =
-      url.searchParams.get("text") || "Hello, this is Classoni. Let us learn.";
+  // ─── LEGACY: single-section TTS (kept for fallback) ───
+  if (url.pathname === "/api/generate-tts") {
+    let text = "";
+    if (request.method === "GET") text = url.searchParams.get("text") || "";
+    else if (request.method === "POST") {
+      try {
+        const body: any = await request.json();
+        text = body.text || "";
+      } catch {}
+    }
+    if (!text) return json({ error: "text is required" }, 400);
     const key = getSecret("DEEPINFRA_API_KEY");
     if (!key) return json({ error: "no key" }, 500);
 
     const words = text.split(/\s+/).filter(Boolean);
     const CHUNK_SIZE = 40;
     const chunks: string[] = [];
-    for (let i = 0; i < words.length; i += CHUNK_SIZE) {
+    for (let i = 0; i < words.length; i += CHUNK_SIZE)
       chunks.push(words.slice(i, i + CHUNK_SIZE).join(" "));
-    }
 
+    const allBytes: Uint8Array[] = [];
     const allWords: any[] = [];
+    const errors: string[] = [];
     let cumulativeOffset = 0;
     let wordId = 0;
-    const chunkSummaries: any[] = [];
 
     for (let ci = 0; ci < chunks.length; ci++) {
       try {
@@ -203,10 +298,19 @@ async function handleApi(request: Request): Promise<Response | null> {
             }),
           }
         );
+        if (!r.ok) {
+          errors.push(`chunk ${ci} HTTP ${r.status}`);
+          continue;
+        }
         const data: any = await r.json();
-        const chunkWords = data.words || [];
+        const audioRaw = data.audio || "";
+        if (!audioRaw || audioRaw.length < 100) {
+          errors.push(`chunk ${ci} no audio`);
+          continue;
+        }
+        allBytes.push(b64ToBytes(stripDataUrl(audioRaw)));
         let lastEnd = 0;
-        for (const w of chunkWords) {
+        for (const w of data.words || []) {
           allWords.push({
             id: wordId++,
             start: w.start + cumulativeOffset,
@@ -215,146 +319,14 @@ async function handleApi(request: Request): Promise<Response | null> {
           });
           if (w.end > lastEnd) lastEnd = w.end;
         }
-        chunkSummaries.push({
-          chunk_index: ci,
-          word_count: chunkWords.length,
-          audio_length: (data.audio || "").length,
-          last_end: lastEnd,
-        });
         cumulativeOffset += lastEnd + 0.15;
       } catch (err) {
-        chunkSummaries.push({
-          chunk_index: ci,
-          error: String(err).slice(0, 150),
-        });
+        errors.push(`chunk ${ci}: ${String(err).slice(0, 100)}`);
       }
     }
 
-    return json({
-      total_chunks: chunks.length,
-      total_words: allWords.length,
-      chunks: chunkSummaries,
-      first_10_words: allWords.slice(0, 10),
-      last_3_words: allWords.slice(-3),
-    });
-  }
-
-  // ─── GENERATE TTS (chunked, merged audio + word timestamps) ───
-  if (url.pathname === "/api/generate-tts") {
-    let text = "";
-    if (request.method === "GET") {
-      text = url.searchParams.get("text") || "";
-    } else if (request.method === "POST") {
-      try {
-        const body: any = await request.json();
-        text = body.text || "";
-      } catch {
-        // ignore
-      }
-    }
-
-    if (!text) return json({ error: "text is required" }, 400);
-
-    const key = getSecret("DEEPINFRA_API_KEY");
-    if (!key) return json({ error: "no key" }, 500);
-
-    const words = text.split(/\s+/).filter(Boolean);
-    const CHUNK_SIZE = 40;
-    const chunks: string[] = [];
-    for (let i = 0; i < words.length; i += CHUNK_SIZE) {
-      chunks.push(words.slice(i, i + CHUNK_SIZE).join(" "));
-    }
-
-    const allBytes: Uint8Array[] = [];
-    const allWords: any[] = [];
-    const errors: string[] = [];
-    let cumulativeOffset = 0;
-    let wordId = 0;
-
-    for (let ci = 0; ci < chunks.length; ci++) {
-      const chunk = chunks[ci];
-      try {
-        const r = await fetch(
-          "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
-          {
-            method: "POST",
-            headers: {
-              Authorization: "Bearer " + key,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              text: chunk,
-              voice: "am_liam",
-              speed: 1.0,
-              output_format: "mp3",
-              return_timestamps: true,
-            }),
-          }
-        );
-
-        if (!r.ok) {
-          const errText = await r.text();
-          errors.push(
-            "chunk " + ci + " HTTP " + r.status + ": " + errText.slice(0, 150)
-          );
-          continue;
-        }
-
-        const data: any = await r.json();
-
-        const audioRaw = data.audio || data.output || data.audio_url || "";
-        if (!audioRaw || typeof audioRaw !== "string" || audioRaw.length < 100) {
-          errors.push("chunk " + ci + " returned no audio");
-          continue;
-        }
-
-        const rawB64 = stripDataUrl(audioRaw);
-        if (!rawB64) {
-          errors.push("chunk " + ci + " empty base64 after strip");
-          continue;
-        }
-
-        allBytes.push(b64ToBytes(rawB64));
-
-        const chunkWords =
-          data.words ||
-          data.timestamps ||
-          data.word_timestamps ||
-          data.alignment ||
-          [];
-
-        let lastEnd = 0;
-        if (Array.isArray(chunkWords)) {
-          for (const w of chunkWords) {
-            const start =
-              typeof w.start === "number" ? w.start : w.start_time || 0;
-            const end = typeof w.end === "number" ? w.end : w.end_time || 0;
-            const wtext = w.text || w.word || "";
-            allWords.push({
-              id: wordId++,
-              start: start + cumulativeOffset,
-              end: end + cumulativeOffset,
-              text: wtext,
-            });
-            if (end > lastEnd) lastEnd = end;
-          }
-        }
-        cumulativeOffset += lastEnd + 0.15;
-      } catch (err) {
-        errors.push("chunk " + ci + " threw: " + String(err).slice(0, 150));
-      }
-    }
-
-    if (allBytes.length === 0) {
-      return json(
-        {
-          error: "All TTS chunks failed",
-          chunk_count: chunks.length,
-          details: errors,
-        },
-        500
-      );
-    }
+    if (allBytes.length === 0)
+      return json({ error: "All chunks failed", details: errors }, 500);
 
     const totalLen = allBytes.reduce((s, b) => s + b.length, 0);
     const merged = new Uint8Array(totalLen);
@@ -369,7 +341,6 @@ async function handleApi(request: Request): Promise<Response | null> {
       words: allWords,
       chunks_used: allBytes.length,
       chunks_failed: errors.length,
-      errors: errors.length ? errors : undefined,
     });
   }
 
@@ -377,18 +348,14 @@ async function handleApi(request: Request): Promise<Response | null> {
   if (url.pathname === "/api/generate-lesson") {
     const topic = url.searchParams.get("topic") || "";
     const country = url.searchParams.get("country") || "Uganda";
-
     if (!topic) return json({ error: "topic is required" }, 400);
-
     const key = getSecret("DEEPINFRA_API_KEY");
     if (!key) return json({ error: "no key" }, 500);
 
     try {
       const userMessage =
-        "COUNTRY: " +
-        country +
-        "\n\nSTANDARD CURRICULUM SOURCE\nSubject and topic: " +
-        topic +
+        "COUNTRY: " + country +
+        "\n\nSTANDARD CURRICULUM SOURCE\nSubject and topic: " + topic +
         "\n\nGenerate ONE keypoint from standard curriculum material for this topic. Follow TEST MODE rules.";
 
       const r = await fetch(
@@ -410,10 +377,8 @@ async function handleApi(request: Request): Promise<Response | null> {
           }),
         }
       );
-
       const data: any = await r.json();
       const content = data?.choices?.[0]?.message?.content || "";
-
       return new Response(content, {
         headers: { ...cors, "Content-Type": "application/json" },
       });
@@ -436,18 +401,13 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-async function normalizeCatastrophicSsrResponse(
-  response: Response,
-): Promise<Response> {
+async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") || "";
   if (contentType.indexOf("application/json") !== -1) return response;
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
-  console.error(
-    consumeLastCapturedError() ||
-      new Error("h3 swallowed SSR error: " + body),
-  );
+  console.error(consumeLastCapturedError() || new Error("h3 swallowed SSR error: " + body));
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -456,10 +416,7 @@ async function normalizeCatastrophicSsrResponse(
 
 function isH3SwallowedErrorBody(body: string): boolean {
   try {
-    const payload = JSON.parse(body) as {
-      unhandled?: unknown;
-      message?: unknown;
-    };
+    const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
     return payload.unhandled === true && payload.message === "HTTPError";
   } catch {
     return false;
