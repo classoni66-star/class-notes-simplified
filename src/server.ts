@@ -16,8 +16,16 @@ function getSecret(name: string): string | undefined {
   return undefined;
 }
 
+function stripDataUrl(audio: string): string {
+  if (!audio) return "";
+  const idx = audio.indexOf("base64,");
+  if (idx !== -1) return audio.slice(idx + 7);
+  return audio;
+}
+
 function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
+  const clean = b64.replace(/\s+/g, "");
+  const bin = atob(clean);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
@@ -188,7 +196,14 @@ async function handleApi(request: Request): Promise<Response | null> {
           continue;
         }
 
-        allBytes.push(b64ToBytes(data.audio));
+        // Strip the "data:audio/mp3;base64," prefix BEFORE decoding
+        const rawB64 = stripDataUrl(data.audio);
+        if (!rawB64) {
+          errors.push("chunk " + ci + " empty base64 after strip");
+          continue;
+        }
+
+        allBytes.push(b64ToBytes(rawB64));
 
         let lastEnd = 0;
         const chunkWords = data.words || [];
@@ -226,8 +241,9 @@ async function handleApi(request: Request): Promise<Response | null> {
       pos += b.length;
     }
 
+    // Return the merged audio as a full data URL — frontend uses it directly
     return json({
-      audio: bytesToB64(merged),
+      audio: "data:audio/mpeg;base64," + bytesToB64(merged),
       words: allWords,
       chunks_used: allBytes.length,
       chunks_failed: errors.length,
