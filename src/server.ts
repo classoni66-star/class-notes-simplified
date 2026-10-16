@@ -1,6 +1,7 @@
 import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { LESSON_SYSTEM_PROMPT } from "./lib/lessonPrompt";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -107,6 +108,65 @@ async function handleApi(request: Request): Promise<Response | null> {
         }, null, 2),
         { headers: { ...cors, "Content-Type": "application/json" } }
       );
+    } catch (err) {
+      return new Response(JSON.stringify({ error: String(err) }), {
+        status: 500,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  // ─── LESSON GENERATION ───
+  if (url.pathname === "/api/generate-lesson") {
+    const topic = url.searchParams.get("topic") || "";
+    const country = url.searchParams.get("country") || "Uganda";
+
+    if (!topic) {
+      return new Response(JSON.stringify({ error: "topic is required" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const key = getSecret("DEEPINFRA_API_KEY");
+    if (!key) {
+      return new Response(JSON.stringify({ error: "no key" }), {
+        status: 500,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const userMessage = `COUNTRY: ${country}
+
+STANDARD CURRICULUM SOURCE (no notes were uploaded for this call)
+Subject and topic: ${topic}
+
+There is no document and no student note behind this call — generate ONE keypoint from standard curriculum material for this subject and topic. Follow TEST MODE rules.`;
+
+      const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + key,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "deepseek-ai/DeepSeek-V4.1-Flash",
+          messages: [
+            { role: "system", content: LESSON_SYSTEM_PROMPT },
+            { role: "user", content: userMessage },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 8000,
+        }),
+      });
+
+      const data: any = await r.json();
+      const content = data?.choices?.[0]?.message?.content || "";
+
+      return new Response(content, {
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
     } catch (err) {
       return new Response(JSON.stringify({ error: String(err) }), {
         status: 500,
