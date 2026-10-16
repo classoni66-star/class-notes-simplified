@@ -20,9 +20,13 @@ export default function ClassoniApp() {
   const [notesFile, setNotesFile] = useState<File | null>(null);
   const [initialProgress, setInitialProgress] = useState<number>(0);
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // Lesson + first audio, fetched on the Loading screen and passed to Player
+  const [lessonData, setLessonData] = useState<any>(null);
+  const [firstAudio, setFirstAudio] = useState<any>(null);
+
   const reduced = useReducedMotion();
 
-  // On mount: detect a returning user and resume their last lesson
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -33,7 +37,7 @@ export default function ClassoniApp() {
         setCurrentScreen("player");
       }
     } catch {
-      // localStorage unavailable — continue as a fresh user
+      // ignore
     }
     setIsHydrated(true);
   }, []);
@@ -42,20 +46,30 @@ export default function ClassoniApp() {
     if (typeof window !== "undefined") {
       try {
         if (screen === "loading") {
-          // A new generation is starting → reset saved progress
           localStorage.setItem("classoni_lastProgress", "0");
           setInitialProgress(0);
+          // Clear any prior lesson so the Loading screen fetches fresh
+          setLessonData(null);
+          setFirstAudio(null);
         }
         if (screen === "player") {
-          // Reached the player → remember this user for next time
           localStorage.setItem("classoni_hasVisited", "true");
         }
       } catch {
-        // Silently ignore storage failures
+        // ignore
       }
     }
     setCurrentScreen(screen);
   }, []);
+
+  const handleLessonReady = useCallback(
+    (lesson: any, audio: any) => {
+      setLessonData(lesson);
+      setFirstAudio(audio);
+      navigate("player");
+    },
+    [navigate],
+  );
 
   const props = { navigate };
 
@@ -64,12 +78,25 @@ export default function ClassoniApp() {
     input: (
       <Input
         {...props}
-        onSubject={(subject, topic) => setLessonRequest({ subject, topic })}
+        onSubject={(subject: string, topic: string) => setLessonRequest({ subject, topic })}
       />
     ),
     source: <Source {...props} onFile={setNotesFile} />,
-    loading: <Loading {...props} />,
-    player: <Player {...props} initialProgress={initialProgress} />,
+    loading: (
+      <Loading
+        {...props}
+        topic={lessonRequest.topic || "Sliding Filament Theory"}
+        onReady={handleLessonReady}
+      />
+    ),
+    player: (
+      <Player
+        {...props}
+        initialProgress={initialProgress}
+        lesson={lessonData}
+        firstAudio={firstAudio}
+      />
+    ),
     premiumPlans: <PremiumPlans {...props} />,
     paywall: <Paywall {...props} />,
     rewards: <Rewards {...props} />,
@@ -79,7 +106,6 @@ export default function ClassoniApp() {
     contributions: <Contributions {...props} />,
   };
 
-  // Pre-hydration splash — avoids a flash of the wrong screen
   if (!isHydrated) {
     return (
       <div className="mx-auto h-screen h-dvh w-full max-w-lg overflow-hidden bg-classoni-navy" />
