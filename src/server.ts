@@ -41,6 +41,53 @@ function bytesToB64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
+// Compute the real duration of an MP3 file from its header + size
+function mp3DurationSeconds(bytes: Uint8Array): number {
+  let offset = 0;
+  // Skip ID3v2 tag if present
+  if (bytes.length >= 10 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) {
+    const size =
+      ((bytes[6] & 0x7f) << 21) |
+      ((bytes[7] & 0x7f) << 14) |
+      ((bytes[8] & 0x7f) << 7) |
+      (bytes[9] & 0x7f);
+    offset = 10 + size;
+  }
+  // Find first MP3 frame sync
+  while (offset < bytes.length - 1) {
+    if (bytes[offset] === 0xff && (bytes[offset + 1] & 0xe0) === 0xe0) break;
+    offset++;
+  }
+  if (offset >= bytes.length - 4) return 0;
+
+  const b1 = bytes[offset + 1];
+  const b2 = bytes[offset + 2];
+  const mpegVersion = (b1 >> 3) & 0x03;
+  const layer = (b1 >> 1) & 0x03;
+  const bitrateIndex = (b2 >> 4) & 0x0f;
+  const sampleRateIndex = (b2 >> 2) & 0x03;
+
+  const bitratesV1L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
+  const bitratesV2L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
+  const sampleRatesV1 = [44100, 48000, 32000, 0];
+  const sampleRatesV2 = [22050, 24000, 16000, 0];
+
+  let bitrate = 0;
+  let sampleRate = 0;
+  if (mpegVersion === 3) {
+    bitrate = bitratesV1L3[bitrateIndex] || 128;
+    sampleRate = sampleRatesV1[sampleRateIndex] || 44100;
+  } else {
+    bitrate = bitratesV2L3[bitrateIndex] || 32;
+    sampleRate = sampleRatesV2[sampleRateIndex] || 24000;
+  }
+  if (bitrate === 0 || sampleRate === 0) return 0;
+
+  // CBR estimate: duration = (total_bytes - header) * 8 / (bitrate_kbps * 1000)
+  const dataBytes = bytes.length - offset;
+  return (dataBytes * 8) / (bitrate * 1000);
+}
+
 const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni, a mobile-first university learning platform. Take the notes or curriculum topic and produce ONE fully choreographed keypoint lesson as strict JSON.
 
 Your Ethos: Speed is mastery (1–2 minutes). Surgical precision. Fidelity above all. Visual-first. Seamless narrative.
@@ -79,22 +126,22 @@ VisualObject schema:
 SECTION RULES:
 1. CURIOSITY QUESTION — ONE sentence (15–40 words) plus invitation phrase. Country-neutral. Zero jargon. Counter-intuitive twist. Visual type "scene", role "micro".
 2. KEYPOINT IDENTITY — Single line: "Keypoint: [Name]". No visuals.
-3. EMOTIONAL HOOK — Three uses in ONE flowing narration_text. Use 1 references the curiosity question. Use 2 is a new application. Use 3 is another. Each has its own visual, type "scene", role "micro". NO exam-leverage phrasing. NO country-specific names.
-4. WALKTHROUGH — Contains the resolution and micro-visuals ending with the full skeleton visual (type "skeleton_full", role "full"). Visuals array: one micro-visual per sub-concept, then curiosity visual returning during resolution, then full skeleton at end.
+3. EMOTIONAL HOOK — Three uses in ONE flowing narration_text. Each has its own visual, type "scene", role "micro".
+4. WALKTHROUGH — Contains the resolution and micro-visuals ending with the full skeleton visual (type "skeleton_full", role "full").
 5. MENTAL ANCHOR — Single memorable structure. Phonetic or visual.
 6. COMMON CONFUSION — Exactly 2 sentences. Visual type "confusion", role "micro", highlight "red".
 
-VISUAL CHOREOGRAPHY: Every visual declares trigger_phrase (4–10 words, copied verbatim, appears EXACTLY ONCE), fade_out_trigger, and role.
+VISUAL CHOREOGRAPHY: Every visual declares trigger_phrase (4–10 words, verbatim), fade_out_trigger, and role.
 
-SVG RULES: Inline. viewBox="0 0 400 300". Transparent. Palette: #0055FF, #4DA6FF, #FFD700, #0A1F44, #F3F4F6, warning red #DC2626 (common_confusion only). Simple shapes. Named groups. No filters, no external refs, no raster. Under 200 elements. Never [[IMG_id]].
+SVG RULES: Inline. viewBox="0 0 400 300". Transparent. Palette: #0055FF, #4DA6FF, #FFD700, #0A1F44, #F3F4F6, red #DC2626. Simple shapes. No filters, no external refs, no raster. Under 200 elements.
 
-COUNTRY ANCHORING — FORMAL PROFESSIONS ONLY: ALLOWED: hospitals, clinics, pharmacies, labs, engineering sites, schools, courts, banks, agencies, NGOs, research institutes. FORBIDDEN: boda boda, market vendors, informal traders, street food, informal taxis, village households. If COUNTRY is blank, anchor to Uganda.
+COUNTRY ANCHORING — FORMAL PROFESSIONS ONLY: hospitals, clinics, pharmacies, labs, engineering sites, schools, courts, banks, agencies, NGOs, research institutes. FORBIDDEN: informal-economy settings. If COUNTRY is blank, anchor to Uganda.
 
-APPLY SCENARIO (never narrated): "[Role in formal profession] in [specific named place] is facing [problem]. Since you have studied [keypoint], help [Person A] to [outcome]." No question mark at the end. skeleton is null unless solution is calculation/mechanism/spatial. solution is ONE flowing paragraph. Never label steps.
+APPLY SCENARIO (never narrated): "[Role in formal profession] in [named place] is facing [problem]. Since you have studied [keypoint], help [Person A] to [outcome]."
 
-QUIZ (never narrated): One question, type "mcq" (4 options).
+QUIZ (never narrated): One "mcq" question with 4 options.
 
-TTS RULES: Only the 6 section ids are narrated. narration_text must be TTS-ready. Numbers as words.
+TTS RULES: Only the 6 section ids are narrated.
 
 TEST MODE: Generate ONE keypoint only. Return ONE JSON object. Nothing before or after.`;
 
@@ -120,18 +167,93 @@ async function handleApi(request: Request): Promise<Response | null> {
   // ─── HEALTH ───
   if (url.pathname === "/api/health") {
     const key = getSecret("DEEPINFRA_API_KEY");
+    return json({ status: "alive", keyPresent: !!key });
+  }
+
+  // ─── DIAGNOSTIC: VOICE NAMES ───
+  if (url.pathname === "/api/debug-voice") {
+    const key = getSecret("DEEPINFRA_API_KEY");
+    if (!key) return json({ error: "no key" }, 500);
+
+    const results: any[] = [];
+    // Try several parameter names
+    for (const paramName of ["voice", "preset_voice", "speaker", "voice_id"]) {
+      const payload: any = {
+        text: "Testing voice parameter",
+        speed: 1.0,
+        output_format: "mp3",
+        return_timestamps: false,
+      };
+      payload[paramName] = "am_liam";
+
+      try {
+        const r = await fetch(
+          "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
+          {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + key,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+        const data: any = await r.json();
+        results.push({
+          param_used: paramName,
+          status: r.status,
+          response_keys: Object.keys(data).slice(0, 12),
+          audio_bytes: (data.audio || "").length,
+        });
+      } catch (err) {
+        results.push({
+          param_used: paramName,
+          status: "error",
+          error: String(err).slice(0, 100),
+        });
+      }
+    }
+    return json({ results });
+  }
+
+  // ─── DIAGNOSTIC: KOKORO RAW ───
+  if (url.pathname === "/api/debug-kokoro2") {
+    const key = getSecret("DEEPINFRA_API_KEY");
+    if (!key) return json({ error: "no key" }, 500);
+
+    const r = await fetch(
+      "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + key,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Hello world",
+          preset_voice: "am_liam",
+          speed: 1.0,
+          output_format: "mp3",
+          return_timestamps: true,
+        }),
+      }
+    );
+    const data: any = await r.json();
+    const audioBytes = stripDataUrl(data.audio || "").length;
     return json({
-      status: "alive",
-      models: ["DeepSeek-V4.1-Flash", "Kokoro-82M"],
-      keyPresent: !!key,
+      response_keys: Object.keys(data),
+      words_count: (data.words || []).length,
+      last_word_end: data.words?.[data.words.length - 1]?.end,
+      audio_data_url_bytes: (data.audio || "").length,
+      audio_raw_b64_bytes: audioBytes,
+      first_word: data.words?.[0],
     });
   }
 
-  // ─── GENERATE FULL AUDIO — all sections in one continuous MP3 ───
+  // ─── GENERATE FULL AUDIO — continuous ───
   if (url.pathname === "/api/generate-full-audio" && request.method === "POST") {
     const body: any = await request.json();
     const sections = body.sections || [];
-
     if (!Array.isArray(sections) || sections.length === 0) {
       return json({ error: "sections array is required" }, 400);
     }
@@ -145,18 +267,14 @@ async function handleApi(request: Request): Promise<Response | null> {
     const errors: string[] = [];
     let cumulativeOffset = 0;
     let wordId = 0;
-    const SECTION_GAP = 0.35;
+    const SECTION_GAP = 0.4;
     const CHUNK_SIZE = 40;
 
     for (let si = 0; si < sections.length; si++) {
       const section = sections[si];
       const text = (section.narration_text || "").trim();
       if (!text) {
-        sectionBoundaries.push({
-          id: section.id,
-          start: cumulativeOffset,
-          end: cumulativeOffset,
-        });
+        sectionBoundaries.push({ id: section.id, start: cumulativeOffset, end: cumulativeOffset });
         continue;
       }
 
@@ -180,7 +298,7 @@ async function handleApi(request: Request): Promise<Response | null> {
               },
               body: JSON.stringify({
                 text: chunks[ci],
-                voice: "am_liam",
+                preset_voice: "am_liam",
                 speed: 1.0,
                 output_format: "mp3",
                 return_timestamps: true,
@@ -200,11 +318,14 @@ async function handleApi(request: Request): Promise<Response | null> {
             continue;
           }
 
-          allBytes.push(b64ToBytes(stripDataUrl(audioRaw)));
+          const chunkBytes = b64ToBytes(stripDataUrl(audioRaw));
+          allBytes.push(chunkBytes);
 
-          let lastEnd = 0;
-          const chunkWords = data.words || [];
-          for (const w of chunkWords) {
+          // Measure the actual chunk duration from MP3 bytes
+          const measuredDuration = mp3DurationSeconds(chunkBytes);
+
+          // Kokoro's word timings are relative to chunk start (already include lead silence)
+          for (const w of data.words || []) {
             allWords.push({
               id: wordId++,
               start: w.start + cumulativeOffset,
@@ -212,9 +333,14 @@ async function handleApi(request: Request): Promise<Response | null> {
               text: w.text,
               section: si,
             });
-            if (w.end > lastEnd) lastEnd = w.end;
           }
-          cumulativeOffset += lastEnd + 0.15;
+
+          // Advance cumulative offset by the ACTUAL chunk duration
+          const lastWordEnd = (data.words || []).length
+            ? data.words[data.words.length - 1].end
+            : 0;
+          const advance = Math.max(measuredDuration, lastWordEnd + 0.5);
+          cumulativeOffset += advance;
         } catch (err) {
           errors.push(`sec ${si} chunk ${ci}: ${String(err).slice(0, 100)}`);
         }
@@ -229,10 +355,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     }
 
     if (allBytes.length === 0) {
-      return json(
-        { error: "All chunks failed", details: errors },
-        500
-      );
+      return json({ error: "All chunks failed", details: errors }, 500);
     }
 
     const totalLen = allBytes.reduce((s, b) => s + b.length, 0);
@@ -248,12 +371,12 @@ async function handleApi(request: Request): Promise<Response | null> {
       words: allWords,
       sectionBoundaries,
       totalChunks: allBytes.length,
-      totalDurationEstimate: cumulativeOffset,
+      estimatedDuration: cumulativeOffset,
       errors: errors.length ? errors : undefined,
     });
   }
 
-  // ─── LEGACY: single-section TTS (kept for fallback) ───
+  // ─── LEGACY: single-section TTS ───
   if (url.pathname === "/api/generate-tts") {
     let text = "";
     if (request.method === "GET") text = url.searchParams.get("text") || "";
@@ -291,7 +414,7 @@ async function handleApi(request: Request): Promise<Response | null> {
             },
             body: JSON.stringify({
               text: chunks[ci],
-              voice: "am_liam",
+              preset_voice: "am_liam",
               speed: 1.0,
               output_format: "mp3",
               return_timestamps: true,
@@ -308,8 +431,10 @@ async function handleApi(request: Request): Promise<Response | null> {
           errors.push(`chunk ${ci} no audio`);
           continue;
         }
-        allBytes.push(b64ToBytes(stripDataUrl(audioRaw)));
-        let lastEnd = 0;
+        const chunkBytes = b64ToBytes(stripDataUrl(audioRaw));
+        allBytes.push(chunkBytes);
+
+        const measuredDuration = mp3DurationSeconds(chunkBytes);
         for (const w of data.words || []) {
           allWords.push({
             id: wordId++,
@@ -317,9 +442,11 @@ async function handleApi(request: Request): Promise<Response | null> {
             end: w.end + cumulativeOffset,
             text: w.text,
           });
-          if (w.end > lastEnd) lastEnd = w.end;
         }
-        cumulativeOffset += lastEnd + 0.15;
+        const lastWordEnd = (data.words || []).length
+          ? data.words[data.words.length - 1].end
+          : 0;
+        cumulativeOffset += Math.max(measuredDuration, lastWordEnd + 0.5);
       } catch (err) {
         errors.push(`chunk ${ci}: ${String(err).slice(0, 100)}`);
       }
