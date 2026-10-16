@@ -127,6 +127,44 @@ async function handleApi(request: Request): Promise<Response | null> {
     });
   }
 
+  // ─── DEBUG: RAW KOKORO RESPONSE ───
+  if (url.pathname === "/api/debug-kokoro") {
+    const text = url.searchParams.get("text") || "Hello, this is Classoni.";
+    const key = getSecret("DEEPINFRA_API_KEY");
+    if (!key) return json({ error: "no key" }, 500);
+
+    try {
+      const r = await fetch(
+        "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
+        {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + key,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text,
+            voice: "am_liam",
+            speed: 1.0,
+            output_format: "mp3",
+            return_timestamps: true,
+          }),
+        }
+      );
+
+      const raw = await r.text();
+
+      return json({
+        status: r.status,
+        contentType: r.headers.get("content-type"),
+        response_preview: raw.slice(0, 800),
+        response_length: raw.length,
+      });
+    } catch (err) {
+      return json({ error: String(err) }, 500);
+    }
+  }
+
   // ─── GENERATE TTS (chunked, merged audio + word timestamps) ───
   if (url.pathname === "/api/generate-tts") {
     let text = "";
@@ -146,7 +184,6 @@ async function handleApi(request: Request): Promise<Response | null> {
     const key = getSecret("DEEPINFRA_API_KEY");
     if (!key) return json({ error: "no key" }, 500);
 
-    // Chunk into 40-word pieces
     const words = text.split(/\s+/).filter(Boolean);
     const CHUNK_SIZE = 40;
     const chunks: string[] = [];
@@ -183,21 +220,20 @@ async function handleApi(request: Request): Promise<Response | null> {
 
         if (!r.ok) {
           const errText = await r.text();
-          errors.push(
-            "chunk " + ci + " HTTP " + r.status + ": " + errText.slice(0, 150)
-          );
+          errors.push("chunk " + ci + " HTTP " + r.status + ": " + errText.slice(0, 150));
           continue;
         }
 
         const data: any = await r.json();
 
-        if (!data.audio || typeof data.audio !== "string" || data.audio.length < 100) {
+        // Try multiple possible keys for the audio payload
+        const audioRaw = data.audio || data.output || data.audio_url || "";
+        if (!audioRaw || typeof audioRaw !== "string" || audioRaw.length < 100) {
           errors.push("chunk " + ci + " returned no audio");
           continue;
         }
 
-        // Strip the "data:audio/mp3;base64," prefix BEFORE decoding
-        const rawB64 = stripDataUrl(data.audio);
+        const rawB64 = stripDataUrl(audioRaw);
         if (!rawB64) {
           errors.push("chunk " + ci + " empty base64 after strip");
           continue;
@@ -205,16 +241,28 @@ async function handleApi(request: Request): Promise<Response | null> {
 
         allBytes.push(b64ToBytes(rawB64));
 
+        // Try multiple possible keys for the word timestamps
+        const chunkWords =
+          data.words ||
+          data.timestamps ||
+          data.word_timestamps ||
+          data.alignment ||
+          [];
+
         let lastEnd = 0;
-        const chunkWords = data.words || [];
-        for (const w of chunkWords) {
-          allWords.push({
-            id: wordId++,
-            start: w.start + cumulativeOffset,
-            end: w.end + cumulativeOffset,
-            text: w.text,
-          });
-          if (w.end > lastEnd) lastEnd = w.end;
+        if (Array.isArray(chunkWords)) {
+          for (const w of chunkWords) {
+            const start = typeof w.start === "number" ? w.start : (w.start_time || 0);
+            const end = typeof w.end === "number" ? w.end : (w.end_time || 0);
+            const wtext = w.text || w.word || "";
+            allWords.push({
+              id: wordId++,
+              start: start + cumulativeOffset,
+              end: end + cumulativeOffset,
+              text: wtext,
+            });
+            if (end > lastEnd) lastEnd = end;
+          }
         }
         cumulativeOffset += lastEnd + 0.15;
       } catch (err) {
@@ -241,7 +289,6 @@ async function handleApi(request: Request): Promise<Response | null> {
       pos += b.length;
     }
 
-    // Return the merged audio as a full data URL — frontend uses it directly
     return json({
       audio: "data:audio/mpeg;base64," + bytesToB64(merged),
       words: allWords,
