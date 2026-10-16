@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 interface Props {
   size?: number;
@@ -6,138 +7,188 @@ interface Props {
 }
 
 export default function RavenMascot({ size = 80, animated = false }: Props) {
+  const [phase, setPhase] = useState<"reading" | "looking">("reading");
+  const [blinking, setBlinking] = useState(false);
+
+  // Behaviour cycle:
+  //   Reading (head bowed, eyes down) for 3 seconds
+  //   Looking at student (head up, eyes forward) for 4 seconds with 2 blinks
+  //   Repeat
+  useEffect(() => {
+    if (!animated) return;
+    let mounted = true;
+
+    const cycle = async () => {
+      while (mounted) {
+        // Phase 1 — reading for 3 seconds
+        setPhase("reading");
+        setBlinking(false);
+        await new Promise((r) => setTimeout(r, 3000));
+        if (!mounted) return;
+
+        // Phase 2 — looking for 4 seconds with 2 blinks
+        setPhase("looking");
+        await new Promise((r) => setTimeout(r, 500));
+        if (!mounted) return;
+
+        // Blink 1
+        setBlinking(true);
+        await new Promise((r) => setTimeout(r, 150));
+        if (!mounted) return;
+        setBlinking(false);
+        await new Promise((r) => setTimeout(r, 1400));
+        if (!mounted) return;
+
+        // Blink 2
+        setBlinking(true);
+        await new Promise((r) => setTimeout(r, 150));
+        if (!mounted) return;
+        setBlinking(false);
+        await new Promise((r) => setTimeout(r, 1800));
+        if (!mounted) return;
+      }
+    };
+
+    cycle();
+    return () => {
+      mounted = false;
+    };
+  }, [animated]);
+
   const wrapperStyle: React.CSSProperties = {
     width: size,
     height: "auto",
     display: "inline-block",
   };
 
+  const isReading = phase === "reading";
+  const pupilY = isReading ? 6 : 0;
+  const headRotate = isReading ? 6 : 0;
+
   const svg = (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560" style={{ width: "100%", height: "auto", display: "block" }}>
+    <svg
+      viewBox="0 0 240 320"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ width: "100%", height: "auto", display: "block" }}
+    >
       <defs>
-        <radialGradient id="headGrad" cx="50%" cy="35%" r="70%">
-          <stop offset="0%" stopColor="#5FB3FF" />
-          <stop offset="55%" stopColor="#1565FF" />
+        <radialGradient id="ravenBodyGrad" cx="50%" cy="40%" r="65%">
+          <stop offset="0%" stopColor="#4DA6FF" />
+          <stop offset="60%" stopColor="#0055FF" />
           <stop offset="100%" stopColor="#0033AA" />
         </radialGradient>
-        <radialGradient id="bellyGrad" cx="50%" cy="40%" r="60%">
-          <stop offset="0%" stopColor="#A8D5FF" />
-          <stop offset="100%" stopColor="#4DA6FF" />
-        </radialGradient>
-        <linearGradient id="capGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#1A3A7A" />
-          <stop offset="100%" stopColor="#0A1F44" />
+        <linearGradient id="ravenCapGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#0A1F44" />
+          <stop offset="100%" stopColor="#001133" />
         </linearGradient>
-        <linearGradient id="beakUp" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#FFD700" />
-          <stop offset="100%" stopColor="#FFB300" />
+        <linearGradient id="ravenBookGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#0055FF" />
+          <stop offset="100%" stopColor="#0033AA" />
         </linearGradient>
-        <linearGradient id="beakDown" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#FFA500" />
-          <stop offset="100%" stopColor="#FF8C00" />
-        </linearGradient>
-        <linearGradient id="wingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#0033AA" />
-          <stop offset="100%" stopColor="#1565FF" />
-        </linearGradient>
-        <linearGradient id="feetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#FFB300" />
-          <stop offset="100%" stopColor="#FF8C00" />
-        </linearGradient>
-        <radialGradient id="irisGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#4DA6FF" />
-          <stop offset="70%" stopColor="#1565FF" />
-          <stop offset="100%" stopColor="#0A2E7A" />
-        </radialGradient>
       </defs>
 
-      {/* FEET */}
-      <g id="feet">
-        <ellipse cx="155" cy="525" rx="32" ry="15" fill="url(#feetGrad)" />
-        <ellipse cx="245" cy="525" rx="32" ry="15" fill="url(#feetGrad)" />
-      </g>
+      {/* Feet */}
+      <ellipse cx="88" cy="290" rx="14" ry="9" fill="#FF9900" />
+      <ellipse cx="152" cy="290" rx="14" ry="9" fill="#FF9900" />
 
-      {/* BODY */}
-      <g id="body">
-        <ellipse cx="200" cy="370" rx="130" ry="145" fill="url(#headGrad)" />
-        <ellipse cx="200" cy="400" rx="80" ry="95" fill="url(#bellyGrad)" />
-      </g>
+      {/* Body */}
+      <ellipse cx="120" cy="215" rx="78" ry="82" fill="url(#ravenBodyGrad)" />
 
-      {/* WINGS */}
-      <g id="leftWing">
-        <path d="M 75 320 Q 45 370 55 440 Q 70 465 100 450 Q 85 400 100 340 Z" fill="url(#wingGrad)" />
-      </g>
-      <g id="rightWing">
-        <path d="M 325 320 Q 355 370 345 440 Q 330 465 300 450 Q 315 400 300 340 Z" fill="url(#wingGrad)" />
-      </g>
+      {/* Belly */}
+      <ellipse cx="120" cy="230" rx="48" ry="52" fill="#4DA6FF" />
 
-      {/* HEAD */}
-      <g id="head">
-        <circle cx="200" cy="215" r="115" fill="url(#headGrad)" />
-      </g>
+      {/* Wings — rest at sides */}
+      <ellipse cx="44" cy="210" rx="18" ry="44" fill="#0033CC" />
+      <ellipse cx="196" cy="210" rx="18" ry="44" fill="#0033CC" />
 
-      {/* GRADUATION CAP */}
-      <g id="cap">
-        <ellipse cx="200" cy="150" rx="90" ry="18" fill="#0A1F44" />
-        <path d="M 200 75 L 350 145 L 200 175 L 50 145 Z" fill="url(#capGrad)" />
-        <path d="M 200 85 L 335 145 L 200 165 L 65 145 Z" fill="#1A3A7A" opacity="0.4" />
-        <path d="M 120 155 Q 200 130 280 155 L 280 165 Q 200 145 120 165 Z" fill="#0A1F44" />
-      </g>
+      {/* Head group — tilts when reading */}
+      <motion.g
+        animate={{ rotate: headRotate }}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
+        style={{ originX: "120px", originY: "185px" }}
+      >
+        {/* Head */}
+        <circle cx="120" cy="115" r="68" fill="url(#ravenBodyGrad)" />
 
-      {/* TASSEL */}
-      <g id="tassel">
-        <path d="M 90 155 Q 65 185 70 225" stroke="#FFD700" strokeWidth="4" fill="none" strokeLinecap="round" />
-        <circle cx="70" cy="230" r="7" fill="#FFD700" />
-        <rect x="62" y="233" width="16" height="8" rx="3" fill="#FFB300" />
-        <path d="M 65 242 Q 63 270 68 290" stroke="#FFD700" strokeWidth="3" fill="none" strokeLinecap="round" />
-        <path d="M 72 244 Q 72 275 73 292" stroke="#FFD700" strokeWidth="3" fill="none" strokeLinecap="round" />
-        <path d="M 79 242 Q 82 270 78 290" stroke="#FFD700" strokeWidth="3" fill="none" strokeLinecap="round" />
-      </g>
+        {/* Graduation cap */}
+        <polygon points="42,68 198,68 220,86 20,86" fill="url(#ravenCapGrad)" />
+        <polygon points="72,48 168,48 192,68 48,68" fill="#0A1F44" />
+        <rect x="86" y="82" width="68" height="14" rx="5" fill="#001133" />
 
-      {/* EYES */}
-      <g id="leftEye">
-        <ellipse cx="155" cy="215" rx="42" ry="44" fill="#FFFFFF" />
-        <circle cx="155" cy="220" r="26" fill="url(#irisGrad)" />
-        <circle cx="155" cy="220" r="15" fill="#0A1F44" />
-        <circle cx="145" cy="208" r="7" fill="#FFFFFF" />
-        <circle cx="165" cy="232" r="3" fill="#FFFFFF" />
-      </g>
-      <g id="rightEye">
-        <ellipse cx="245" cy="215" rx="42" ry="44" fill="#FFFFFF" />
-        <circle cx="245" cy="220" r="26" fill="url(#irisGrad)" />
-        <circle cx="245" cy="220" r="15" fill="#0A1F44" />
-        <circle cx="235" cy="208" r="7" fill="#FFFFFF" />
-        <circle cx="255" cy="232" r="3" fill="#FFFFFF" />
-      </g>
+        {/* Tassel */}
+        <path
+          d="M 42 84 Q 28 105 30 138"
+          stroke="#FFD700"
+          strokeWidth="5"
+          fill="none"
+        />
+        <circle cx="30" cy="143" r="7" fill="#FFD700" />
+        <rect x="25" y="148" width="10" height="24" rx="3" fill="#FFD700" />
 
-      {/* EYEBROWS */}
-      <g id="eyebrows">
-        <path d="M 120 165 Q 145 145 180 155" stroke="#4DA6FF" strokeWidth="7" fill="none" strokeLinecap="round" />
-        <path d="M 280 165 Q 255 145 220 155" stroke="#4DA6FF" strokeWidth="7" fill="none" strokeLinecap="round" />
-      </g>
+        {/* Eye whites */}
+        <circle cx="95" cy="120" r="24" fill="#FFFFFF" />
+        <circle cx="145" cy="120" r="24" fill="#FFFFFF" />
 
-      {/* BEAK */}
-      <g id="beak">
-        <path d="M 200 245 L 178 282 Q 200 292 222 282 Z" fill="url(#beakUp)" />
-        <path d="M 182 285 Q 200 300 218 285 Q 200 292 182 285 Z" fill="url(#beakDown)" />
-      </g>
+        {/* Pupils — move down when reading */}
+        <motion.g
+          animate={{ y: pupilY }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+        >
+          <circle cx="95" cy="120" r="13" fill="#0A1F44" />
+          <circle cx="145" cy="120" r="13" fill="#0A1F44" />
+          <circle cx="99" cy="115" r="4" fill="#FFFFFF" />
+          <circle cx="149" cy="115" r="4" fill="#FFFFFF" />
+        </motion.g>
 
-      {/* OPEN BOOK */}
-      <g id="book">
-        <path d="M 60 400 Q 60 385 80 385 L 320 385 Q 340 385 340 400 L 340 525 Q 340 540 320 540 L 80 540 Q 60 540 60 525 Z" fill="#0A1F44" />
-        <path d="M 75 395 L 195 400 L 195 525 L 75 520 Z" fill="#F0F0F0" />
-        <path d="M 85 405 L 190 408 L 190 515 L 85 512 Z" fill="#FAFAFA" />
-        <path d="M 325 395 L 205 400 L 205 525 L 325 520 Z" fill="#E8E8E8" />
-        <path d="M 315 405 L 210 408 L 210 515 L 315 512 Z" fill="#F5F5F5" />
-        <line x1="200" y1="392" x2="200" y2="527" stroke="#0A1F44" strokeWidth="3" />
-      </g>
+        {/* Eyelids — blink */}
+        <motion.g
+          animate={{ opacity: blinking ? 1 : 0 }}
+          transition={{ duration: 0.08 }}
+          style={{ pointerEvents: "none" }}
+        >
+          <ellipse cx="95" cy="120" rx="26" ry="26" fill="#0055FF" />
+          <ellipse cx="145" cy="120" rx="26" ry="26" fill="#0055FF" />
+        </motion.g>
+
+        {/* Beak */}
+        <polygon points="120,142 108,162 132,162" fill="#FFD700" />
+        <polygon points="120,155 111,162 129,162" fill="#FF9900" />
+      </motion.g>
+
+      {/* Book — brighter when reading, dimmer when looking */}
+      <motion.g
+        animate={{
+          opacity: isReading ? 1 : 0.35,
+          y: isReading ? 0 : 8,
+        }}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
+      >
+        {/* Book cover */}
+        <path
+          d="M 55 248 Q 55 236 70 236 L 170 236 Q 185 236 185 248 L 185 288 Q 185 296 170 296 L 70 296 Q 55 296 55 288 Z"
+          fill="url(#ravenBookGrad)"
+        />
+        {/* Left page */}
+        <path d="M 62 244 L 118 248 L 118 290 L 62 288 Z" fill="#F3F4F6" />
+        {/* Right page */}
+        <path d="M 178 244 L 122 248 L 122 290 L 178 288 Z" fill="#E5E7EB" />
+        {/* Spine */}
+        <line x1="120" y1="242" x2="120" y2="292" stroke="#0A1F44" strokeWidth="2" />
+        {/* Tiny text lines on pages */}
+        <line x1="72" y1="258" x2="112" y2="259" stroke="#B8BCC4" strokeWidth="1.5" />
+        <line x1="72" y1="268" x2="112" y2="269" stroke="#B8BCC4" strokeWidth="1.5" />
+        <line x1="72" y1="278" x2="106" y2="279" stroke="#B8BCC4" strokeWidth="1.5" />
+        <line x1="128" y1="259" x2="168" y2="258" stroke="#B8BCC4" strokeWidth="1.5" />
+        <line x1="128" y1="269" x2="168" y2="268" stroke="#B8BCC4" strokeWidth="1.5" />
+        <line x1="128" y1="279" x2="162" y2="278" stroke="#B8BCC4" strokeWidth="1.5" />
+      </motion.g>
     </svg>
   );
 
   if (animated) {
     return (
       <motion.div
-        animate={{ y: [0, -4, 0] }}
+        animate={{ y: [0, -3, 0] }}
         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         style={wrapperStyle}
       >
@@ -147,4 +198,4 @@ export default function RavenMascot({ size = 80, animated = false }: Props) {
   }
 
   return <div style={wrapperStyle}>{svg}</div>;
-            }
+      }
