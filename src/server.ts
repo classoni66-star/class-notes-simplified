@@ -129,7 +129,6 @@ async function handleApi(request: Request): Promise<Response | null> {
     return json({ status: "alive", keyPresent: !!key });
   }
 
-  // ─── GENERATE AUDIO CHUNKS — parallel generation ───
   if (url.pathname === "/api/generate-full-audio" && request.method === "POST") {
     const body: any = await request.json();
     const sections = body.sections || [];
@@ -142,7 +141,6 @@ async function handleApi(request: Request): Promise<Response | null> {
 
     const CHUNK_SIZE = 40;
 
-    // Build the plan: one task per (section, piece) pair
     type Piece = {
       section_index: number;
       section_id: string;
@@ -174,7 +172,6 @@ async function handleApi(request: Request): Promise<Response | null> {
       });
     }
 
-    // Fire all Kokoro calls in parallel with limited concurrency
     const tasks = pieces.map((p) => async () => {
       try {
         const r = await fetch(
@@ -196,7 +193,7 @@ async function handleApi(request: Request): Promise<Response | null> {
         );
 
         if (!r.ok) {
-          return { ok: false, error: `HTTP ${r.status}` } as any;
+          return { ok: false, error: "HTTP " + r.status } as any;
         }
 
         const data: any = await r.json();
@@ -226,7 +223,6 @@ async function handleApi(request: Request): Promise<Response | null> {
       }
     });
 
-    // Concurrency 4 — fast enough, avoids rate limits
     const results = await runWithConcurrency(tasks, 4);
 
     const goodChunks: any[] = [];
@@ -235,7 +231,7 @@ async function handleApi(request: Request): Promise<Response | null> {
       if (r && r.ok) {
         goodChunks.push(r.chunk);
       } else {
-        errors.push(`piece ${i}: ${r?.error || "unknown"}`);
+        errors.push("piece " + i + ": " + (r && r.error ? r.error : "unknown"));
       }
     });
 
@@ -243,7 +239,6 @@ async function handleApi(request: Request): Promise<Response | null> {
       return json({ error: "All chunks failed", details: errors }, 500);
     }
 
-    // Sort chunks by section + piece order (parallel may have kept order, but enforce)
     goodChunks.sort((a, b) => {
       if (a.section_index !== b.section_index) return a.section_index - b.section_index;
       return a.piece_index - b.piece_index;
@@ -256,7 +251,6 @@ async function handleApi(request: Request): Promise<Response | null> {
     });
   }
 
-  // ─── GENERATE LESSON ───
   if (url.pathname === "/api/generate-lesson") {
     const topic = url.searchParams.get("topic") || "";
     const country = url.searchParams.get("country") || "Uganda";
@@ -290,7 +284,9 @@ async function handleApi(request: Request): Promise<Response | null> {
         }
       );
       const data: any = await r.json();
-      const content = data?.choices?.[0]?.message?.content || "";
+      const content = data && data.choices && data.choices[0] && data.choices[0].message
+        ? data.choices[0].message.content || ""
+        : "";
       return new Response(content, {
         headers: { ...cors, "Content-Type": "application/json" },
       });
@@ -353,4 +349,4 @@ export default {
       });
     }
   },
-};.
+};
