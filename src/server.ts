@@ -170,7 +170,7 @@ async function handleApi(request: Request): Promise<Response | null> {
         body: JSON.stringify({
           text,
           voice: "am_liam",
-          speed: 0.85,
+          speed: 1.0,
           output_format: "mp3",
           return_timestamps: true,
         }),
