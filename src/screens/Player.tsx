@@ -207,7 +207,6 @@ export default function Player({
   useEffect(() => {
     if (!lesson) return;
 
-    // Section 0 audio was pre-fetched on the Loading screen
     if (currentSectionIndex === 0 && firstAudio) {
       setCurrentAudio(firstAudio);
       setLoadingAudio(false);
@@ -236,7 +235,7 @@ export default function Player({
           setCurrentAudio(data);
         }
       } catch {
-        // silent fail — visuals remain blank, audio section skipped
+        // silent fail
       } finally {
         if (mounted) setLoadingAudio(false);
       }
@@ -295,8 +294,8 @@ export default function Player({
       visualTimersRef.current.push(t);
     });
 
-    // MIME type fixed: audio/mpeg (not audio/mp3)
-    audio.src = "data:audio/mpeg;base64," + currentAudio.audio;
+    // Audio comes from the worker as a full data URL already
+    audio.src = currentAudio.audio;
     audio.playbackRate = playbackSpeed;
     audio
       .play()
@@ -444,7 +443,6 @@ export default function Player({
         />
       </div>
 
-      {/* CAPTION */}
       <div className="flex-shrink-0 px-4 py-2">
         <p className="text-center text-classoni-navy text-base leading-relaxed">
           {loadingLesson
@@ -453,7 +451,6 @@ export default function Player({
         </p>
       </div>
 
-      {/* VISUAL CANVAS */}
       <div className="flex-1 min-h-0 mx-4 mb-2 relative">
         <div
           onClick={togglePlay}
@@ -496,7 +493,6 @@ export default function Player({
           </AnimatePresence>
         </div>
 
-        {/* Speed pill */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -564,7 +560,6 @@ export default function Player({
         )}
       </div>
 
-      {/* PROGRESS BAR */}
       <div className="flex-shrink-0 px-4 pt-1 pb-2">
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-classoni-navy/60 font-medium w-9 text-right">
@@ -582,7 +577,6 @@ export default function Player({
         </div>
       </div>
 
-      {/* PILL BUTTONS */}
       <div className="flex-shrink-0 px-4 pb-2 flex gap-2">
         <button
           onClick={() => openSheet("apply")}
@@ -621,7 +615,6 @@ export default function Player({
         />
       </div>
 
-      {/* BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet && (
           <>
@@ -827,7 +820,6 @@ export default function Player({
         )}
       </AnimatePresence>
 
-      {/* FEEDBACK MODAL */}
       <AnimatePresence>
         {feedbackOpen && (
           <>
@@ -910,4 +902,4 @@ export default function Player({
       </AnimatePresence>
     </div>
   );
-        }
+  }
