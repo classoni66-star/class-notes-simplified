@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import RavenMascot from "../components/RavenMascot";
 
 interface Props {
-  setScreen: (s: string) => void;
+  navigate?: (s: string) => void;
+  setScreen?: (s: string) => void;
 }
 
 const STEPS = [
@@ -20,22 +21,25 @@ const STEPS = [
   "🚀 BOOM... your lesson is ready!",
 ];
 
-export default function Loading({ setScreen }: Props) {
+export default function Loading({ navigate, setScreen }: Props) {
   const [visible, setVisible] = useState(0);
+
+  // Use whichever navigation prop the parent supplies
+  const go = navigate || setScreen || (() => {});
 
   useEffect(() => {
     const timers = STEPS.map((_, i) =>
       setTimeout(() => setVisible(i + 1), (i + 1) * 900),
     );
     const done = setTimeout(
-      () => setScreen("player"),
-      STEPS.length * 900 + 1200,
+      () => go("player"),
+      STEPS.length * 900 + 1500,
     );
     return () => {
       timers.forEach(clearTimeout);
       clearTimeout(done);
     };
-  }, [setScreen]);
+  }, [go]);
 
   return (
     <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-6 pt-4">
@@ -71,4 +75,4 @@ export default function Loading({ setScreen }: Props) {
       </ul>
     </div>
   );
-     }
+        }
