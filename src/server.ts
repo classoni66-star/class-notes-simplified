@@ -22,31 +22,37 @@ function getSecret(name: string): string | undefined {
   return undefined;
 }
 
-function stripDataUrl(audio: string): string {
-  if (!audio) return "";
-  const idx = audio.indexOf("base64,");
-  if (idx !== -1) return audio.slice(idx + 7);
-  return audio;
-}
-
-const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni. Take the notes or curriculum topic and produce ONE fully choreographed keypoint lesson as strict JSON.
+const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni. Take the notes or curriculum topic and produce ONE keypoint broken into micro-concepts as strict JSON.
 
 OUTPUT FORMAT — STRICT JSON:
 {
   "keypoint_title": "string",
-  "sections": [
-    { "id": "curiosity_question", "narration_text": "string", "visuals": [] },
-    { "id": "keypoint_identity", "narration_text": "string", "visuals": [] },
-    { "id": "emotional_hook", "narration_text": "string", "visuals": [] },
-    { "id": "walkthrough", "narration_text": "string", "visuals": [] },
-    { "id": "mental_anchor", "narration_text": "string", "visuals": [] },
-    { "id": "common_confusion", "narration_text": "string", "visuals": [] }
+  "location_indicator": "string — e.g., '1.2'",
+  "micro_steps": [
+    {
+      "step_number": 1,
+      "micro_step_title": "string — e.g., 'Particles Never Sit Still'",
+      "visual_skeleton_text": "string — A short, punchy bulleted list or definition that acts as the visual card. Use \\n for line breaks. DO NOT GENERATE SVG CODE.",
+      "audio_segments": ["string", "string"], 
+      "explain_context": "string — the core marking pillars the student must mention"
+    }
   ],
-  "apply": { "scenario": "string", "skeleton": "string or null", "solution": "string" },
-  "quiz": { "type": "mcq", "question": "string", "options": ["A","B","C","D"], "correct_answer": "string", "explanation": "string" }
+  "apply": {
+    "title": "Application of [keypoint_title]",
+    "scenario": "string",
+    "solution": "string"
+  },
+  "quiz": {
+    "title": "Exam Question",
+    "type": "mcq",
+    "question": "string",
+    "options": ["A","B","C","D"],
+    "correct_answer": "string",
+    "explanation": "string"
+  }
 }
 
-TEST MODE: Generate ONE keypoint only. Return ONE JSON object.`;
+TEST MODE: Return ONE JSON object. Nothing before or after.`;
 
 async function handleApi(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
@@ -57,23 +63,19 @@ async function handleApi(request: Request): Promise<Response | null> {
       headers: { ...GLOBAL_CORS, "Content-Type": "application/json" },
     });
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: GLOBAL_CORS });
-  }
+  if (request.method === "OPTIONS") return new Response(null, { headers: GLOBAL_CORS });
 
   if (url.pathname === "/api/health") {
-    const key = getSecret("DEEPINFRA_API_KEY");
-    return json({ status: "alive", keyPresent: !!key });
+    return json({ status: "alive" });
   }
 
-  // ─── GENERATE LESSON ───
   if (url.pathname === "/api/generate-lesson") {
     try {
       const topic = url.searchParams.get("topic") || "";
       if (!topic) return json({ error: "topic is required" }, 400);
       
       const key = getSecret("DEEPINFRA_API_KEY");
-      if (!key) return json({ error: "DeepInfra API key is missing" }, 500);
+      if (!key) return json({ error: "API key missing" }, 500);
 
       const userMessage = "STANDARD CURRICULUM SOURCE\nSubject and topic: " + topic + "\n\nGenerate ONE keypoint.";
 
@@ -81,79 +83,40 @@ async function handleApi(request: Request): Promise<Response | null> {
         method: "POST",
         headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "deepseek-ai/DeepSeek-V4-Flash",
+          model: "deepseek-ai/DeepSeek-V4.1-Flash", // Your requested model
           messages: [
             { role: "system", content: LESSON_SYSTEM_PROMPT },
             { role: "user", content: userMessage },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 4000,
+          max_tokens: 3000, // Low token limit keeps it fast
         }),
       });
 
-      if (!r.ok) {
-        const rawText = await r.text();
-        return json({ error: "DeepInfra rejected: " + rawText.slice(0, 200) }, 500);
-      }
+      if (!r.ok) return json({ error: "DeepInfra rejected: " + (await r.text()).slice(0, 100) }, 500);
 
       const data: any = await r.json();
       let content = data?.choices?.[0]?.message?.content || "";
 
+      // Strip markdown if the AI adds it
       content = content.trim();
       if (content.startsWith("```json")) content = content.slice(7);
       else if (content.startsWith("```")) content = content.slice(3);
       if (content.endsWith("```")) content = content.slice(0, -3);
-      content = content.trim();
-
-      // VALIDATE THE JSON BEFORE SENDING TO FRONTEND
+      
+      // Validate
       try {
         const parsed = JSON.parse(content);
-        if (!parsed.sections || !Array.isArray(parsed.sections)) {
-          return json({ error: "LLM returned invalid structure. Missing sections. Raw: " + content.slice(0, 150) }, 500);
+        if (!parsed.micro_steps || !Array.isArray(parsed.micro_steps)) {
+          return json({ error: "AI returned malformed data. Missing micro_steps. Raw: " + content.slice(0, 100) }, 500);
         }
       } catch (e) {
-        return json({ error: "LLM returned malformed JSON: " + content.slice(0, 150) }, 500);
+        return json({ error: "AI returned invalid JSON." }, 500);
       }
 
       return new Response(content, { headers: { ...GLOBAL_CORS, "Content-Type": "application/json" } });
     } catch (err) {
       return json({ error: "Worker crashed: " + String(err) }, 500);
-    }
-  }
-
-  // ─── GENERATE AUDIO (ONE CHUNK) ───
-  if (url.pathname === "/api/generate-audio" && request.method === "POST") {
-    try {
-      const body: any = await request.json();
-      const text = body.text || "";
-      if (!text) return json({ error: "text is required" }, 400);
-
-      const key = getSecret("DEEPINFRA_API_KEY");
-      if (!key) return json({ error: "no key" }, 500);
-
-      const r = await fetch("https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: text,
-          preset_voice: "am_liam",
-          speed: 1.0,
-          output_format: "mp3",
-          return_timestamps: true,
-        }),
-      });
-
-      if (!r.ok) return json({ error: "Kokoro failed with status " + r.status }, 500);
-      
-      const data: any = await r.json();
-      if (!data.audio) return json({ error: "No audio returned" }, 500);
-
-      return json({
-        audio: "data:audio/mpeg;base64," + stripDataUrl(data.audio),
-        words: data.words || []
-      });
-    } catch (err) {
-      return json({ error: "Audio crashed: " + String(err) }, 500);
     }
   }
 
@@ -174,14 +137,13 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   if (contentType.indexOf("application/json") !== -1) return response;
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
-  console.error(consumeLastCapturedError() || new Error("h3 swallowed SSR error: " + body));
   return new Response(renderErrorPage(), { status: 500, headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
 function isH3SwallowedErrorBody(body: string): boolean {
   try {
-    const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
-    return payload.unhandled === true && payload.message === "HTTPError";
+    const parsed = JSON.parse(body);
+    return parsed.unhandled === true && parsed.message === "HTTPError";
   } catch { return false; }
 }
 
@@ -191,12 +153,9 @@ export default {
     try {
       const apiResponse = await handleApi(request);
       if (apiResponse) return apiResponse;
-    } catch (apiErr) {
-      return new Response(JSON.stringify({ error: "API routing failed: " + String(apiErr) }), {
-        status: 500, headers: { ...GLOBAL_CORS, "Content-Type": "application/json" }
-      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...GLOBAL_CORS, "Content-Type": "application/json" }});
     }
-
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
