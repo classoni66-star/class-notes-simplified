@@ -10,37 +10,28 @@ export default function Source({ setScreen }: Props) {
       </h2>
 
       <div className="space-y-4 flex-1">
-        {/* Primary Option */}
         <button
           onClick={() => setScreen("loading")}
           className="w-full bg-classoni-yellow text-classoni-navy rounded-2xl p-6 text-left shadow-lg active:scale-95 transition-transform"
         >
           <h3 className="font-bold text-lg mb-1">Use standard curriculum notes</h3>
-          <p className="text-classoni-navy/70 text-sm">
-            Instant, AI-generated, exam-ready.
-          </p>
+          <p className="text-classoni-navy/70 text-sm">Instant, AI-generated, exam-ready.</p>
         </button>
 
-        {/* Secondary Option */}
         <button
-          onClick={() => setScreen("loading")}
+          onClick={() => setScreen("uploadNotes")}
           className="w-full bg-white/10 border border-white/20 text-white rounded-2xl p-6 text-left active:scale-95 transition-transform"
         >
           <h3 className="font-bold text-lg mb-1">Upload my own notes</h3>
-          <p className="text-white/60 text-sm">
-            PDF, images, or handwritten.
-          </p>
+          <p className="text-white/60 text-sm">Paste text to generate a custom lesson.</p>
         </button>
       </div>
 
       <div className="flex-shrink-0 pb-8">
-        <button
-          onClick={() => setScreen("input")}
-          className="w-full bg-transparent text-white/50 text-sm font-semibold py-4"
-        >
+        <button onClick={() => setScreen("input")} className="w-full bg-transparent text-white/50 text-sm font-semibold py-4">
           ← Back
         </button>
       </div>
     </div>
   );
-           }
+}
