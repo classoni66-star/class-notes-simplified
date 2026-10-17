@@ -63,37 +63,50 @@ async function handleApi(request: Request): Promise<Response | null> {
       headers: { ...GLOBAL_CORS, "Content-Type": "application/json" },
     });
 
-  if (request.method === "OPTIONS") return new Response(null, { headers: GLOBAL_CORS });
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: GLOBAL_CORS });
+  }
 
   if (url.pathname === "/api/health") {
     return json({ status: "alive" });
   }
 
-  if (url.pathname === "/api/generate-lesson") {
+  // ─── GENERATE LESSON ───
+  if (url.pathname === "/api/generate-lesson" && request.method === "POST") {
     try {
-      const topic = url.searchParams.get("topic") || "";
-      if (!topic) return json({ error: "topic is required" }, 400);
-      
+      const body: any = await request.json();
+      const topic = body.topic || "General Studies";
+      const notes = body.notes || "";
+
       const key = getSecret("DEEPINFRA_API_KEY");
       if (!key) return json({ error: "API key missing" }, 500);
 
-      const userMessage = "STANDARD CURRICULUM SOURCE\nSubject and topic: " + topic + "\n\nGenerate ONE keypoint.";
+      // If notes exist, we tell the AI to use them. If not, standard curriculum.
+      let userMessage = "";
+      if (notes.trim().length > 10) {
+        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract the core keypoints from these specific notes and generate the lesson.`;
+      } else {
+        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint.`;
+      }
 
       const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
         method: "POST",
         headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "deepseek-ai/DeepSeek-V4.1-Flash", // Your requested model
+          model: "deepseek-ai/DeepSeek-V4-Flash-0731",
           messages: [
             { role: "system", content: LESSON_SYSTEM_PROMPT },
             { role: "user", content: userMessage },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 3000, // Low token limit keeps it fast
+          max_tokens: 4000,
         }),
       });
 
-      if (!r.ok) return json({ error: "DeepInfra rejected: " + (await r.text()).slice(0, 100) }, 500);
+      if (!r.ok) {
+        const errText = await r.text();
+        return json({ error: "DeepInfra rejected: " + errText.slice(0, 150) }, 500);
+      }
 
       const data: any = await r.json();
       let content = data?.choices?.[0]?.message?.content || "";
@@ -103,8 +116,9 @@ async function handleApi(request: Request): Promise<Response | null> {
       if (content.startsWith("```json")) content = content.slice(7);
       else if (content.startsWith("```")) content = content.slice(3);
       if (content.endsWith("```")) content = content.slice(0, -3);
-      
-      // Validate
+      content = content.trim();
+
+      // Validate the JSON structure before sending to frontend
       try {
         const parsed = JSON.parse(content);
         if (!parsed.micro_steps || !Array.isArray(parsed.micro_steps)) {
@@ -137,14 +151,17 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   if (contentType.indexOf("application/json") !== -1) return response;
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
+  console.error(consumeLastCapturedError() || new Error("h3 swallowed SSR error: " + body));
   return new Response(renderErrorPage(), { status: 500, headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
 function isH3SwallowedErrorBody(body: string): boolean {
   try {
-    const parsed = JSON.parse(body);
-    return parsed.unhandled === true && parsed.message === "HTTPError";
-  } catch { return false; }
+    const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
+    return payload.unhandled === true && payload.message === "HTTPError";
+  } catch {
+    return false;
+  }
 }
 
 export default {
@@ -153,15 +170,23 @@ export default {
     try {
       const apiResponse = await handleApi(request);
       if (apiResponse) return apiResponse;
-    } catch (e) {
-      return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...GLOBAL_CORS, "Content-Type": "application/json" }});
+    } catch (apiErr) {
+      return new Response(JSON.stringify({ error: "API routing failed: " + String(apiErr) }), {
+        status: 500,
+        headers: { ...GLOBAL_CORS, "Content-Type": "application/json" },
+      });
     }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
-      return new Response(renderErrorPage(), { status: 500, headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" } });
+      console.error(error);
+      return new Response(renderErrorPage(), {
+        status: 500,
+        headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" },
+      });
     }
   },
 };
