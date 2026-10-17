@@ -6,7 +6,7 @@ interface Props {
   navigate?: (s: string) => void;
   setScreen?: (s: string) => void;
   topic?: string;
-  onReady?: (lesson: any, audio: any) => void;
+  onReady?: (lesson: any) => void; // Notice: No audio passed here anymore
 }
 
 const STEPS = [
@@ -15,17 +15,12 @@ const STEPS = [
   "🏗️ Structuring your lesson...",
   "🎯 Creating a real-world question first...",
   "🎨 Searching for the best visuals...",
-  "🎙️ Recording your narrator...",
-  "📝 Adding captions and timing...",
   "🛡️ Checking for accuracy...",
-  "🎯 Creating your Apply scenario...",
-  "📝 Preparing your exam quiz...",
   "🚀 BOOM... your lesson is ready!",
 ];
 
 export default function Loading({ navigate, setScreen, topic, onReady }: Props) {
   const [visible, setVisible] = useState(0);
-  const [status, setStatus] = useState<"lesson" | "audio" | "done" | "error">("lesson");
   const [errorMsg, setErrorMsg] = useState("");
   const go = navigate || setScreen || (() => {});
   const startedRef = useRef(false);
@@ -33,135 +28,65 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-
     let cancelled = false;
 
     async function run() {
       try {
-        // Phase 1 — Lesson
         let stepIdx = 1;
         const stepTimer = setInterval(() => {
-          stepIdx = Math.min(stepIdx + 1, 3);
+          stepIdx = Math.min(stepIdx + 1, 5);
           if (!cancelled) setVisible(stepIdx);
-        }, 2500);
+        }, 2000);
 
-        const lessonUrl =
-          "https://classoni.classoni66.workers.dev/api/generate-lesson?topic=" +
-          encodeURIComponent(topic || "Sliding Filament Theory");
-
+        const lessonUrl = "https://classoni.classoni66.workers.dev/api/generate-lesson?topic=" + encodeURIComponent(topic || "Sliding Filament Theory");
         const lessonRes = await fetch(lessonUrl);
         const lesson = await lessonRes.json();
         clearInterval(stepTimer);
+        
         if (cancelled) return;
 
-        if (!lessonRes.ok || lesson.error) {
-          throw new Error(lesson.error || "Unknown server error");
+        if (!lessonRes.ok || lesson.error) throw new Error(lesson.error || "Unknown server error");
+        if (!lesson.sections || !lesson.sections.length) {
+          const dump = JSON.stringify(lesson).slice(0, 200);
+          throw new Error("Missing 'sections'. LLM returned: " + dump);
         }
 
-        if (!lesson || !lesson.sections || !lesson.sections.length) {
-          // DUMP THE ACTUAL JSON SO WE CAN SEE WHAT DEEPSEEK RETURNED
-          const dump = JSON.stringify(lesson).slice(0, 300);
-          throw new Error("Missing 'sections'. DeepSeek returned: " + dump);
-        }
-
-        // Phase 2 — Audio
-        setVisible(4);
-        setStatus("audio");
-
-        let audioStep = 4;
-        const audioTimer = setInterval(() => {
-          audioStep = Math.min(audioStep + 1, 10);
-          if (!cancelled) setVisible(audioStep);
-        }, 3000); 
-
-        const audioRes = await fetch(
-          "https://classoni.classoni66.workers.dev/api/generate-full-audio",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sections: lesson.sections.map((s: any) => ({
-                id: s.id,
-                narration_text: s.narration_text,
-              })),
-            }),
-          }
-        );
-        const fullAudio = await audioRes.json();
-        clearInterval(audioTimer);
-        if (cancelled) return;
-
-        if (!fullAudio || !fullAudio.chunks || !fullAudio.chunks.length) {
-          const detail = fullAudio && fullAudio.error 
-            ? fullAudio.error 
-            : "no chunks returned from worker";
-          throw new Error("Audio generation failed: " + detail);
-        }
-
-        setVisible(11);
-        setStatus("done");
-
-        // Delay slightly to let the UI finish ticking, then transition
+        setVisible(7);
         setTimeout(() => {
-          if (onReady) onReady(lesson, fullAudio);
+          if (onReady) onReady(lesson);
           else go("player");
         }, 800);
         
       } catch (err) {
         if (cancelled) return;
-        console.error("[Loading] error:", err);
         setErrorMsg(String(err));
-        setStatus("error");
       }
     }
 
     run();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { cancelled = true; };
   }, [topic]);
 
   return (
     <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-6 pt-4">
       <h1 className="text-white font-bold text-xl text-center">Building your lesson</h1>
-      <p className="text-white/70 text-xs text-center mt-1">
-        A little preparation. A lot of understanding.
-      </p>
-
-      <div className="flex justify-center mt-3">
-        <RavenMascot size={110} animated={true} />
-      </div>
-
-      <ul className="mt-4 space-y-2 overflow-y-auto flex-1 pb-4">
+      <div className="flex justify-center mt-4"><RavenMascot size={100} animated={true} /></div>
+      
+      <ul className="mt-6 space-y-3 overflow-y-auto flex-1 pb-4">
         {STEPS.map((step, i) => (
-          <motion.li
-            key={i}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: visible > i ? 1 : 0.25, x: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center justify-between text-white text-sm"
-          >
+          <motion.li key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: visible > i ? 1 : 0.25, x: 0 }} className="flex items-center justify-between text-white text-sm">
             <span>{step}</span>
             {visible > i && <span className="text-classoni-yellow">✓</span>}
           </motion.li>
         ))}
       </ul>
 
-      {status === "error" && (
+      {errorMsg && (
         <div className="flex-shrink-0 mb-4 bg-red-500/20 border border-red-500/40 rounded-xl p-3">
-          <p className="text-red-200 text-xs font-semibold mb-1">
-            Something went wrong while building your lesson.
-          </p>
           <p className="text-red-200/70 text-[10px] break-all">{errorMsg}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-3 w-full bg-white text-classoni-navy rounded-full py-2 text-xs font-bold"
-          >
-            Try again
-          </button>
+          <button onClick={() => window.location.reload()} className="mt-3 w-full bg-white text-classoni-navy rounded-full py-2 text-xs font-bold">Try again</button>
         </div>
       )}
     </div>
   );
-                      }
+      }
