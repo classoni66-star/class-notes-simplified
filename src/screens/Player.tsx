@@ -38,7 +38,7 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
 
     async function run() {
       try {
-        // Phase 1 — lesson
+        // Phase 1 — Lesson
         let stepIdx = 1;
         const stepTimer = setInterval(() => {
           stepIdx = Math.min(stepIdx + 1, 3);
@@ -53,11 +53,17 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         const lesson = await lessonRes.json();
         clearInterval(stepTimer);
         if (!mounted) return;
-        if (!lesson || !lesson.sections || !lesson.sections.length) {
-          throw new Error("Lesson generation returned no sections");
+
+        // SHOW THE REAL ERROR FROM THE WORKER
+        if (!lessonRes.ok || lesson.error) {
+          throw new Error(lesson.error || "Unknown server error");
         }
 
-        // Phase 2 — full audio (all sections returned as chunks)
+        if (!lesson || !lesson.sections || !lesson.sections.length) {
+          throw new Error("Lesson JSON is missing 'sections' array. The AI returned malformed data.");
+        }
+
+        // Phase 2 — Audio
         setVisible(4);
         setStatus("audio");
 
@@ -84,13 +90,11 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         clearInterval(audioTimer);
         if (!mounted) return;
 
-        // NEW response shape: { chunks, totalChunks, errors }
         if (!fullAudio || !fullAudio.chunks || !fullAudio.chunks.length) {
-          const detail =
-            fullAudio && fullAudio.details
-              ? JSON.stringify(fullAudio.details).slice(0, 200)
-              : "no chunks returned";
-          throw new Error("Full audio generation failed: " + detail);
+          const detail = fullAudio && fullAudio.error 
+            ? fullAudio.error 
+            : "no chunks returned";
+          throw new Error("Audio generation failed: " + detail);
         }
 
         setVisible(11);
@@ -158,4 +162,4 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
       )}
     </div>
   );
-                                       }
+        }
