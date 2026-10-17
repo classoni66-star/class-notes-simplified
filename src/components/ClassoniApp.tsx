@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import Welcome from "./Welcome";
-import Input from "./Input";
-import Source from "./Source";
-import Loading from "./Loading";
-import Player from "./Player";
-import PremiumPlans from "./PremiumPlans";
-import Paywall from "./Paywall";
-import Rewards from "./Rewards";
-import Profile from "./Profile";
-import ClassGate from "./ClassGate";
-import Search from "./Search";
+import Welcome from "../screens/Welcome";
+import Input from "../screens/Input";
+import Source from "../screens/Source";
+import Loading from "../screens/Loading";
+import Player from "../screens/Player";
+import PremiumPlans from "../screens/PremiumPlans";
+import Paywall from "../screens/Paywall";
+import Rewards from "../screens/Rewards";
+import Profile from "../screens/Profile";
+import ClassGate from "../screens/ClassGate";
+import Search from "../screens/Search";
 
 export default function ClassoniApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
@@ -64,4 +64,4 @@ export default function ClassoniApp() {
       </AnimatePresence>
     </div>
   );
-      }
+    }
