@@ -22,40 +22,37 @@ function getSecret(name: string): string | undefined {
   return undefined;
 }
 
-const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni. Take the notes or curriculum topic and produce ONE keypoint broken into micro-concepts as strict JSON.
+const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni. Take the notes or curriculum topic and produce ONE keypoint broken into micro-concepts.
 
-You MUST return a valid JSON object. Do NOT return an empty object like {}. You MUST populate the "micro_steps" array with at least 2 steps.
+You MUST return a valid JSON object. Do not use markdown backticks. Return ONLY the raw JSON object starting with { and ending with }.
 
-OUTPUT FORMAT — STRICT JSON:
 {
-  "keypoint_title": "String",
+  "keypoint_title": "The Main Topic",
   "location_indicator": "1.1",
   "micro_steps": [
     {
       "step_number": 1,
-      "micro_step_title": "String",
-      "summary_text": "String (A short 1-sentence summary)",
-      "visual_skeleton_text": "String (Use \\n for line breaks. DO NOT GENERATE SVG CODE.)",
-      "audio_segments": ["String", "String"], 
-      "explain_context": "String"
+      "micro_step_title": "First Concept Name",
+      "summary_text": "A one sentence summary of this concept.",
+      "visual_skeleton_text": "Bullet 1\\nBullet 2\\nBullet 3",
+      "audio_segments": ["First sentence to narrate.", "Second sentence to narrate."],
+      "explain_context": "The core pillars the student must mention."
     }
   ],
   "apply": {
-    "title": "String",
-    "scenario": "String",
-    "solution": "String"
+    "title": "Application of the concept",
+    "scenario": "A real-world scenario.",
+    "solution": "The solution."
   },
   "quiz": {
-    "title": "String",
+    "title": "Exam Question",
     "type": "mcq",
-    "question": "String",
-    "options": ["A","B","C","D"],
-    "correct_answer": "String",
-    "explanation": "String"
+    "question": "Question text",
+    "options": ["A", "B", "C", "D"],
+    "correct_answer": "A",
+    "explanation": "Why A is correct."
   }
-}
-
-TEST MODE: Return ONE JSON object. Nothing before or after.`;
+}`;
 
 async function handleApi(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
@@ -80,8 +77,8 @@ async function handleApi(request: Request): Promise<Response | null> {
       const topic = body.topic || "General Studies";
       let notes = body.notes || "";
 
-      if (notes.length > 4000) {
-        notes = notes.slice(0, 4000) + "\n...[Text truncated for processing]...";
+      if (notes.length > 3000) {
+        notes = notes.slice(0, 3000) + "\n...[Text truncated]...";
       }
 
       const key = getSecret("DEEPINFRA_API_KEY");
@@ -89,56 +86,55 @@ async function handleApi(request: Request): Promise<Response | null> {
 
       let userMessage = "";
       if (notes.trim().length > 10) {
-        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract the core keypoints from these specific notes and generate the lesson. You MUST populate the micro_steps array.`;
+        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract the core keypoints and generate the JSON.`;
       } else {
-        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint. You MUST populate the micro_steps array.`;
+        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint in the JSON format.`;
       }
 
-      let content = "";
-      let attempts = 0;
-      let isValid = false;
+      // We removed response_format: { type: "json_object" } to prevent the {} error
+      const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "deepseek-ai/DeepSeek-V4-Flash-0731",
+          messages: [
+            { role: "system", content: LESSON_SYSTEM_PROMPT },
+            { role: "user", content: userMessage },
+          ],
+          max_tokens: 4000,
+          temperature: 0.7,
+        }),
+      });
 
-      while (attempts < 2 && !isValid) {
-        attempts++;
-        const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "deepseek-ai/DeepSeek-V4-Flash-0731",
-            messages: [
-              { role: "system", content: LESSON_SYSTEM_PROMPT },
-              { role: "user", content: userMessage },
-            ],
-            response_format: { type: "json_object" },
-            max_tokens: 4000,
-            temperature: 0.7,
-          }),
-        });
+      if (!r.ok) {
+        const errText = await r.text();
+        return json({ error: "DeepInfra rejected: " + errText.slice(0, 150) }, 500);
+      }
 
-        if (!r.ok) {
-          const errText = await r.text();
-          return json({ error: "DeepInfra rejected: " + errText.slice(0, 150) }, 500);
+      const data: any = await r.json();
+      let content = data?.choices?.[0]?.message?.content || "";
+
+      // Clean the response (strip markdown if the AI ignored our instructions)
+      content = content.trim();
+      if (content.startsWith("```json")) content = content.slice(7);
+      else if (content.startsWith("```")) content = content.slice(3);
+      if (content.endsWith("```")) content = content.slice(0, -3);
+      content = content.trim();
+
+      // Find the first '{' and last '}' just in case there is text outside the JSON
+      const startIdx = content.indexOf("{");
+      const endIdx = content.lastIndexOf("}");
+      if (startIdx !== -1 && endIdx !== -1) {
+        content = content.slice(startIdx, endIdx + 1);
+      }
+
+      try {
+        const parsed = JSON.parse(content);
+        if (!parsed.micro_steps || !Array.isArray(parsed.micro_steps) || parsed.micro_steps.length === 0) {
+          return json({ error: "AI returned JSON without micro_steps. Raw: " + content.slice(0, 100) }, 500);
         }
-
-        const data: any = await r.json();
-        content = data?.choices?.[0]?.message?.content || "";
-
-        content = content.trim();
-        if (content.startsWith("```json")) content = content.slice(7);
-        else if (content.startsWith("```")) content = content.slice(3);
-        if (content.endsWith("```")) content = content.slice(0, -3);
-        content = content.trim();
-
-        try {
-          const parsed = JSON.parse(content);
-          if (parsed.micro_steps && Array.isArray(parsed.micro_steps) && parsed.micro_steps.length > 0) {
-            isValid = true;
-          }
-        } catch (e) {}
-      }
-
-      if (!isValid) {
-        return json({ error: "AI failed to generate a valid lesson after 2 attempts. Raw: " + content.slice(0, 100) }, 500);
+      } catch (e) {
+        return json({ error: "AI returned invalid JSON format. Raw: " + content.slice(0, 100) }, 500);
       }
 
       return new Response(content, { headers: { ...GLOBAL_CORS, "Content-Type": "application/json" } });
