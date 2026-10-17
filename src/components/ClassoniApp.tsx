@@ -3,25 +3,20 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Welcome from "../screens/Welcome";
 import Input from "../screens/Input";
 import Source from "../screens/Source";
+import UploadNotes from "../screens/UploadNotes"; // 👈 Import new screen
 import Loading from "../screens/Loading";
 import Player from "../screens/Player";
-import PremiumPlans from "../screens/PremiumPlans";
-import Paywall from "../screens/Paywall";
-import Rewards from "../screens/Rewards";
-import Profile from "../screens/Profile";
-import ClassGate from "../screens/ClassGate";
-import Search from "../screens/Search";
+// ... (keep all your other imports)
 
 export default function ClassoniApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
   const [lessonData, setLessonData] = useState<any>(null);
   const [topic, setTopic] = useState("Sliding Filament Theory");
+  const [customNotes, setCustomNotes] = useState(""); // 👈 Add state for notes
   const [isHydrated, setIsHydrated] = useState(false);
   const reduced = useReducedMotion();
 
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
+  useEffect(() => { setIsHydrated(true); }, []);
 
   const navigate = useCallback((screen: string) => {
     setCurrentScreen(screen);
@@ -36,14 +31,10 @@ export default function ClassoniApp() {
     welcome: <Welcome setScreen={navigate} />,
     input: <Input setScreen={navigate} onTopicSet={setTopic} />,
     source: <Source setScreen={navigate} />,
-    loading: <Loading navigate={navigate} topic={topic} onReady={handleLessonReady} />,
+    uploadNotes: <UploadNotes setScreen={navigate} onNotesSet={setCustomNotes} />, // 👈 Register
+    loading: <Loading navigate={navigate} topic={topic} customNotes={customNotes} onReady={handleLessonReady} />, // 👈 Pass notes to Loading
     player: <Player navigate={navigate} lesson={lessonData} />,
-    premiumPlans: <PremiumPlans setScreen={navigate} />,
-    paywall: <Paywall setScreen={navigate} />,
-    rewards: <Rewards setScreen={navigate} navigate={navigate} />,
-    profile: <Profile setScreen={navigate} />,
-    classGate: <ClassGate setScreen={navigate} />,
-    search: <Search setScreen={navigate} />,
+    // ... (keep the rest of your screens)
   };
 
   if (!isHydrated) return <div className="h-screen bg-classoni-navy" />;
@@ -64,4 +55,4 @@ export default function ClassoniApp() {
       </AnimatePresence>
     </div>
   );
-    }
+}
