@@ -66,6 +66,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     return json({ status: "alive", keyPresent: !!key });
   }
 
+  // ─── GENERATE LESSON ───
   if (url.pathname === "/api/generate-lesson") {
     try {
       const topic = url.searchParams.get("topic") || "";
@@ -111,18 +112,108 @@ async function handleApi(request: Request): Promise<Response | null> {
     }
   }
 
+  // ─── GENERATE AUDIO ───
   if (url.pathname === "/api/generate-full-audio" && request.method === "POST") {
-    // (Audio code omitted for brevity, it's the same as before)
-    return json({ error: "Audio currently disabled in test" }, 500);
+    try {
+      const body: any = await request.json();
+      const sections = body.sections || [];
+      if (!Array.isArray(sections) || sections.length === 0) {
+        return json({ error: "sections array is required" }, 400);
+      }
+
+      const key = getSecret("DEEPINFRA_API_KEY");
+      if (!key) return json({ error: "no key" }, 500);
+
+      const CHUNK_SIZE = 40;
+      const pieces: any[] = [];
+
+      for (let si = 0; si < sections.length; si++) {
+        const section = sections[si];
+        const text = (section.narration_text || "").trim();
+        if (!text) continue;
+
+        const wordsInSection = text.split(/\s+/).filter(Boolean);
+        const textPieces: string[] = [];
+        for (let i = 0; i < wordsInSection.length; i += CHUNK_SIZE) {
+          textPieces.push(wordsInSection.slice(i, i + CHUNK_SIZE).join(" "));
+        }
+
+        textPieces.forEach((piece, pi) => {
+          pieces.push({
+            section_index: si,
+            section_id: section.id,
+            piece_index: pi,
+            is_last_piece_of_section: pi === textPieces.length - 1,
+            text: piece,
+          });
+        });
+      }
+
+      const tasks = pieces.map((p) => async () => {
+        try {
+          const r = await fetch(
+            "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M",
+            {
+              method: "POST",
+              headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                text: p.text,
+                preset_voice: "am_liam",
+                speed: 1.0,
+                output_format: "mp3",
+                return_timestamps: true,
+              }),
+            }
+          );
+          if (!r.ok) return { ok: false, error: "HTTP " + r.status };
+          const data: any = await r.json();
+          const audioRaw = data.audio || "";
+          if (!audioRaw) return { ok: false, error: "no audio" };
+
+          return {
+            ok: true,
+            chunk: {
+              audio: "data:audio/mpeg;base64," + stripDataUrl(audioRaw),
+              words: (data.words || []).map((w: any, i: number) => ({ id: i, start: w.start, end: w.end, text: w.text })),
+              section_id: p.section_id,
+              section_index: p.section_index,
+              piece_index: p.piece_index,
+            },
+          };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      });
+
+      // Run with concurrency 4
+      const results = [];
+      for (let i = 0; i < tasks.length; i += 4) {
+        const batch = tasks.slice(i, i + 4).map(t => t());
+        const resolved = await Promise.all(batch);
+        results.push(...resolved);
+      }
+
+      const goodChunks = results.filter(r => r.ok).map(r => (r as any).chunk);
+      if (goodChunks.length === 0) return json({ error: "All audio chunks failed" }, 500);
+
+      goodChunks.sort((a, b) => a.section_index - b.section_index || a.piece_index - b.piece_index);
+
+      return json({ chunks: goodChunks, totalChunks: goodChunks.length });
+    } catch (err) {
+      return json({ error: "Audio generation crashed: " + String(err) }, 500);
+    }
   }
 
   return null;
 }
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
+
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
-    serverEntryPromise = import("@tanstack/react-start/server-entry").then((m) => (m.default ?? m) as ServerEntry);
+    serverEntryPromise = import("@tanstack/react-start/server-entry").then(
+      (m) => (m.default ?? m) as ServerEntry,
+    );
   }
   return serverEntryPromise;
 }
@@ -141,7 +232,9 @@ function isH3SwallowedErrorBody(body: string): boolean {
   try {
     const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
     return payload.unhandled === true && payload.message === "HTTPError";
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 export default {
@@ -152,7 +245,8 @@ export default {
       if (apiResponse) return apiResponse;
     } catch (apiErr) {
       return new Response(JSON.stringify({ error: "API routing failed: " + String(apiErr) }), {
-        status: 500, headers: { ...GLOBAL_CORS, "Content-Type": "application/json" }
+        status: 500,
+        headers: { ...GLOBAL_CORS, "Content-Type": "application/json" }
       });
     }
 
@@ -163,7 +257,8 @@ export default {
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
-        status: 500, headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" },
+        status: 500,
+        headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" },
       });
     }
   },
