@@ -34,7 +34,7 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
     if (startedRef.current) return;
     startedRef.current = true;
 
-    let mounted = true;
+    let cancelled = false;
 
     async function run() {
       try {
@@ -42,7 +42,7 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         let stepIdx = 1;
         const stepTimer = setInterval(() => {
           stepIdx = Math.min(stepIdx + 1, 3);
-          if (mounted) setVisible(stepIdx);
+          if (!cancelled) setVisible(stepIdx);
         }, 2500);
 
         const lessonUrl =
@@ -52,7 +52,7 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         const lessonRes = await fetch(lessonUrl);
         const lesson = await lessonRes.json();
         clearInterval(stepTimer);
-        if (!mounted) return;
+        if (cancelled) return;
 
         if (!lessonRes.ok || lesson.error) {
           throw new Error(lesson.error || "Unknown server error");
@@ -69,8 +69,8 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         let audioStep = 4;
         const audioTimer = setInterval(() => {
           audioStep = Math.min(audioStep + 1, 10);
-          if (mounted) setVisible(audioStep);
-        }, 3000); // Speeds up the UI animation to match the parallel generation speed
+          if (!cancelled) setVisible(audioStep);
+        }, 3000); 
 
         const audioRes = await fetch(
           "https://classoni.classoni66.workers.dev/api/generate-full-audio",
@@ -87,9 +87,8 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         );
         const fullAudio = await audioRes.json();
         clearInterval(audioTimer);
-        if (!mounted) return;
+        if (cancelled) return;
 
-        // Check for the NEW 'chunks' array shape
         if (!fullAudio || !fullAudio.chunks || !fullAudio.chunks.length) {
           const detail = fullAudio && fullAudio.error 
             ? fullAudio.error 
@@ -100,13 +99,14 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         setVisible(11);
         setStatus("done");
 
+        // WE REMOVED THE CANCELLED CHECK HERE. IT WILL ALWAYS TRANSITION.
         setTimeout(() => {
-          if (!mounted) return;
           if (onReady) onReady(lesson, fullAudio);
           else go("player");
         }, 800);
+        
       } catch (err) {
-        if (!mounted) return;
+        if (cancelled) return;
         console.error("[Loading] error:", err);
         setErrorMsg(String(err));
         setStatus("error");
@@ -115,7 +115,7 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
 
     run();
     return () => {
-      mounted = false;
+      cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topic]);
@@ -162,4 +162,4 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
       )}
     </div>
   );
-            }
+          }
