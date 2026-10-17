@@ -77,19 +77,26 @@ async function handleApi(request: Request): Promise<Response | null> {
 
       const userMessage = "STANDARD CURRICULUM SOURCE\nSubject and topic: " + topic + "\n\nGenerate ONE keypoint.";
 
+      // 45-second timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+
       const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
         method: "POST",
         headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "deepseek-ai/DeepSeek-V4-Flash-0731",
+          model: "deepseek-ai/DeepSeek-V4-Flash", // Swapped from -0731 to stable Flash
           messages: [
             { role: "system", content: LESSON_SYSTEM_PROMPT },
             { role: "user", content: userMessage },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 4000,
+          max_tokens: 2500, // Reduced to prevent generation stalls
         }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!r.ok) {
         const rawText = await r.text();
@@ -107,7 +114,10 @@ async function handleApi(request: Request): Promise<Response | null> {
       content = content.trim();
 
       return new Response(content, { headers: { ...GLOBAL_CORS, "Content-Type": "application/json" } });
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return json({ error: "AI generation timed out after 45 seconds. Please try a shorter topic." }, 504);
+      }
       return json({ error: "Worker crashed: " + String(err) }, 500);
     }
   }
@@ -185,7 +195,6 @@ async function handleApi(request: Request): Promise<Response | null> {
         }
       });
 
-      // Run with concurrency 4
       const results = [];
       for (let i = 0; i < tasks.length; i += 4) {
         const batch = tasks.slice(i, i + 4).map(t => t());
@@ -245,8 +254,7 @@ export default {
       if (apiResponse) return apiResponse;
     } catch (apiErr) {
       return new Response(JSON.stringify({ error: "API routing failed: " + String(apiErr) }), {
-        status: 500,
-        headers: { ...GLOBAL_CORS, "Content-Type": "application/json" }
+        status: 500, headers: { ...GLOBAL_CORS, "Content-Type": "application/json" }
       });
     }
 
@@ -257,8 +265,7 @@ export default {
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" },
+        status: 500, headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" },
       });
     }
   },
