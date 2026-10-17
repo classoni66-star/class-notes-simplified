@@ -53,20 +53,24 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         const lesson = await lessonRes.json();
         clearInterval(stepTimer);
         if (!mounted) return;
-        if (!lesson || !lesson.sections || !lesson.sections.length) {
-          throw new Error("Lesson generation returned no sections");
+
+        if (!lessonRes.ok || lesson.error) {
+          throw new Error(lesson.error || "Unknown server error");
         }
 
-        // Phase 2 — Full audio for all sections
+        if (!lesson || !lesson.sections || !lesson.sections.length) {
+          throw new Error("Lesson JSON is missing 'sections' array.");
+        }
+
+        // Phase 2 — Audio
         setVisible(4);
         setStatus("audio");
 
-        // Animate audio steps (5-9) while the fetch runs
         let audioStep = 4;
         const audioTimer = setInterval(() => {
-          audioStep = Math.min(audioStep + 1, 9);
+          audioStep = Math.min(audioStep + 1, 10);
           if (mounted) setVisible(audioStep);
-        }, 4000);
+        }, 3000); // Speeds up the UI animation to match the parallel generation speed
 
         const audioRes = await fetch(
           "https://classoni.classoni66.workers.dev/api/generate-full-audio",
@@ -85,8 +89,12 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         clearInterval(audioTimer);
         if (!mounted) return;
 
-        if (!fullAudio || !fullAudio.audio || !fullAudio.sectionBoundaries) {
-          throw new Error("Full audio generation failed");
+        // Check for the NEW 'chunks' array shape
+        if (!fullAudio || !fullAudio.chunks || !fullAudio.chunks.length) {
+          const detail = fullAudio && fullAudio.error 
+            ? fullAudio.error 
+            : "no chunks returned from worker";
+          throw new Error("Audio generation failed: " + detail);
         }
 
         setVisible(11);
@@ -154,4 +162,4 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
       )}
     </div>
   );
-    }
+            }
