@@ -66,7 +66,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     return json({ status: "alive", keyPresent: !!key });
   }
 
-  // ─── GENERATE LESSON (TEXT ONLY, NO AUDIO) ───
+  // ─── GENERATE LESSON ───
   if (url.pathname === "/api/generate-lesson") {
     try {
       const topic = url.searchParams.get("topic") || "";
@@ -105,13 +105,23 @@ async function handleApi(request: Request): Promise<Response | null> {
       if (content.endsWith("```")) content = content.slice(0, -3);
       content = content.trim();
 
+      // VALIDATE THE JSON BEFORE SENDING TO FRONTEND
+      try {
+        const parsed = JSON.parse(content);
+        if (!parsed.sections || !Array.isArray(parsed.sections)) {
+          return json({ error: "LLM returned invalid structure. Missing sections. Raw: " + content.slice(0, 150) }, 500);
+        }
+      } catch (e) {
+        return json({ error: "LLM returned malformed JSON: " + content.slice(0, 150) }, 500);
+      }
+
       return new Response(content, { headers: { ...GLOBAL_CORS, "Content-Type": "application/json" } });
     } catch (err) {
       return json({ error: "Worker crashed: " + String(err) }, 500);
     }
   }
 
-  // ─── GENERATE AUDIO (ONE CHUNK AT A TIME) ───
+  // ─── GENERATE AUDIO (ONE CHUNK) ───
   if (url.pathname === "/api/generate-audio" && request.method === "POST") {
     try {
       const body: any = await request.json();
