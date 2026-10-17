@@ -6,19 +6,16 @@ interface Props {
   navigate?: (s: string) => void;
   setScreen?: (s: string) => void;
   topic?: string;
+  customNotes?: string; // 👈 New prop
   onReady?: (lesson: any) => void;
 }
 
 const STEPS = [
-  "🔍 Analyzing your notes...",
-  "🧠 Extracting keypoints...",
-  "🏗️ Structuring your lesson...",
-  "🎨 Formatting the concept skeleton...",
-  "🛡️ Checking for accuracy...",
-  "🚀 BOOM... your lesson is ready!",
+  "🔍 Analyzing your notes...", "🧠 Extracting keypoints...", "🏗️ Structuring your lesson...",
+  "🎨 Formatting the concept skeleton...", "🛡️ Checking for accuracy...", "🚀 BOOM... your lesson is ready!",
 ];
 
-export default function Loading({ navigate, setScreen, topic, onReady }: Props) {
+export default function Loading({ navigate, setScreen, topic, customNotes, onReady }: Props) {
   const [visible, setVisible] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
   const go = navigate || setScreen || (() => {});
@@ -37,8 +34,16 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
           if (!cancelled) setVisible(stepIdx);
         }, 2000);
 
-        const lessonUrl = "https://classoni.classoni66.workers.dev/api/generate-lesson?topic=" + encodeURIComponent(topic || "Sliding Filament Theory");
-        const lessonRes = await fetch(lessonUrl);
+        // CHANGED TO POST REQUEST
+        const lessonRes = await fetch("https://classoni.classoni66.workers.dev/api/generate-lesson", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic: topic || "Sliding Filament Theory",
+            notes: customNotes || ""
+          }),
+        });
+        
         const lesson = await lessonRes.json();
         clearInterval(stepTimer);
         
@@ -60,7 +65,7 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
 
     run();
     return () => { cancelled = true; };
-  }, [topic]);
+  }, [topic, customNotes]);
 
   return (
     <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-6 pt-10">
@@ -84,4 +89,4 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
       )}
     </div>
   );
-}
+                                                           }
