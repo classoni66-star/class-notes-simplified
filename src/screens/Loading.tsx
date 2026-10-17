@@ -6,15 +6,14 @@ interface Props {
   navigate?: (s: string) => void;
   setScreen?: (s: string) => void;
   topic?: string;
-  onReady?: (lesson: any) => void; // Notice: No audio passed here anymore
+  onReady?: (lesson: any) => void;
 }
 
 const STEPS = [
   "🔍 Analyzing your notes...",
   "🧠 Extracting keypoints...",
   "🏗️ Structuring your lesson...",
-  "🎯 Creating a real-world question first...",
-  "🎨 Searching for the best visuals...",
+  "🎨 Formatting the concept skeleton...",
   "🛡️ Checking for accuracy...",
   "🚀 BOOM... your lesson is ready!",
 ];
@@ -34,7 +33,7 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
       try {
         let stepIdx = 1;
         const stepTimer = setInterval(() => {
-          stepIdx = Math.min(stepIdx + 1, 5);
+          stepIdx = Math.min(stepIdx + 1, 4);
           if (!cancelled) setVisible(stepIdx);
         }, 2000);
 
@@ -46,12 +45,8 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         if (cancelled) return;
 
         if (!lessonRes.ok || lesson.error) throw new Error(lesson.error || "Unknown server error");
-        if (!lesson.sections || !lesson.sections.length) {
-          const dump = JSON.stringify(lesson).slice(0, 200);
-          throw new Error("Missing 'sections'. LLM returned: " + dump);
-        }
 
-        setVisible(7);
+        setVisible(6);
         setTimeout(() => {
           if (onReady) onReady(lesson);
           else go("player");
@@ -68,11 +63,11 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
   }, [topic]);
 
   return (
-    <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-6 pt-4">
+    <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-6 pt-10">
       <h1 className="text-white font-bold text-xl text-center">Building your lesson</h1>
-      <div className="flex justify-center mt-4"><RavenMascot size={100} animated={true} /></div>
+      <div className="flex justify-center mt-6"><RavenMascot size={120} animated={true} /></div>
       
-      <ul className="mt-6 space-y-3 overflow-y-auto flex-1 pb-4">
+      <ul className="mt-8 space-y-4 overflow-y-auto flex-1 pb-4">
         {STEPS.map((step, i) => (
           <motion.li key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: visible > i ? 1 : 0.25, x: 0 }} className="flex items-center justify-between text-white text-sm">
             <span>{step}</span>
@@ -89,4 +84,4 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
       )}
     </div>
   );
-      }
+}
