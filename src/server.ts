@@ -24,31 +24,40 @@ function getSecret(name: string): string | undefined {
 
 const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni. Take the notes or curriculum topic and produce ONE keypoint broken into micro-concepts as strict JSON.
 
+You MUST return a valid JSON object. Do NOT return an empty object like {}. You MUST populate the "micro_steps" array with at least 2 steps.
+
 OUTPUT FORMAT — STRICT JSON:
 {
-  "keypoint_title": "string",
-  "location_indicator": "string — e.g., '1.2'",
+  "keypoint_title": "String",
+  "location_indicator": "1.1",
   "micro_steps": [
     {
       "step_number": 1,
-      "micro_step_title": "string — e.g., 'Particles Never Sit Still'",
-      "visual_skeleton_text": "string — A short, punchy bulleted list or definition that acts as the visual card. Use \\n for line breaks. DO NOT GENERATE SVG CODE.",
-      "audio_segments": ["string", "string"], 
-      "explain_context": "string — the core marking pillars the student must mention"
+      "micro_step_title": "String (e.g., 'Particles Never Sit Still')",
+      "visual_skeleton_text": "String (A short, punchy bulleted list. Use \\n for line breaks. DO NOT GENERATE SVG CODE.)",
+      "audio_segments": ["String", "String"], 
+      "explain_context": "String (The core marking pillars the student must mention)"
+    },
+    {
+      "step_number": 2,
+      "micro_step_title": "String",
+      "visual_skeleton_text": "String",
+      "audio_segments": ["String", "String"], 
+      "explain_context": "String"
     }
   ],
   "apply": {
-    "title": "Application of [keypoint_title]",
-    "scenario": "string",
-    "solution": "string"
+    "title": "String",
+    "scenario": "String",
+    "solution": "String"
   },
   "quiz": {
-    "title": "Exam Question",
+    "title": "String",
     "type": "mcq",
-    "question": "string",
+    "question": "String",
     "options": ["A","B","C","D"],
-    "correct_answer": "string",
-    "explanation": "string"
+    "correct_answer": "String",
+    "explanation": "String"
   }
 }
 
@@ -84,9 +93,9 @@ async function handleApi(request: Request): Promise<Response | null> {
       // If notes exist, we tell the AI to use them. If not, standard curriculum.
       let userMessage = "";
       if (notes.trim().length > 10) {
-        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract the core keypoints from these specific notes and generate the lesson.`;
+        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract the core keypoints from these specific notes and generate the lesson. Ensure micro_steps is populated.`;
       } else {
-        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint.`;
+        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint. Ensure micro_steps is populated.`;
       }
 
       const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
@@ -121,7 +130,7 @@ async function handleApi(request: Request): Promise<Response | null> {
       // Validate the JSON structure before sending to frontend
       try {
         const parsed = JSON.parse(content);
-        if (!parsed.micro_steps || !Array.isArray(parsed.micro_steps)) {
+        if (!parsed.micro_steps || !Array.isArray(parsed.micro_steps) || parsed.micro_steps.length === 0) {
           return json({ error: "AI returned malformed data. Missing micro_steps. Raw: " + content.slice(0, 100) }, 500);
         }
       } catch (e) {
