@@ -59,7 +59,9 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         }
 
         if (!lesson || !lesson.sections || !lesson.sections.length) {
-          throw new Error("Lesson JSON is missing 'sections' array.");
+          // DUMP THE ACTUAL JSON SO WE CAN SEE WHAT DEEPSEEK RETURNED
+          const dump = JSON.stringify(lesson).slice(0, 300);
+          throw new Error("Missing 'sections'. DeepSeek returned: " + dump);
         }
 
         // Phase 2 — Audio
@@ -99,7 +101,7 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
         setVisible(11);
         setStatus("done");
 
-        // WE REMOVED THE CANCELLED CHECK HERE. IT WILL ALWAYS TRANSITION.
+        // Delay slightly to let the UI finish ticking, then transition
         setTimeout(() => {
           if (onReady) onReady(lesson, fullAudio);
           else go("player");
@@ -162,4 +164,4 @@ export default function Loading({ navigate, setScreen, topic, onReady }: Props) 
       )}
     </div>
   );
-          }
+                      }
