@@ -33,10 +33,10 @@ OUTPUT FORMAT — STRICT JSON:
   "micro_steps": [
     {
       "step_number": 1,
-      "micro_step_title": "String (e.g., 'Particles Never Sit Still')",
-      "visual_skeleton_text": "String (A short, punchy bulleted list. Use \\n for line breaks. DO NOT GENERATE SVG CODE.)",
+      "micro_step_title": "String",
+      "visual_skeleton_text": "String (Use \\n for line breaks. DO NOT GENERATE SVG CODE.)",
       "audio_segments": ["String", "String"], 
-      "explain_context": "String (The core marking pillars the student must mention)"
+      "explain_context": "String"
     },
     {
       "step_number": 2,
@@ -85,56 +85,72 @@ async function handleApi(request: Request): Promise<Response | null> {
     try {
       const body: any = await request.json();
       const topic = body.topic || "General Studies";
-      const notes = body.notes || "";
+      let notes = body.notes || "";
+
+      // DEFENSE 1: Slice the notes so we don't overwhelm the AI
+      if (notes.length > 4000) {
+        notes = notes.slice(0, 4000) + "\n...[Text truncated for processing]...";
+      }
 
       const key = getSecret("DEEPINFRA_API_KEY");
       if (!key) return json({ error: "API key missing" }, 500);
 
-      // If notes exist, we tell the AI to use them. If not, standard curriculum.
       let userMessage = "";
       if (notes.trim().length > 10) {
-        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract the core keypoints from these specific notes and generate the lesson. Ensure micro_steps is populated.`;
+        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract the core keypoints from these specific notes and generate the lesson. You MUST populate the micro_steps array.`;
       } else {
-        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint. Ensure micro_steps is populated.`;
+        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint. You MUST populate the micro_steps array.`;
       }
 
-      const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "deepseek-ai/DeepSeek-V4-Flash-0731",
-          messages: [
-            { role: "system", content: LESSON_SYSTEM_PROMPT },
-            { role: "user", content: userMessage },
-          ],
-          response_format: { type: "json_object" },
-          max_tokens: 4000,
-        }),
-      });
+      // DEFENSE 2: Retry logic (try up to 2 times if AI returns empty {})
+      let content = "";
+      let attempts = 0;
+      let isValid = false;
 
-      if (!r.ok) {
-        const errText = await r.text();
-        return json({ error: "DeepInfra rejected: " + errText.slice(0, 150) }, 500);
-      }
+      while (attempts < 2 && !isValid) {
+        attempts++;
+        const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "deepseek-ai/DeepSeek-V4-Flash-0731",
+            messages: [
+              { role: "system", content: LESSON_SYSTEM_PROMPT },
+              { role: "user", content: userMessage },
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: 4000,
+            temperature: 0.7, // A little creativity helps it get unstuck
+          }),
+        });
 
-      const data: any = await r.json();
-      let content = data?.choices?.[0]?.message?.content || "";
-
-      // Strip markdown if the AI adds it
-      content = content.trim();
-      if (content.startsWith("```json")) content = content.slice(7);
-      else if (content.startsWith("```")) content = content.slice(3);
-      if (content.endsWith("```")) content = content.slice(0, -3);
-      content = content.trim();
-
-      // Validate the JSON structure before sending to frontend
-      try {
-        const parsed = JSON.parse(content);
-        if (!parsed.micro_steps || !Array.isArray(parsed.micro_steps) || parsed.micro_steps.length === 0) {
-          return json({ error: "AI returned malformed data. Missing micro_steps. Raw: " + content.slice(0, 100) }, 500);
+        if (!r.ok) {
+          const errText = await r.text();
+          return json({ error: "DeepInfra rejected: " + errText.slice(0, 150) }, 500);
         }
-      } catch (e) {
-        return json({ error: "AI returned invalid JSON." }, 500);
+
+        const data: any = await r.json();
+        content = data?.choices?.[0]?.message?.content || "";
+
+        // Strip markdown
+        content = content.trim();
+        if (content.startsWith("```json")) content = content.slice(7);
+        else if (content.startsWith("```")) content = content.slice(3);
+        if (content.endsWith("```")) content = content.slice(0, -3);
+        content = content.trim();
+
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed.micro_steps && Array.isArray(parsed.micro_steps) && parsed.micro_steps.length > 0) {
+            isValid = true;
+          }
+        } catch (e) {
+          // Parsing failed, loop will retry
+        }
+      }
+
+      if (!isValid) {
+        return json({ error: "AI failed to generate a valid lesson after 2 attempts. Raw: " + content.slice(0, 100) }, 500);
       }
 
       return new Response(content, { headers: { ...GLOBAL_CORS, "Content-Type": "application/json" } });
