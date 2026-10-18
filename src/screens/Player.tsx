@@ -9,7 +9,6 @@ interface PlayerProps {
   lesson: any;
 }
 
-// Helper to split text into ~60 character chunks (approx 2 lines on mobile)
 const splitIntoChunks = (text: string) => {
   const words = text.split(" ");
   const chunks: string[] = [];
@@ -34,6 +33,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   // Audio/Typing State
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0 to 100
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Typing speed
   
   // Flash Test State
   const [showFlashTest, setShowFlashTest] = useState(false);
@@ -51,7 +51,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const lastChunkRef = useRef(-1);
 
   useEffect(() => {
-    // Initialize Web Audio API for typing sounds
     audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
   }, []);
 
@@ -94,7 +93,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const fullText = currentStep.audio_segments ? currentStep.audio_segments.join(" ") : "Narrating micro concept...";
   const textChunks = splitIntoChunks(fullText);
   
-  // Calculate current chunk and character based on progress
   const totalChunks = textChunks.length;
   const chunkProgress = (progress / 100) * totalChunks;
   const currentChunkIndex = Math.min(Math.floor(chunkProgress), totalChunks - 1);
@@ -119,19 +117,26 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     lastChunkRef.current = currentChunkIndex;
   }, [currentChunkIndex]);
 
-  // Playback loop
+  // Playback loop (Slowed down + Speed controlled)
   useEffect(() => {
     let timer: any;
     if (isPlaying && !showFlashTest) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 100) { setIsPlaying(false); return 100; }
-          return prev + 1.5; // Speed of typing
+          // Base speed: 100% in ~10 seconds at 1.0x speed (using 50ms interval)
+          return prev + (0.6 * playbackSpeed); 
         });
-      }, 100);
+      }, 50);
     }
     return () => clearInterval(timer);
-  }, [isPlaying, showFlashTest]);
+  }, [isPlaying, showFlashTest, playbackSpeed]);
+
+  const cycleSpeed = () => {
+    const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+    const currentIndex = speeds.indexOf(playbackSpeed);
+    setPlaybackSpeed(speeds[(currentIndex + 1) % speeds.length]);
+  };
 
   const triggerNavigation = (dir: 1 | -1) => {
     if (dir === 1 && currentStepIndex === lesson.micro_steps.length - 1) return;
@@ -185,9 +190,10 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     }, 1200); 
   };
 
-  // Handle dragging the progress circle
   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProgress(Number(e.target.value));
+    // Reset the audio click trackers so it doesn't rapid-fire sound on drag
+    lastCharRef.current = -1; 
   };
 
   const flashTest = currentStep.flash_test || {
@@ -203,7 +209,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         <TopBar title={lesson.keypoint_title} uploader="By You" points={dailyPoints} onProfileTap={() => navigate("profile")} onRewardsTap={() => navigate("rewards")} onPremiumTap={() => navigate("premiumPlans")} />
       </div>
 
-      {/* 1. CAPTIONS SECTION (Typewriter Animation) */}
+      {/* 1. CAPTIONS SECTION */}
       <div className="flex-shrink-0 px-4 py-3 min-h-[80px] flex items-center justify-center">
         <AnimatePresence mode="wait">
           <motion.div 
@@ -219,7 +225,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </AnimatePresence>
       </div>
 
-      {/* 2. AUDIO CONTROL BAR */}
+      {/* 2. AUDIO/TYPING CONTROL BAR */}
       <div className="flex-shrink-0 px-4 pb-2 flex items-center gap-3">
         <button onClick={() => setIsPlaying(!isPlaying)} className="w-8 h-8 flex items-center justify-center bg-classoni-navy rounded-full text-white">
           {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
@@ -233,8 +239,12 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           onChange={handleProgressChange}
           className="flex-1 h-1 bg-classoni-navy/20 rounded-full appearance-none cursor-pointer accent-classoni-yellow"
         />
-        
-        <span className="text-xs font-bold text-classoni-navy/70">{Math.floor(progress)}%</span>
+
+        {/* SPEED BUTTON */}
+        <button onClick={cycleSpeed} className="flex items-center gap-1 text-xs font-bold text-classoni-navy/70 w-14 justify-end">
+          <Gauge size={14} />
+          {playbackSpeed.toFixed(2)}x
+        </button>
       </div>
 
       {/* 3. VISUAL SECTION */}
@@ -390,4 +400,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-    }
+  }
