@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, Play, Pause, Share2, ThumbsUp, Gauge } from "lucide-react";
 import TopBar from "../components/TopBar";
@@ -14,49 +14,100 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const [direction, setDirection] = useState(0); 
   const [activeSheet, setActiveSheet] = useState<"apply" | "quiz" | "posts" | "explain" | null>(null);
   
+  // Audio Mock State
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); 
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+
+  // Flash Test State
+  const [showFlashTest, setShowFlashTest] = useState(false);
+  const [flashTestAnswer, setFlashTestAnswer] = useState<boolean | null>(null);
+  const [flashTestResult, setFlashTestResult] = useState<"correct" | "wrong" | "timeout" | null>(null);
+  const [flashTestTimer, setFlashTestTimer] = useState(3);
+  const [pendingDirection, setPendingDirection] = useState<0 | 1 | -1>(0);
+  
+  // Points State
+  const [dailyPoints, setDailyPoints] = useState(12);
+
+  const timerRef = useRef<any>(null);
 
   if (!lesson || !lesson.micro_steps) {
     return <div className="p-4 text-white bg-classoni-navy h-screen flex items-center justify-center">Loading lesson data...</div>;
   }
 
   const currentStep = lesson.micro_steps[currentStepIndex];
-
-  const handleNext = () => {
-    if (currentStepIndex < lesson.micro_steps.length - 1) {
-      setDirection(1);
-      setCurrentStepIndex(prev => prev + 1);
-      setProgress(0);
-      setIsPlaying(false);
-    }
+  const flashTest = currentStep.flash_test || {
+    statement: "The nucleus is the powerhouse of the cell.",
+    answer: false,
+    explanation: "Mitochondria is the powerhouse."
   };
 
-  const handlePrev = () => {
-    if (currentStepIndex > 0) {
-      setDirection(-1);
-      setCurrentStepIndex(prev => prev - 1);
-      setProgress(0);
-      setIsPlaying(false);
-    }
+  // Handle starting the Flash Test
+  const triggerNavigation = (dir: 1 | -1) => {
+    if (dir === 1 && currentStepIndex === lesson.micro_steps.length - 1) return;
+    if (dir === -1 && currentStepIndex === 0) return;
+
+    setPendingDirection(dir);
+    setShowFlashTest(true);
+    setFlashTestResult(null);
+    setFlashTestAnswer(null);
+    setFlashTestTimer(3);
   };
 
+  // Flash Test Timer Logic
+  useEffect(() => {
+    if (showFlashTest && flashTestTimer > 0 && !flashTestAnswer) {
+      timerRef.current = setTimeout(() => {
+        setFlashTestTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (showFlashTest && flashTestTimer === 0 && !flashTestAnswer) {
+      // Timeout
+      setFlashTestResult("timeout");
+      finishFlashTest();
+    }
+    return () => clearTimeout(timerRef.current);
+  }, [showFlashTest, flashTestTimer, flashTestAnswer]);
+
+  const handleFlashAnswer = (val: boolean) => {
+    if (flashTestAnswer !== null) return; // Already answered
+    setFlashTestAnswer(val);
+    const isCorrect = val === flashTest.answer;
+    
+    if (isCorrect) {
+      setFlashTestResult("correct");
+      setDailyPoints((prev) => prev + 1);
+    } else {
+      setFlashTestResult("wrong");
+    }
+    
+    clearTimeout(timerRef.current);
+    finishFlashTest();
+  };
+
+  const finishFlashTest = () => {
+    setTimeout(() => {
+      setShowFlashTest(false);
+      setDirection(pendingDirection);
+      setCurrentStepIndex((prev) => prev + pendingDirection);
+      setProgress(0);
+      setIsPlaying(false);
+      setPendingDirection(0);
+    }, 1200); // 1.2s delay to show the result before swiping
+  };
+
+  // Audio Sim
   useEffect(() => {
     let timer: any;
-    if (isPlaying) {
+    if (isPlaying && !showFlashTest) {
       timer = setInterval(() => {
         setProgress((prev) => {
-          if (prev >= 100) {
-            setIsPlaying(false);
-            return 100;
-          }
+          if (prev >= 100) { setIsPlaying(false); return 100; }
           return prev + 1;
         });
       }, 300);
     }
     return () => clearInterval(timer);
-  }, [isPlaying]);
+  }, [isPlaying, showFlashTest]);
 
   const cycleSpeed = () => {
     const speeds = [1.0, 1.25, 1.5, 0.75];
@@ -68,10 +119,10 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
       
       <div className="flex-shrink-0">
-        <TopBar title={lesson.keypoint_title} uploader="By You" points={12} onProfileTap={() => navigate("profile")} onRewardsTap={() => navigate("rewards")} onPremiumTap={() => navigate("premiumPlans")} />
+        <TopBar title={lesson.keypoint_title} uploader="By You" points={dailyPoints} onProfileTap={() => navigate("profile")} onRewardsTap={() => navigate("rewards")} onPremiumTap={() => navigate("premiumPlans")} />
       </div>
 
-      {/* 1. CAPTIONS SECTION (Strictly Top) */}
+      {/* 1. CAPTIONS SECTION */}
       <div className="flex-shrink-0 px-4 py-3 min-h-[60px] flex items-center justify-center">
         <p className="text-center text-classoni-navy text-sm font-medium leading-relaxed bg-classoni-yellow/30 px-2 py-1 rounded-md">
           {currentStep.audio_segments && currentStep.audio_segments.length > 0 
@@ -80,7 +131,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </p>
       </div>
 
-      {/* 2. AUDIO CONTROL BAR (Between Captions and Visual) */}
+      {/* 2. AUDIO CONTROL BAR */}
       <div className="flex-shrink-0 px-4 pb-2 flex items-center gap-3">
         <button onClick={() => setIsPlaying(!isPlaying)} className="w-8 h-8 flex items-center justify-center bg-classoni-navy rounded-full text-white">
           {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
@@ -99,14 +150,53 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </button>
       </div>
 
-      {/* 3. VISUAL SECTION (Sliding page effect) */}
+      {/* 3. VISUAL SECTION (With Flash Test Overlay) */}
       <div className="flex-1 relative mx-4 my-2 flex items-center justify-center overflow-hidden">
         
-        <button onClick={handlePrev} disabled={currentStepIndex === 0} className={`absolute left-1 z-20 p-2 rounded-full bg-white/90 shadow-lg ${currentStepIndex === 0 ? 'opacity-30' : 'hover:bg-white'}`}>
+        <button onClick={() => triggerNavigation(-1)} disabled={currentStepIndex === 0} className={`absolute left-1 z-20 p-2 rounded-full bg-white/90 shadow-lg ${currentStepIndex === 0 ? 'opacity-30' : 'hover:bg-white'}`}>
           <ChevronLeft size={24} className="text-classoni-navy" />
         </button>
 
         <div className="w-full h-full max-h-[55vh] bg-white rounded-2xl shadow-xl border border-classoni-navy/10 relative overflow-hidden">
+          
+          {/* THE FLASH TEST OVERLAY */}
+          <AnimatePresence>
+            {showFlashTest && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }} 
+                animate={{ opacity: 1, scale: 1 }} 
+                exit={{ opacity: 0 }}
+                className={`absolute inset-0 z-30 flex flex-col items-center justify-center p-6 text-center ${
+                  flashTestResult === "correct" ? "bg-green-500 text-white" : 
+                  flashTestResult === "wrong" ? "bg-red-500 text-white" : 
+                  flashTestResult === "timeout" ? "bg-orange-500 text-white" : 
+                  "bg-classoni-navy text-white"
+                }`}
+              >
+                {!flashTestResult ? (
+                  <>
+                    <div className="w-12 h-12 rounded-full border-4 border-white/30 flex items-center justify-center mb-4">
+                      <span className="text-xl font-bold">{flashTestTimer}</span>
+                    </div>
+                    <h3 className="text-lg font-bold mb-6 leading-tight">"{flashTest.statement}"</h3>
+                    <div className="flex gap-4 w-full">
+                      <button onClick={() => handleFlashAnswer(true)} className="flex-1 bg-white/20 hover:bg-white/30 py-4 rounded-xl font-bold text-xl transition-colors">TRUE</button>
+                      <button onClick={() => handleFlashAnswer(false)} className="flex-1 bg-white/20 hover:bg-white/30 py-4 rounded-xl font-bold text-xl transition-colors">FALSE</button>
+                    </div>
+                  </>
+                ) : (
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center">
+                    <h2 className="text-3xl font-extrabold mb-2">
+                      {flashTestResult === "correct" ? "CORRECT! +1pt" : flashTestResult === "wrong" ? "NOT QUITE" : "TIME'S UP"}
+                    </h2>
+                    <p className="text-sm opacity-80">{flashTestResult === "correct" ? flashTest.explanation : "Moving on..."}</p>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* THE ACTUAL CONCEPT CONTENT */}
           <AnimatePresence initial={false} custom={direction} mode="wait">
             <motion.div
               key={currentStepIndex}
@@ -133,12 +223,12 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           </AnimatePresence>
         </div>
 
-        <button onClick={handleNext} disabled={currentStepIndex === lesson.micro_steps.length - 1} className={`absolute right-1 z-20 p-2 rounded-full bg-white/90 shadow-lg ${currentStepIndex === lesson.micro_steps.length - 1 ? 'opacity-30' : 'hover:bg-white'}`}>
+        <button onClick={() => triggerNavigation(1)} disabled={currentStepIndex === lesson.micro_steps.length - 1} className={`absolute right-1 z-20 p-2 rounded-full bg-white/90 shadow-lg ${currentStepIndex === lesson.micro_steps.length - 1 ? 'opacity-30' : 'hover:bg-white'}`}>
           <ChevronRight size={24} className="text-classoni-navy" />
         </button>
       </div>
 
-      {/* 4. BOTTOM BUTTONS (Always Uniform) */}
+      {/* 4. BOTTOM BUTTONS */}
       <div className="flex-shrink-0 px-4 py-3 flex gap-2">
         <button onClick={() => setActiveSheet("apply")} className="flex-1 bg-classoni-blue text-white rounded-full py-3 font-semibold text-sm shadow-md active:scale-95 transition-transform">Apply</button>
         <button onClick={() => setActiveSheet("explain")} className="flex-1 bg-classoni-yellow text-classoni-navy rounded-full py-3 font-bold text-sm shadow-md active:scale-95 transition-transform">Explain</button>
