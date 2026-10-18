@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, Play, Pause, Share2, ThumbsUp, Gauge } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Play, Pause, Share2, ThumbsUp, Gauge, Music, VolumeX } from "lucide-react";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 
@@ -19,6 +19,10 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const [progress, setProgress] = useState(0); 
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
 
+  // Background Music State
+  const [isMusicPlaying, setIsMusicPlaying] = useState(true);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+
   // Flash Test State
   const [showFlashTest, setShowFlashTest] = useState(false);
   const [flashTestAnswer, setFlashTestAnswer] = useState<boolean | null>(null);
@@ -31,6 +35,38 @@ export default function Player({ navigate, lesson }: PlayerProps) {
 
   const timerRef = useRef<any>(null);
 
+  // Try to play music on mount (might be blocked by browser)
+  useEffect(() => {
+    if (musicRef.current && isMusicPlaying) {
+      musicRef.current.volume = 0.2; // Keep it soft
+      musicRef.current.play().catch(() => {
+        // Autoplay blocked. Will start on first click.
+        setIsMusicPlaying(false);
+      });
+    }
+  }, []);
+
+  // Handle user interaction to start music if it was blocked
+  const startMusicOnInteraction = () => {
+    if (musicRef.current && !isMusicPlaying) {
+      setIsMusicPlaying(true);
+      musicRef.current.play().catch(() => {});
+    }
+  };
+
+  const toggleMusic = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (musicRef.current) {
+      if (isMusicPlaying) {
+        musicRef.current.pause();
+        setIsMusicPlaying(false);
+      } else {
+        musicRef.current.play();
+        setIsMusicPlaying(true);
+      }
+    }
+  };
+
   if (!lesson || !lesson.micro_steps) {
     return <div className="p-4 text-white bg-classoni-navy h-screen flex items-center justify-center">Loading lesson data...</div>;
   }
@@ -42,8 +78,8 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     explanation: "Mitochondria is the powerhouse."
   };
 
-  // Handle starting the Flash Test
   const triggerNavigation = (dir: 1 | -1) => {
+    startMusicOnInteraction(); // Start music on first swipe
     if (dir === 1 && currentStepIndex === lesson.micro_steps.length - 1) return;
     if (dir === -1 && currentStepIndex === 0) return;
 
@@ -54,14 +90,12 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     setFlashTestTimer(3);
   };
 
-  // Flash Test Timer Logic
   useEffect(() => {
     if (showFlashTest && flashTestTimer > 0 && !flashTestAnswer) {
       timerRef.current = setTimeout(() => {
         setFlashTestTimer((prev) => prev - 1);
       }, 1000);
     } else if (showFlashTest && flashTestTimer === 0 && !flashTestAnswer) {
-      // Timeout
       setFlashTestResult("timeout");
       finishFlashTest();
     }
@@ -69,7 +103,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   }, [showFlashTest, flashTestTimer, flashTestAnswer]);
 
   const handleFlashAnswer = (val: boolean) => {
-    if (flashTestAnswer !== null) return; // Already answered
+    if (flashTestAnswer !== null) return;
     setFlashTestAnswer(val);
     const isCorrect = val === flashTest.answer;
     
@@ -92,10 +126,9 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       setProgress(0);
       setIsPlaying(false);
       setPendingDirection(0);
-    }, 1200); // 1.2s delay to show the result before swiping
+    }, 1200); 
   };
 
-  // Audio Sim
   useEffect(() => {
     let timer: any;
     if (isPlaying && !showFlashTest) {
@@ -116,7 +149,17 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   };
 
   return (
-    <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
+    <div 
+      className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative"
+      onClick={startMusicOnInteraction}
+    >
+      {/* BACKGROUND MUSIC ELEMENT */}
+      <audio 
+        ref={musicRef} 
+        src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" 
+        loop 
+        hidden 
+      />
       
       <div className="flex-shrink-0">
         <TopBar title={lesson.keypoint_title} uploader="By You" points={dailyPoints} onProfileTap={() => navigate("profile")} onRewardsTap={() => navigate("rewards")} onPremiumTap={() => navigate("premiumPlans")} />
@@ -144,6 +187,11 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-classoni-yellow border-2 border-white shadow-md" style={{ left: `calc(${progress}% - 7px)` }} />
         </div>
 
+        {/* MUSIC TOGGLE BUTTON */}
+        <button onClick={toggleMusic} className="text-classoni-navy/70 p-1">
+          {isMusicPlaying ? <Music size={16} /> : <VolumeX size={16} />}
+        </button>
+
         <button onClick={cycleSpeed} className="flex items-center gap-1 text-xs font-bold text-classoni-navy/70">
           <Gauge size={14} />
           {playbackSpeed.toFixed(2)}x
@@ -159,7 +207,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
 
         <div className="w-full h-full max-h-[55vh] bg-white rounded-2xl shadow-xl border border-classoni-navy/10 relative overflow-hidden">
           
-          {/* THE FLASH TEST OVERLAY */}
           <AnimatePresence>
             {showFlashTest && (
               <motion.div 
@@ -196,7 +243,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
             )}
           </AnimatePresence>
 
-          {/* THE ACTUAL CONCEPT CONTENT */}
           <AnimatePresence initial={false} custom={direction} mode="wait">
             <motion.div
               key={currentStepIndex}
@@ -305,4 +351,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-         }
+    }
