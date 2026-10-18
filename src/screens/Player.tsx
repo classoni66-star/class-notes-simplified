@@ -33,7 +33,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   // Audio/Typing State
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0 to 100
-  const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Typing speed
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Baseline typing speed
   
   // Flash Test State
   const [showFlashTest, setShowFlashTest] = useState(false);
@@ -102,7 +102,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const charsToShow = Math.floor(progressInChunk * activeChunkText.length);
   const visibleText = activeChunkText.substring(0, charsToShow);
 
-  // Play sounds when characters or chunks change
+  // Play sounds
   useEffect(() => {
     if (charsToShow > lastCharRef.current && charsToShow > 0) {
       playClick();
@@ -117,15 +117,15 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     lastChunkRef.current = currentChunkIndex;
   }, [currentChunkIndex]);
 
-  // Playback loop (Slowed down + Speed controlled)
+  // Playback loop (SLOWED DOWN for human typing feel)
   useEffect(() => {
     let timer: any;
     if (isPlaying && !showFlashTest) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 100) { setIsPlaying(false); return 100; }
-          // Base speed: 100% in ~10 seconds at 1.0x speed (using 50ms interval)
-          return prev + (0.6 * playbackSpeed); 
+          // 0.05 base increment = exactly 0.08x of the old speed
+          return prev + (0.05 * playbackSpeed); 
         });
       }, 50);
     }
@@ -133,7 +133,8 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   }, [isPlaying, showFlashTest, playbackSpeed]);
 
   const cycleSpeed = () => {
-    const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+    // 1.0x is now the slow, human typing speed. 
+    const speeds = [1.0, 1.5, 2.0, 3.0, 5.0];
     const currentIndex = speeds.indexOf(playbackSpeed);
     setPlaybackSpeed(speeds[(currentIndex + 1) % speeds.length]);
   };
@@ -192,8 +193,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
 
   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProgress(Number(e.target.value));
-    // Reset the audio click trackers so it doesn't rapid-fire sound on drag
-    lastCharRef.current = -1; 
+    lastCharRef.current = -1; // prevent sound spam when dragging
   };
 
   const flashTest = currentStep.flash_test || {
@@ -220,7 +220,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
             className="text-center text-classoni-navy text-sm font-medium leading-relaxed"
           >
             {visibleText}
-            {isPlaying && <span className="animate-pulse">|</span>}
+            {isPlaying && <span className="animate-pulse font-light">|</span>}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -243,7 +243,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         {/* SPEED BUTTON */}
         <button onClick={cycleSpeed} className="flex items-center gap-1 text-xs font-bold text-classoni-navy/70 w-14 justify-end">
           <Gauge size={14} />
-          {playbackSpeed.toFixed(2)}x
+          {playbackSpeed.toFixed(1)}x
         </button>
       </div>
 
@@ -400,4 +400,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-  }
+    }
