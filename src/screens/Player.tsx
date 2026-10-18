@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, Play, Pause, Share2, ThumbsUp, Gauge } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Share2, ThumbsUp } from "lucide-react";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 
@@ -9,31 +9,10 @@ interface PlayerProps {
   lesson: any;
 }
 
-const splitIntoChunks = (text: string) => {
-  const words = text.split(" ");
-  const chunks: string[] = [];
-  let current = "";
-  for (const word of words) {
-    if ((current + word).length > 60) {
-      chunks.push(current.trim());
-      current = word + " ";
-    } else {
-      current += word + " ";
-    }
-  }
-  if (current.trim()) chunks.push(current.trim());
-  return chunks;
-};
-
 export default function Player({ navigate, lesson }: PlayerProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [direction, setDirection] = useState(0); 
   const [activeSheet, setActiveSheet] = useState<"apply" | "quiz" | "posts" | "explain" | null>(null);
-  
-  // Audio/Typing State
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0); // 0 to 100
-  const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Baseline typing speed
   
   // Flash Test State
   const [showFlashTest, setShowFlashTest] = useState(false);
@@ -44,100 +23,20 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   
   const [dailyPoints, setDailyPoints] = useState(12);
   const timerRef = useRef<any>(null);
-  
-  // Audio Synthesis for Typing & Whoosh
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const lastCharRef = useRef(-1);
-  const lastChunkRef = useRef(-1);
-
-  useEffect(() => {
-    audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-  }, []);
-
-  const playClick = () => {
-    if (!audioCtxRef.current) return;
-    const ctx = audioCtxRef.current;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(600 + Math.random() * 200, ctx.currentTime);
-    gain.gain.setValueAtTime(0.05, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.05);
-  };
-
-  const playWhoosh = () => {
-    if (!audioCtxRef.current) return;
-    const ctx = audioCtxRef.current;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(400, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.3);
-    gain.gain.setValueAtTime(0.05, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
-  };
+  const walkthroughRef = useRef<HTMLDivElement>(null);
 
   if (!lesson || !lesson.micro_steps) {
     return <div className="p-4 text-white bg-classoni-navy h-screen flex items-center justify-center">Loading lesson data...</div>;
   }
 
   const currentStep = lesson.micro_steps[currentStepIndex];
-  const fullText = currentStep.audio_segments ? currentStep.audio_segments.join(" ") : "Narrating micro concept...";
-  const textChunks = splitIntoChunks(fullText);
   
-  const totalChunks = textChunks.length;
-  const chunkProgress = (progress / 100) * totalChunks;
-  const currentChunkIndex = Math.min(Math.floor(chunkProgress), totalChunks - 1);
-  const progressInChunk = chunkProgress - currentChunkIndex;
-  
-  const activeChunkText = textChunks[currentChunkIndex] || "";
-  const charsToShow = Math.floor(progressInChunk * activeChunkText.length);
-  const visibleText = activeChunkText.substring(0, charsToShow);
-
-  // Play sounds
+  // Ensure the walkthrough text resets its scroll position when the card changes
   useEffect(() => {
-    if (charsToShow > lastCharRef.current && charsToShow > 0) {
-      playClick();
+    if (walkthroughRef.current) {
+      walkthroughRef.current.scrollTop = 0;
     }
-    lastCharRef.current = charsToShow;
-  }, [charsToShow]);
-
-  useEffect(() => {
-    if (currentChunkIndex > lastChunkRef.current && lastChunkRef.current !== -1) {
-      playWhoosh();
-    }
-    lastChunkRef.current = currentChunkIndex;
-  }, [currentChunkIndex]);
-
-  // Playback loop (SLOWED DOWN for human typing feel)
-  useEffect(() => {
-    let timer: any;
-    if (isPlaying && !showFlashTest) {
-      timer = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 100) { setIsPlaying(false); return 100; }
-          // 0.05 base increment = exactly 0.08x of the old speed
-          return prev + (0.05 * playbackSpeed); 
-        });
-      }, 50);
-    }
-    return () => clearInterval(timer);
-  }, [isPlaying, showFlashTest, playbackSpeed]);
-
-  const cycleSpeed = () => {
-    // 1.0x is now the slow, human typing speed. 
-    const speeds = [1.0, 1.5, 2.0, 3.0, 5.0];
-    const currentIndex = speeds.indexOf(playbackSpeed);
-    setPlaybackSpeed(speeds[(currentIndex + 1) % speeds.length]);
-  };
+  }, [currentStepIndex]);
 
   const triggerNavigation = (dir: 1 | -1) => {
     if (dir === 1 && currentStepIndex === lesson.micro_steps.length - 1) return;
@@ -183,17 +82,8 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       setShowFlashTest(false);
       setDirection(pendingDirection);
       setCurrentStepIndex((prev) => prev + pendingDirection);
-      setProgress(0);
-      setIsPlaying(false);
       setPendingDirection(0);
-      lastChunkRef.current = -1;
-      lastCharRef.current = -1;
     }, 1200); 
-  };
-
-  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProgress(Number(e.target.value));
-    lastCharRef.current = -1; // prevent sound spam when dragging
   };
 
   const flashTest = currentStep.flash_test || {
@@ -202,6 +92,11 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     explanation: "Mitochondria is the powerhouse."
   };
 
+  // Combine audio segments into one solid text block for the Walkthrough
+  const walkthroughText = currentStep.audio_segments 
+    ? currentStep.audio_segments.join(" ") 
+    : "Understanding this concept is crucial for your mastery of the topic.";
+
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
       
@@ -209,52 +104,14 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         <TopBar title={lesson.keypoint_title} uploader="By You" points={dailyPoints} onProfileTap={() => navigate("profile")} onRewardsTap={() => navigate("rewards")} onPremiumTap={() => navigate("premiumPlans")} />
       </div>
 
-      {/* 1. CAPTIONS SECTION */}
-      <div className="flex-shrink-0 px-4 py-3 min-h-[80px] flex items-center justify-center">
-        <AnimatePresence mode="wait">
-          <motion.div 
-            key={currentChunkIndex}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-center text-classoni-navy text-sm font-medium leading-relaxed"
-          >
-            {visibleText}
-            {isPlaying && <span className="animate-pulse font-light">|</span>}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* 2. AUDIO/TYPING CONTROL BAR */}
-      <div className="flex-shrink-0 px-4 pb-2 flex items-center gap-3">
-        <button onClick={() => setIsPlaying(!isPlaying)} className="w-8 h-8 flex items-center justify-center bg-classoni-navy rounded-full text-white">
-          {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
-        </button>
-        
-        <input 
-          type="range" 
-          min="0" 
-          max="100" 
-          value={progress} 
-          onChange={handleProgressChange}
-          className="flex-1 h-1 bg-classoni-navy/20 rounded-full appearance-none cursor-pointer accent-classoni-yellow"
-        />
-
-        {/* SPEED BUTTON */}
-        <button onClick={cycleSpeed} className="flex items-center gap-1 text-xs font-bold text-classoni-navy/70 w-14 justify-end">
-          <Gauge size={14} />
-          {playbackSpeed.toFixed(1)}x
-        </button>
-      </div>
-
-      {/* 3. VISUAL SECTION */}
-      <div className="flex-1 relative mx-4 my-2 flex items-center justify-center overflow-hidden">
+      {/* 1. VISUAL SECTION (The Memory Part) */}
+      <div className="flex-shrink-0 relative mx-4 mt-2 mb-2 h-[45vh] flex items-center justify-center">
         
         <button onClick={() => triggerNavigation(-1)} disabled={currentStepIndex === 0} className={`absolute left-1 z-20 p-2 rounded-full bg-white/90 shadow-lg ${currentStepIndex === 0 ? 'opacity-30' : 'hover:bg-white'}`}>
           <ChevronLeft size={24} className="text-classoni-navy" />
         </button>
 
-        <div className="w-full h-full max-h-[55vh] bg-white rounded-2xl shadow-xl border border-classoni-navy/10 relative overflow-hidden">
+        <div className="w-full h-full bg-white rounded-2xl shadow-xl border border-classoni-navy/10 relative overflow-hidden">
           
           <AnimatePresence>
             {showFlashTest && (
@@ -323,12 +180,27 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </button>
       </div>
 
-      {/* 4. BOTTOM BUTTONS */}
+      {/* 2. WALKTHROUGH SECTION (The Comprehension Part) */}
+      <div className="flex-1 min-h-0 mx-4 mb-2 flex flex-col bg-white rounded-2xl shadow-sm border border-classoni-navy/10 overflow-hidden">
+        <div className="bg-classoni-navy/5 px-4 py-2 border-b border-classoni-navy/10">
+          <h3 className="text-xs font-bold text-classoni-navy tracking-wider uppercase">Walkthrough</h3>
+        </div>
+        <div 
+          ref={walkthroughRef}
+          className="flex-1 overflow-y-auto p-4"
+        >
+          <p className="text-classoni-navy/80 text-sm leading-relaxed">
+            {walkthroughText}
+          </p>
+        </div>
+      </div>
+
+      {/* 3. BOTTOM BUTTONS */}
       <div className="flex-shrink-0 px-4 py-3 flex gap-2">
-        <button onClick={() => setActiveSheet("apply")} className="flex-1 bg-gray-200 text-gray-600 rounded-full py-3 font-semibold text-sm shadow-md active:scale-95 transition-transform">Apply</button>
+        <button onClick={() => setActiveSheet("apply")} className="flex-1 bg-gray-200 text-gray-600 rounded-full py-3 font-semibold text-sm shadow-sm active:scale-95 transition-transform">Apply</button>
         <button onClick={() => setActiveSheet("explain")} className="flex-[2] bg-classoni-blue text-white rounded-full py-3 font-bold text-sm shadow-md active:scale-95 transition-transform">Explain</button>
-        <button onClick={() => setActiveSheet("quiz")} className="flex-1 bg-gray-200 text-gray-600 rounded-full py-3 font-semibold text-sm shadow-md active:scale-95 transition-transform">Quiz</button>
-        <button onClick={() => setActiveSheet("posts")} className="flex-1 bg-gray-200 text-gray-600 rounded-full py-3 font-semibold text-sm shadow-md active:scale-95 transition-transform">Posts</button>
+        <button onClick={() => setActiveSheet("quiz")} className="flex-1 bg-gray-200 text-gray-600 rounded-full py-3 font-semibold text-sm shadow-sm active:scale-95 transition-transform">Quiz</button>
+        <button onClick={() => setActiveSheet("posts")} className="flex-1 bg-gray-200 text-gray-600 rounded-full py-3 font-semibold text-sm shadow-sm active:scale-95 transition-transform">Posts</button>
       </div>
 
       <BottomNav active="courses" onNavigate={(tab) => {
@@ -400,4 +272,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-    }
+  }
