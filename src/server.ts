@@ -33,6 +33,7 @@ You MUST return a valid JSON object. Do not use markdown backticks. Return ONLY 
     {
       "step_number": 1,
       "micro_step_title": "First Concept Name",
+      "visual_search_query": "2-3 simple words for an image search (e.g. muscle cells, survey forms)",
       "summary_text": "A one sentence summary of this concept.",
       "visual_skeleton_text": "Bullet 1\\nBullet 2\\nBullet 3",
       "audio_segments": ["First sentence to narrate.", "Second sentence to narrate."],
@@ -53,6 +54,27 @@ You MUST return a valid JSON object. Do not use markdown backticks. Return ONLY 
     "explanation": "Why A is correct."
   }
 }`;
+
+// Helper to fetch images in the background
+async function getVisualImage(query: string): Promise<string> {
+  const cleanQuery = encodeURIComponent(query.trim());
+  try {
+    // Try Openverse first
+    const res = await fetch(`https://api.openverse.engineering/v1/images/?q=${cleanQuery}&page_size=1&mature=false`);
+    if (res.ok) {
+      const data: any = await res.json();
+      if (data.results && data.results.length > 0) {
+        return data.results[0].thumbnail || data.results[0].url;
+      }
+    }
+  } catch (e) {
+    console.error("Openverse failed:", e);
+  }
+  
+  // Fallback to LoremFlickr
+  const fallbackQuery = cleanQuery.replace(/%20/g, ',');
+  return `https://loremflickr.com/600/400/${fallbackQuery || 'education'}`;
+}
 
 async function handleApi(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
@@ -91,7 +113,6 @@ async function handleApi(request: Request): Promise<Response | null> {
         userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint in the JSON format.`;
       }
 
-      // We removed response_format: { type: "json_object" } to prevent the {} error
       const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
         method: "POST",
         headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
@@ -114,22 +135,21 @@ async function handleApi(request: Request): Promise<Response | null> {
       const data: any = await r.json();
       let content = data?.choices?.[0]?.message?.content || "";
 
-      // Clean the response (strip markdown if the AI ignored our instructions)
       content = content.trim();
       if (content.startsWith("```json")) content = content.slice(7);
       else if (content.startsWith("```")) content = content.slice(3);
       if (content.endsWith("```")) content = content.slice(0, -3);
       content = content.trim();
 
-      // Find the first '{' and last '}' just in case there is text outside the JSON
       const startIdx = content.indexOf("{");
       const endIdx = content.lastIndexOf("}");
       if (startIdx !== -1 && endIdx !== -1) {
         content = content.slice(startIdx, endIdx + 1);
       }
 
+      let parsed: any;
       try {
-        const parsed = JSON.parse(content);
+        parsed = JSON.parse(content);
         if (!parsed.micro_steps || !Array.isArray(parsed.micro_steps) || parsed.micro_steps.length === 0) {
           return json({ error: "AI returned JSON without micro_steps. Raw: " + content.slice(0, 100) }, 500);
         }
@@ -137,7 +157,20 @@ async function handleApi(request: Request): Promise<Response | null> {
         return json({ error: "AI returned invalid JSON format. Raw: " + content.slice(0, 100) }, 500);
       }
 
-      return new Response(content, { headers: { ...GLOBAL_CORS, "Content-Type": "application/json" } });
+      // --- NEW: Attach Images to each micro-step ---
+      if (parsed.micro_steps && Array.isArray(parsed.micro_steps)) {
+        // Fetch all images in parallel so it doesn't slow down the loading screen
+        const stepsWithImages = await Promise.all(
+          parsed.micro_steps.map(async (step: any) => {
+            const query = step.visual_search_query || step.micro_step_title || topic;
+            const imgUrl = await getVisualImage(query);
+            return { ...step, visual_image_url: imgUrl };
+          })
+        );
+        parsed.micro_steps = stepsWithImages;
+      }
+
+      return new Response(JSON.stringify(parsed), { headers: { ...GLOBAL_CORS, "Content-Type": "application/json" } });
     } catch (err) {
       return json({ error: "Worker crashed: " + String(err) }, 500);
     }
