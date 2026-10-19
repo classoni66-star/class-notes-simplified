@@ -22,47 +22,57 @@ function getSecret(name: string): string | undefined {
   return undefined;
 }
 
-const LESSON_SYSTEM_PROMPT = `You are the lesson architect behind Classoni. Take the notes or curriculum topic and produce ONE keypoint broken into micro-concepts.
+const LESSON_SYSTEM_PROMPT = `You are the master lesson architect behind Classoni. Your goal is to teach with REAL CLARITY, using micro-bits. Do not dump information. You don't truly know it until you can explain it.
+
+Take the notes or curriculum topic and break it down into ALL the essential Keypoints. 
+
+RULES:
+1. NEVER write walls of text. Keep summaries to 1 sentence. Keep audio segments to short, conversational sentences.
+2. Scenarios MUST use formal professions in Uganda (e.g., hospital, bank, lab, court, engineering site). NEVER use informal economy (boda bodas, market vendors).
+3. For each micro-step, provide a "visual_search_query" using only 1 or 2 simple words (e.g., "blood cells", "survey form", "microscope").
 
 You MUST return a valid JSON object. Do not use markdown backticks. Return ONLY the raw JSON object starting with { and ending with }.
 
 {
-  "keypoint_title": "The Main Topic",
-  "location_indicator": "1.1",
-  "micro_steps": [
+  "topic": "The Main Subject",
+  "keypoints": [
     {
-      "step_number": 1,
-      "micro_step_title": "First Concept Name",
-      "visual_search_query": "1-2 simple words for an image search (e.g. muscle, survey, heart)",
-      "summary_text": "A one sentence summary of this concept.",
-      "visual_skeleton_text": "Bullet 1\\nBullet 2\\nBullet 3",
-      "audio_segments": ["First sentence to narrate.", "Second sentence to narrate."],
-      "explain_context": "The core pillars the student must mention."
+      "keypoint_number": 1,
+      "keypoint_title": "Main Keypoint Name",
+      "micro_steps": [
+        {
+          "step_number": 1,
+          "micro_step_title": "Micro Concept 1",
+          "visual_search_query": "simple words",
+          "summary_text": "One clear sentence summarizing this micro-bit.",
+          "visual_skeleton_text": "• Core definition\\n• Key characteristic\\n• The underlying logic",
+          "audio_segments": ["Short sentence to narrate.", "Another short sentence."],
+          "explain_context": "The core pillars the student must mention."
+        }
+      ],
+      "apply": {
+        "title": "Application in a formal profession",
+        "scenario": "A real-world scenario in a Ugandan hospital/bank/lab.",
+        "solution": "The solution."
+      },
+      "quiz": {
+        "title": "Exam Question",
+        "type": "mcq",
+        "question": "Question text",
+        "options": ["A", "B", "C", "D"],
+        "correct_answer": "A",
+        "explanation": "Why A is correct."
+      }
     }
-  ],
-  "apply": {
-    "title": "Application of the concept",
-    "scenario": "A real-world scenario.",
-    "solution": "The solution."
-  },
-  "quiz": {
-    "title": "Exam Question",
-    "type": "mcq",
-    "question": "Question text",
-    "options": ["A", "B", "C", "D"],
-    "correct_answer": "A",
-    "explanation": "Why A is correct."
-  }
+  ]
 }`;
 
 async function getVisualImage(query: string): Promise<string> {
-  // Clean the query to ensure it works well in a URL
   const cleanQuery = encodeURIComponent((query || "education").trim().replace(/[^a-zA-Z0-9 ]/g, ""));
   
   try {
-    // Use the NEW Openverse API endpoint (.org, not .engineering)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 4000); 
 
     const res = await fetch(`https://api.openverse.org/v1/images/?q=${cleanQuery}&page_size=1&mature=false`, {
       headers: { "User-Agent": "ClassoniApp/1.0" },
@@ -81,7 +91,6 @@ async function getVisualImage(query: string): Promise<string> {
     console.error("Openverse failed:", e);
   }
   
-  // GUARANTEED FALLBACK: Use a reliable placeholder service with the topic text
   return `https://placehold.co/600x400/F3F4F6/0A1F44?text=${cleanQuery.replace(/%20/g, '+')}`;
 }
 
@@ -117,9 +126,9 @@ async function handleApi(request: Request): Promise<Response | null> {
 
       let userMessage = "";
       if (notes.trim().length > 10) {
-        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract the core keypoints and generate the JSON.`;
+        userMessage = `STUDENT'S NOTES:\n${notes}\n\nExtract all keypoints and generate the JSON.`;
       } else {
-        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate ONE keypoint in the JSON format.`;
+        userMessage = `STANDARD CURRICULUM SOURCE\nSubject and topic: ${topic}\n\nGenerate all keypoints in the JSON format.`;
       }
 
       const r = await fetch("https://api.deepinfra.com/v1/openai/chat/completions", {
@@ -159,24 +168,26 @@ async function handleApi(request: Request): Promise<Response | null> {
       let parsed: any;
       try {
         parsed = JSON.parse(content);
-        if (!parsed.micro_steps || !Array.isArray(parsed.micro_steps) || parsed.micro_steps.length === 0) {
-          return json({ error: "AI returned JSON without micro_steps. Raw: " + content.slice(0, 100) }, 500);
+        if (!parsed.keypoints || !Array.isArray(parsed.keypoints) || parsed.keypoints.length === 0) {
+          return json({ error: "AI returned JSON without keypoints. Raw: " + content.slice(0, 100) }, 500);
         }
       } catch (e) {
         return json({ error: "AI returned invalid JSON format. Raw: " + content.slice(0, 100) }, 500);
       }
 
-      // Attach Images to each micro-step
-      if (parsed.micro_steps && Array.isArray(parsed.micro_steps)) {
-        const stepsWithImages = await Promise.all(
-          parsed.micro_steps.map(async (step: any) => {
-            // Fallback to the title if the AI forgot to add visual_search_query
-            const query = step.visual_search_query || step.micro_step_title || topic;
-            const imgUrl = await getVisualImage(query);
-            return { ...step, visual_image_url: imgUrl };
-          })
-        );
-        parsed.micro_steps = stepsWithImages;
+      // Attach Images to EVERY micro-step in EVERY keypoint
+      if (parsed.keypoints && Array.isArray(parsed.keypoints)) {
+        for (const kp of parsed.keypoints) {
+          if (kp.micro_steps && Array.isArray(kp.micro_steps)) {
+            kp.micro_steps = await Promise.all(
+              kp.micro_steps.map(async (step: any) => {
+                const query = step.visual_search_query || step.micro_step_title || topic;
+                const imgUrl = await getVisualImage(query);
+                return { ...step, visual_image_url: imgUrl };
+              })
+            );
+          }
+        }
       }
 
       return new Response(JSON.stringify(parsed), { headers: { ...GLOBAL_CORS, "Content-Type": "application/json" } });
