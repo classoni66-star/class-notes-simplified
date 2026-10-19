@@ -33,7 +33,7 @@ You MUST return a valid JSON object. Do not use markdown backticks. Return ONLY 
     {
       "step_number": 1,
       "micro_step_title": "First Concept Name",
-      "visual_search_query": "2-3 simple words for an image search (e.g. muscle cells, survey forms)",
+      "visual_search_query": "1-2 simple words for an image search (e.g. muscle, survey, heart)",
       "summary_text": "A one sentence summary of this concept.",
       "visual_skeleton_text": "Bullet 1\\nBullet 2\\nBullet 3",
       "audio_segments": ["First sentence to narrate.", "Second sentence to narrate."],
@@ -55,12 +55,22 @@ You MUST return a valid JSON object. Do not use markdown backticks. Return ONLY 
   }
 }`;
 
-// Helper to fetch images in the background
 async function getVisualImage(query: string): Promise<string> {
-  const cleanQuery = encodeURIComponent(query.trim());
+  // Clean the query to ensure it works well in a URL
+  const cleanQuery = encodeURIComponent((query || "education").trim().replace(/[^a-zA-Z0-9 ]/g, ""));
+  
   try {
-    // Try Openverse first
-    const res = await fetch(`https://api.openverse.engineering/v1/images/?q=${cleanQuery}&page_size=1&mature=false`);
+    // Use the NEW Openverse API endpoint (.org, not .engineering)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 second timeout
+
+    const res = await fetch(`https://api.openverse.org/v1/images/?q=${cleanQuery}&page_size=1&mature=false`, {
+      headers: { "User-Agent": "ClassoniApp/1.0" },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+
     if (res.ok) {
       const data: any = await res.json();
       if (data.results && data.results.length > 0) {
@@ -71,9 +81,8 @@ async function getVisualImage(query: string): Promise<string> {
     console.error("Openverse failed:", e);
   }
   
-  // Fallback to LoremFlickr
-  const fallbackQuery = cleanQuery.replace(/%20/g, ',');
-  return `https://loremflickr.com/600/400/${fallbackQuery || 'education'}`;
+  // GUARANTEED FALLBACK: Use a reliable placeholder service with the topic text
+  return `https://placehold.co/600x400/F3F4F6/0A1F44?text=${cleanQuery.replace(/%20/g, '+')}`;
 }
 
 async function handleApi(request: Request): Promise<Response | null> {
@@ -157,11 +166,11 @@ async function handleApi(request: Request): Promise<Response | null> {
         return json({ error: "AI returned invalid JSON format. Raw: " + content.slice(0, 100) }, 500);
       }
 
-      // --- NEW: Attach Images to each micro-step ---
+      // Attach Images to each micro-step
       if (parsed.micro_steps && Array.isArray(parsed.micro_steps)) {
-        // Fetch all images in parallel so it doesn't slow down the loading screen
         const stepsWithImages = await Promise.all(
           parsed.micro_steps.map(async (step: any) => {
+            // Fallback to the title if the AI forgot to add visual_search_query
             const query = step.visual_search_query || step.micro_step_title || topic;
             const imgUrl = await getVisualImage(query);
             return { ...step, visual_image_url: imgUrl };
