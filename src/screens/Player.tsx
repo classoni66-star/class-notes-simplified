@@ -22,8 +22,10 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const [showToast, setShowToast] = useState(false);
   const toastTimeoutRef = useRef<any>(null);
 
+  // Image State
   const [visualImage, setVisualImage] = useState<string | null>(null);
   const [isImageLoading, setIsImageLoading] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const walkthroughRef = useRef<HTMLDivElement>(null);
 
@@ -47,11 +49,11 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     const fetchVisual = async () => {
       setIsImageLoading(true);
       setVisualImage(null);
+      setImgError(false); // Reset error on step change
       
       const query = encodeURIComponent(currentStep.micro_step_title || lesson.topic || "education");
       
       try {
-        // Try Openverse first
         const res = await fetch(`https://api.openverse.engineering/v1/images/?q=${query}&page_size=1&mature=false`);
         if (res.ok) {
           const data = await res.json();
@@ -62,12 +64,10 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           }
         }
         
-        // Fallback to LoremFlickr if Openverse fails or returns no results
         if (isMounted) {
            setVisualImage(`https://loremflickr.com/600/400/${query.replace(/%20/g, ',')}`);
         }
       } catch (error) {
-        // If Openverse throws an error, use Fallback
         if (isMounted) {
            setVisualImage(`https://loremflickr.com/600/400/${query.replace(/%20/g, ',')}`);
         }
@@ -196,9 +196,9 @@ export default function Player({ navigate, lesson }: PlayerProps) {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: direction > 0 ? -400 : 400, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="absolute inset-0 flex flex-col overflow-y-auto p-6" 
+              className="absolute inset-0 flex flex-col overflow-y-auto p-6 pb-20" 
             >
-              <div className="flex flex-col pb-12">
+              <div className="flex flex-col">
                 <h2 className="text-xl font-extrabold text-classoni-navy mb-2">{currentStep.micro_step_title}</h2>
                 
                 <p className="text-sm text-classoni-navy/60 italic leading-relaxed mb-3">
@@ -209,24 +209,27 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                   {currentStep.visual_skeleton_text}
                 </p>
 
-                <div className="w-full rounded-xl overflow-hidden bg-gray-50 flex flex-col items-center justify-center min-h-[150px]">
+                {/* Image Section with Beautiful Fallback */}
+                <div className="w-full rounded-xl overflow-hidden bg-classoni-lavender/30 border border-classoni-navy/5 flex flex-col items-center justify-center min-h-[160px]">
                   {isImageLoading ? (
-                    <div className="flex flex-col items-center text-gray-400">
+                    <div className="flex flex-col items-center text-classoni-navy/40">
                       <span className="text-xs font-medium animate-pulse">Finding visual...</span>
                     </div>
-                  ) : visualImage ? (
+                  ) : imgError || !visualImage ? (
+                    /* Beautiful Fallback if image fails */
+                    <div className="flex flex-col items-center text-classoni-navy/50 p-6 text-center">
+                      <ImageIcon size={32} className="mb-2 opacity-50" />
+                      <span className="text-xs font-bold uppercase tracking-wider">{currentStep.micro_step_title}</span>
+                      <span className="text-[10px] mt-1">Visual representation unavailable</span>
+                    </div>
+                  ) : (
                     <img 
                       src={visualImage} 
                       alt={currentStep.micro_step_title} 
-                      className="w-full h-auto object-cover rounded-xl shadow-sm" 
+                      className="w-full h-auto object-cover" 
                       loading="lazy"
-                      onError={() => setVisualImage("https://loremflickr.com/600/400/education")} // Ultimate Fallback
+                      onError={() => setImgError(true)} // Triggers beautiful fallback instead of broken icon
                     />
-                  ) : (
-                    <div className="flex flex-col items-center text-gray-400 p-4 text-center">
-                      <ImageIcon size={24} className="mb-2 opacity-50" />
-                      <span className="text-xs font-medium">No visual found for this concept</span>
-                    </div>
                   )}
                 </div>
               </div>
@@ -348,4 +351,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-          }
+    }
