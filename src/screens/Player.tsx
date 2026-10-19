@@ -10,6 +10,7 @@ interface PlayerProps {
 }
 
 export default function Player({ navigate, lesson }: PlayerProps) {
+  const [keypointIndex, setKeypointIndex] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   const [activeSheet, setActiveSheet] = useState<"apply" | "quiz" | "posts" | "explain" | null>(null);
@@ -22,11 +23,11 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const [showToast, setShowToast] = useState(false);
   const toastTimeoutRef = useRef<any>(null);
 
-  const [imgError, setImgError] = useState<Record<number, boolean>>({});
+  const [imgError, setImgError] = useState<Record<string, boolean>>({});
 
   const walkthroughRef = useRef<HTMLDivElement>(null);
 
-  if (!lesson || !lesson.micro_steps) {
+  if (!lesson || !lesson.keypoints || lesson.keypoints.length === 0) {
     return (
       <div className="p-4 text-white bg-classoni-navy h-screen flex items-center justify-center">
         Loading lesson data...
@@ -34,7 +35,8 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     );
   }
 
-  const currentStep = lesson.micro_steps[currentStepIndex];
+  const currentKeypoint = lesson.keypoints[keypointIndex];
+  const currentStep = currentKeypoint.micro_steps[currentStepIndex];
 
   const walkthroughText = currentStep.audio_segments
     ? currentStep.audio_segments.join(" ")
@@ -42,7 +44,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
 
   useEffect(() => {
     if (walkthroughRef.current) walkthroughRef.current.scrollTop = 0;
-  }, [currentStepIndex]);
+  }, [currentStepIndex, keypointIndex]);
 
   useEffect(() => {
     return () => {
@@ -51,10 +53,11 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   }, []);
 
   const handleNext = () => {
-    if (currentStepIndex < lesson.micro_steps.length - 1) {
+    if (currentStepIndex < currentKeypoint.micro_steps.length - 1) {
       setDirection(1);
       setCurrentStepIndex((p) => p + 1);
     } else {
+      // Reached end of micro-steps for this keypoint
       if (!hasShownExplainPrompt.current) {
         hasShownExplainPrompt.current = true;
         setShowExplainPrompt(true);
@@ -69,6 +72,18 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     }
   };
 
+  const handleNextKeypoint = () => {
+    if (keypointIndex < lesson.keypoints.length - 1) {
+      setKeypointIndex((p) => p + 1);
+      setCurrentStepIndex(0);
+      setDirection(1);
+      hasShownExplainPrompt.current = false; // Reset for next keypoint
+    } else {
+      // Entire lesson finished
+      navigate("courses");
+    }
+  };
+
   const handlePlayClick = () => {
     setShowToast(true);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -77,19 +92,18 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     }, 2000);
   };
 
-  const mainKeypointTitle = `Keypoint ${lesson.keypoint_number || 1}: ${lesson.keypoint_title || "Primary Data Collection"}`;
-  const microConceptTitle = `Keypoint ${lesson.keypoint_number || 1}.${currentStep.step_number || currentStepIndex + 1}: ${currentStep.micro_step_title}`;
+  const mainKeypointTitle = `Keypoint ${currentKeypoint.keypoint_number}: ${currentKeypoint.keypoint_title}`;
+  const microConceptTitle = `Keypoint ${currentKeypoint.keypoint_number}.${currentStep.step_number || currentStepIndex + 1}: ${currentStep.micro_step_title}`;
 
-  // The image URL is now sent directly from the backend!
   const visualImage = currentStep.visual_image_url;
-  const isImgBroken = imgError[currentStepIndex];
+  const isImgBroken = imgError[`${keypointIndex}-${currentStepIndex}`];
 
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
       
       <div className="flex-shrink-0">
         <TopBar
-          title={lesson.topic || lesson.subject || "Classoni Lesson"}
+          title={lesson.topic || "Classoni Lesson"}
           uploader="By You"
           points={dailyPoints}
           keypointTitle={mainKeypointTitle}
@@ -151,7 +165,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         <div className="w-full h-full bg-white rounded-2xl shadow-sm border border-classoni-navy/10 relative overflow-hidden">
           <AnimatePresence initial={false} custom={direction} mode="wait">
             <motion.div
-              key={currentStepIndex}
+              key={`${keypointIndex}-${currentStepIndex}`}
               custom={direction}
               initial={{ x: direction > 0 ? 400 : -400, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -183,7 +197,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                       alt={currentStep.micro_step_title} 
                       className="w-full h-auto object-cover" 
                       loading="lazy"
-                      onError={() => setImgError(prev => ({ ...prev, [currentStepIndex]: true }))} 
+                      onError={() => setImgError(prev => ({ ...prev, [`${keypointIndex}-${currentStepIndex}`]: true }))} 
                     />
                   )}
                 </div>
@@ -225,7 +239,22 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         }}
       />
 
-      {/* MODALS */}
+      {/* EXPLAIN PROMPT & MODAL */}
+      <AnimatePresence>
+        {showExplainPrompt && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
+              <h2 className="text-xl font-extrabold text-classoni-navy mb-2">Explain "{currentKeypoint.keypoint_title}" in your own words</h2>
+              <p className="text-sm text-classoni-navy/70 mb-6">Score 8/10 to unlock teacher mode...</p>
+              <div className="space-y-2">
+                <button onClick={() => { setShowExplainPrompt(false); setActiveSheet("explain"); }} className="w-full bg-classoni-blue text-white py-3 rounded-full font-bold">Start Explaining</button>
+                <button onClick={() => { setShowExplainPrompt(false); setShowApplyPrompt(true); }} className="w-full text-classoni-navy/60 py-2 text-sm font-semibold">Maybe Later</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {activeSheet === "explain" && (
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="fixed inset-0 bg-classoni-navy z-50 flex flex-col p-6 text-white">
@@ -242,6 +271,23 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         )}
       </AnimatePresence>
 
+      {/* APPLY PROMPT & MODAL */}
+      <AnimatePresence>
+        {showApplyPrompt && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
+              <h2 className="text-xl font-extrabold text-classoni-navy mb-2">Don't just memorize knowledge</h2>
+              <p className="text-sm text-classoni-navy/70 mb-6">Put "{currentKeypoint.keypoint_title}" to work to solve a real problem...</p>
+              <div className="space-y-2">
+                <button onClick={() => { setShowApplyPrompt(false); setActiveSheet("apply"); }} className="w-full bg-classoni-yellow text-classoni-navy py-3 rounded-full font-bold">Practice Now</button>
+                <button onClick={() => { setShowApplyPrompt(false); handleNextKeypoint(); }} className="w-full text-classoni-navy/60 py-2 text-sm font-semibold">Skip to Next Keypoint</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet && activeSheet !== "explain" && (
           <>
@@ -251,21 +297,26 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                 <h3 className="font-bold text-lg capitalize text-classoni-navy">{activeSheet}</h3>
                 <button onClick={() => setActiveSheet(null)}><X size={20} className="text-classoni-navy" /></button>
               </div>
-              {activeSheet === "apply" && lesson.apply && (
+              {activeSheet === "apply" && currentKeypoint.apply && (
                 <div>
-                  <h4 className="font-bold text-classoni-navy mb-2">{lesson.apply.title}</h4>
-                  <p className="text-sm text-classoni-navy/80 mb-4">{lesson.apply.scenario}</p>
-                  <button className="w-full bg-classoni-blue text-white py-3 rounded-full font-bold">Reveal Solution</button>
+                  <h4 className="font-bold text-classoni-navy mb-2">{currentKeypoint.apply.title}</h4>
+                  <p className="text-sm text-classoni-navy/80 mb-4">{currentKeypoint.apply.scenario}</p>
+                  <button onClick={() => { setActiveSheet(null); handleNextKeypoint(); }} className="w-full bg-classoni-blue text-white py-3 rounded-full font-bold">
+                    Next Keypoint
+                  </button>
                 </div>
               )}
-              {activeSheet === "quiz" && lesson.quiz && (
+              {activeSheet === "quiz" && currentKeypoint.quiz && (
                 <div>
-                  <h4 className="font-bold text-classoni-navy mb-2">{lesson.quiz.question}</h4>
-                  <div className="space-y-2 mt-4">
-                    {lesson.quiz.options.map((opt: string, i: number) => (
+                  <h4 className="font-bold text-classoni-navy mb-2">{currentKeypoint.quiz.question}</h4>
+                  <div className="space-y-2 mt-4 mb-4">
+                    {currentKeypoint.quiz.options.map((opt: string, i: number) => (
                       <button key={i} className="w-full text-left p-3 rounded-xl border border-classoni-navy/20 text-classoni-navy hover:bg-classoni-lavender">{opt}</button>
                     ))}
                   </div>
+                  <button onClick={() => { setActiveSheet(null); handleNextKeypoint(); }} className="w-full bg-classoni-blue text-white py-3 rounded-full font-bold">
+                    Next Keypoint
+                  </button>
                 </div>
               )}
               {activeSheet === "posts" && (
@@ -275,36 +326,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           </>
         )}
       </AnimatePresence>
-      
-      <AnimatePresence>
-        {showExplainPrompt && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-6">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
-              <h2 className="text-xl font-extrabold text-classoni-navy mb-2">Explain "{lesson.keypoint_title}" in your own words</h2>
-              <p className="text-sm text-classoni-navy/70 mb-6">Score 8/10 to unlock teacher mode...</p>
-              <div className="space-y-2">
-                <button onClick={() => { setShowExplainPrompt(false); setActiveSheet("explain"); }} className="w-full bg-classoni-blue text-white py-3 rounded-full font-bold">Start Explaining</button>
-                <button onClick={() => { setShowExplainPrompt(false); setShowApplyPrompt(true); }} className="w-full text-classoni-navy/60 py-2 text-sm font-semibold">Maybe Later</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {showApplyPrompt && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-6">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
-              <h2 className="text-xl font-extrabold text-classoni-navy mb-2">Don't just memorize knowledge</h2>
-              <p className="text-sm text-classoni-navy/70 mb-6">Put "{lesson.keypoint_title}" to work to solve a real problem...</p>
-              <div className="space-y-2">
-                <button onClick={() => { setShowApplyPrompt(false); setActiveSheet("apply"); }} className="w-full bg-classoni-yellow text-classoni-navy py-3 rounded-full font-bold">Practice Now</button>
-                <button onClick={() => { setShowApplyPrompt(false); navigate("courses"); }} className="w-full text-classoni-navy/60 py-2 text-sm font-semibold">Skip for Now</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
-        }
+    }
