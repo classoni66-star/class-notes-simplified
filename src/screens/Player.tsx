@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, Share2, ThumbsUp, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Share2, ThumbsUp, Play, Image as ImageIcon } from "lucide-react";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 
@@ -24,6 +24,10 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const [showToast, setShowToast] = useState(false);
   const toastTimeoutRef = useRef<any>(null);
 
+  // Openverse Image State
+  const [visualImage, setVisualImage] = useState<string | null>(null);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+
   const walkthroughRef = useRef<HTMLDivElement>(null);
 
   if (!lesson || !lesson.micro_steps) {
@@ -39,6 +43,38 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const walkthroughText = currentStep.audio_segments
     ? currentStep.audio_segments.join(" ")
     : "Understanding this concept is crucial for your mastery of the topic.";
+
+  // Fetch image from Openverse whenever the step changes
+  useEffect(() => {
+    let isMounted = true;
+    const fetchOpenverseImage = async () => {
+      setIsImageLoading(true);
+      setVisualImage(null);
+      try {
+        // Use the micro step title as the search query
+        const query = encodeURIComponent(currentStep.micro_step_title || lesson.topic || "education");
+        const res = await fetch(`https://api.openverse.engineering/v1/images/?q=${query}&page_size=1&mature=false`);
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.results && data.results.length > 0 && isMounted) {
+            // Use thumbnail to save data bandwidth
+            setVisualImage(data.results[0].thumbnail || data.results[0].url);
+          }
+        }
+      } catch (error) {
+        console.error("Openverse fetch failed:", error);
+      } finally {
+        if (isMounted) setIsImageLoading(false);
+      }
+    };
+
+    fetchOpenverseImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentStepIndex, currentStep.micro_step_title, lesson.topic]);
 
   useEffect(() => {
     if (walkthroughRef.current) walkthroughRef.current.scrollTop = 0;
@@ -56,7 +92,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       setDirection(1);
       setCurrentStepIndex((p) => p + 1);
     } else {
-      // Reached the end of the lesson
       if (!hasShownExplainPrompt.current) {
         hasShownExplainPrompt.current = true;
         setShowExplainPrompt(true);
@@ -79,7 +114,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     }, 2000);
   };
 
-  // Build the dynamic titles for the TopBar
   const mainKeypointTitle = `Keypoint ${lesson.keypoint_number || 1}: ${lesson.keypoint_title || "Primary Data Collection"}`;
   const microConceptTitle = `Keypoint ${lesson.keypoint_number || 1}.${currentStep.step_number || currentStepIndex + 1}: ${currentStep.micro_step_title}`;
 
@@ -100,17 +134,17 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         />
       </div>
 
-      {/* 1. WALKTHROUGH (Scrollable with Title) */}
+      {/* 1. THE UNDERLYING LOGIC (Scrollable with Title) */}
       <div className="mx-4 mt-2 mb-1 flex flex-col bg-[#FFFCE8] rounded-xl border border-classoni-yellow/40 overflow-hidden shadow-sm flex-shrink-0 h-[18vh]">
         <div className="bg-classoni-yellow/20 px-4 py-1.5 border-b border-classoni-yellow/30">
-          <h3 className="text-xs font-bold text-classoni-navy tracking-wider uppercase">Walkthrough</h3>
+          <h3 className="text-xs font-bold text-classoni-navy tracking-wider uppercase">The Underlying Logic</h3>
         </div>
         <div ref={walkthroughRef} className="overflow-y-auto p-4 h-full">
           <p className="text-classoni-navy/90 text-sm leading-relaxed font-medium">{walkthroughText}</p>
         </div>
       </div>
 
-      {/* 2. AUDIO PLAYER WITH TOAST */}
+      {/* 2. AUDIO PLAYER */}
       <div className="flex items-center gap-3 px-6 py-2 flex-shrink-0 relative">
         <button 
           onClick={handlePlayClick}
@@ -119,7 +153,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           <Play size={18} fill="currentColor" className="ml-1" />
         </button>
         
-        {/* Audio Toast */}
         <AnimatePresence>
           {showToast && (
             <motion.div
@@ -140,10 +173,9 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         <span className="text-xs text-classoni-navy/60 font-semibold">1.00x</span>
       </div>
 
-      {/* 3. VISUAL BLOCK (Single scrollable card) */}
+      {/* 3. VISUAL BLOCK (Single continuous paragraph) */}
       <div className="flex-1 min-h-0 relative mx-4 mb-2">
         
-        {/* Left Arrow */}
         <button
           onClick={handlePrev}
           disabled={currentStepIndex === 0}
@@ -154,7 +186,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           <ChevronLeft size={24} className="text-classoni-navy" />
         </button>
 
-        {/* Visual Card */}
         <div className="w-full h-full bg-white rounded-2xl shadow-sm border border-classoni-navy/10 relative overflow-hidden">
           <AnimatePresence initial={false} custom={direction} mode="wait">
             <motion.div
@@ -166,32 +197,47 @@ export default function Player({ navigate, lesson }: PlayerProps) {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="absolute inset-0 flex flex-col overflow-y-auto p-6" 
             >
-              <div className="flex flex-col space-y-4 pb-10">
+              {/* Continuous Flow Container */}
+              <div className="flex flex-col pb-12">
                 
-                {/* Visual Title */}
-                <div>
-                  <h3 className="text-[11px] font-bold text-classoni-blue tracking-wider uppercase mb-1">
-                    What you need to know
-                  </h3>
-                  <h2 className="text-xl font-extrabold text-classoni-navy">{currentStep.micro_step_title}</h2>
-                </div>
-
-                <p className="text-sm text-classoni-navy/60 italic leading-relaxed">{currentStep.summary_text || "Understanding this core concept is crucial."}</p>
+                {/* 1. Title */}
+                <h2 className="text-xl font-extrabold text-classoni-navy mb-2">{currentStep.micro_step_title}</h2>
                 
-                <div className="bg-classoni-lavender/60 p-4 rounded-xl border-l-4 border-classoni-blue">
-                  <p className="text-classoni-navy whitespace-pre-wrap leading-relaxed font-medium text-sm">{currentStep.visual_skeleton_text}</p>
-                </div>
+                {/* 2. Description & Skeleton (Flowing together) */}
+                <p className="text-sm text-classoni-navy/60 italic leading-relaxed mb-3">
+                  {currentStep.summary_text || "Understanding this core concept is crucial."}
+                </p>
+                
+                <p className="text-classoni-navy whitespace-pre-wrap leading-relaxed font-medium text-sm mb-5">
+                  {currentStep.visual_skeleton_text}
+                </p>
 
-                <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl h-32 flex flex-col items-center justify-center">
-                   <span className="text-xs text-gray-400 font-medium">Visual / OpenVerse</span>
-                   <span className="text-[10px] text-gray-400">Coming Soon</span>
+                {/* 3. Openverse Visual */}
+                <div className="w-full rounded-xl overflow-hidden bg-gray-50 flex flex-col items-center justify-center min-h-[150px]">
+                  {isImageLoading ? (
+                    <div className="flex flex-col items-center text-gray-400">
+                      <span className="text-xs font-medium animate-pulse">Finding visual...</span>
+                    </div>
+                  ) : visualImage ? (
+                    <img 
+                      src={visualImage} 
+                      alt={currentStep.micro_step_title} 
+                      className="w-full h-auto object-cover rounded-xl shadow-sm" 
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center text-gray-400 p-4 text-center">
+                      <ImageIcon size={24} className="mb-2 opacity-50" />
+                      <span className="text-xs font-medium">No visual found for this concept</span>
+                    </div>
+                  )}
                 </div>
+                
               </div>
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* Right Arrow */}
         <button
           onClick={handleNext}
           className="absolute right-1 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-white/90 shadow-lg hover:bg-white"
@@ -227,7 +273,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         }}
       />
 
-      {/* MODALS & BOTTOM SHEETS (Apply, Quiz, Explain, Posts) */}
+      {/* MODALS & BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet === "explain" && (
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="fixed inset-0 bg-classoni-navy z-50 flex flex-col p-6 text-white">
@@ -310,4 +356,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-  }
+        }
