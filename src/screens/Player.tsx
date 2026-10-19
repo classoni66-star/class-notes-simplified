@@ -22,10 +22,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const [showToast, setShowToast] = useState(false);
   const toastTimeoutRef = useRef<any>(null);
 
-  // Image State
-  const [visualImage, setVisualImage] = useState<string | null>(null);
-  const [isImageLoading, setIsImageLoading] = useState(false);
-  const [imgError, setImgError] = useState(false);
+  const [imgError, setImgError] = useState<Record<number, boolean>>({});
 
   const walkthroughRef = useRef<HTMLDivElement>(null);
 
@@ -42,46 +39,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const walkthroughText = currentStep.audio_segments
     ? currentStep.audio_segments.join(" ")
     : "Understanding this concept is crucial for your mastery of the topic.";
-
-  // Fetch image with Fallback
-  useEffect(() => {
-    let isMounted = true;
-    const fetchVisual = async () => {
-      setIsImageLoading(true);
-      setVisualImage(null);
-      setImgError(false); // Reset error on step change
-      
-      const query = encodeURIComponent(currentStep.micro_step_title || lesson.topic || "education");
-      
-      try {
-        const res = await fetch(`https://api.openverse.engineering/v1/images/?q=${query}&page_size=1&mature=false`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.results && data.results.length > 0 && isMounted) {
-            setVisualImage(data.results[0].thumbnail || data.results[0].url);
-            setIsImageLoading(false);
-            return;
-          }
-        }
-        
-        if (isMounted) {
-           setVisualImage(`https://loremflickr.com/600/400/${query.replace(/%20/g, ',')}`);
-        }
-      } catch (error) {
-        if (isMounted) {
-           setVisualImage(`https://loremflickr.com/600/400/${query.replace(/%20/g, ',')}`);
-        }
-      } finally {
-        if (isMounted) setIsImageLoading(false);
-      }
-    };
-
-    fetchVisual();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentStepIndex, currentStep.micro_step_title, lesson.topic]);
 
   useEffect(() => {
     if (walkthroughRef.current) walkthroughRef.current.scrollTop = 0;
@@ -122,6 +79,10 @@ export default function Player({ navigate, lesson }: PlayerProps) {
 
   const mainKeypointTitle = `Keypoint ${lesson.keypoint_number || 1}: ${lesson.keypoint_title || "Primary Data Collection"}`;
   const microConceptTitle = `Keypoint ${lesson.keypoint_number || 1}.${currentStep.step_number || currentStepIndex + 1}: ${currentStep.micro_step_title}`;
+
+  // The image URL is now sent directly from the backend!
+  const visualImage = currentStep.visual_image_url;
+  const isImgBroken = imgError[currentStepIndex];
 
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
@@ -209,14 +170,8 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                   {currentStep.visual_skeleton_text}
                 </p>
 
-                {/* Image Section with Beautiful Fallback */}
                 <div className="w-full rounded-xl overflow-hidden bg-classoni-lavender/30 border border-classoni-navy/5 flex flex-col items-center justify-center min-h-[160px]">
-                  {isImageLoading ? (
-                    <div className="flex flex-col items-center text-classoni-navy/40">
-                      <span className="text-xs font-medium animate-pulse">Finding visual...</span>
-                    </div>
-                  ) : imgError || !visualImage ? (
-                    /* Beautiful Fallback if image fails */
+                  {isImgBroken || !visualImage ? (
                     <div className="flex flex-col items-center text-classoni-navy/50 p-6 text-center">
                       <ImageIcon size={32} className="mb-2 opacity-50" />
                       <span className="text-xs font-bold uppercase tracking-wider">{currentStep.micro_step_title}</span>
@@ -228,7 +183,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                       alt={currentStep.micro_step_title} 
                       className="w-full h-auto object-cover" 
                       loading="lazy"
-                      onError={() => setImgError(true)} // Triggers beautiful fallback instead of broken icon
+                      onError={() => setImgError(prev => ({ ...prev, [currentStepIndex]: true }))} 
                     />
                   )}
                 </div>
@@ -270,6 +225,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         }}
       />
 
+      {/* MODALS */}
       <AnimatePresence>
         {activeSheet === "explain" && (
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="fixed inset-0 bg-classoni-navy z-50 flex flex-col p-6 text-white">
@@ -351,4 +307,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-    }
+  }
