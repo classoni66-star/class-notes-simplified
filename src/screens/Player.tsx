@@ -14,17 +14,14 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const [direction, setDirection] = useState(0);
   const [activeSheet, setActiveSheet] = useState<"apply" | "quiz" | "posts" | "explain" | null>(null);
 
-  // Points & completion
   const [dailyPoints, setDailyPoints] = useState(12);
   const [showExplainPrompt, setShowExplainPrompt] = useState(false);
   const [showApplyPrompt, setShowApplyPrompt] = useState(false);
   const hasShownExplainPrompt = useRef(false);
 
-  // Toast for Audio
   const [showToast, setShowToast] = useState(false);
   const toastTimeoutRef = useRef<any>(null);
 
-  // Openverse Image State
   const [visualImage, setVisualImage] = useState<string | null>(null);
   const [isImageLoading, setIsImageLoading] = useState(false);
 
@@ -44,32 +41,42 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     ? currentStep.audio_segments.join(" ")
     : "Understanding this concept is crucial for your mastery of the topic.";
 
-  // Fetch image from Openverse whenever the step changes
+  // Fetch image with Fallback
   useEffect(() => {
     let isMounted = true;
-    const fetchOpenverseImage = async () => {
+    const fetchVisual = async () => {
       setIsImageLoading(true);
       setVisualImage(null);
+      
+      const query = encodeURIComponent(currentStep.micro_step_title || lesson.topic || "education");
+      
       try {
-        // Use the micro step title as the search query
-        const query = encodeURIComponent(currentStep.micro_step_title || lesson.topic || "education");
+        // Try Openverse first
         const res = await fetch(`https://api.openverse.engineering/v1/images/?q=${query}&page_size=1&mature=false`);
-        
         if (res.ok) {
           const data = await res.json();
           if (data.results && data.results.length > 0 && isMounted) {
-            // Use thumbnail to save data bandwidth
             setVisualImage(data.results[0].thumbnail || data.results[0].url);
+            setIsImageLoading(false);
+            return;
           }
         }
+        
+        // Fallback to LoremFlickr if Openverse fails or returns no results
+        if (isMounted) {
+           setVisualImage(`https://loremflickr.com/600/400/${query.replace(/%20/g, ',')}`);
+        }
       } catch (error) {
-        console.error("Openverse fetch failed:", error);
+        // If Openverse throws an error, use Fallback
+        if (isMounted) {
+           setVisualImage(`https://loremflickr.com/600/400/${query.replace(/%20/g, ',')}`);
+        }
       } finally {
         if (isMounted) setIsImageLoading(false);
       }
     };
 
-    fetchOpenverseImage();
+    fetchVisual();
 
     return () => {
       isMounted = false;
@@ -86,7 +93,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     };
   }, []);
 
-  // Navigation without Flash Test
   const handleNext = () => {
     if (currentStepIndex < lesson.micro_steps.length - 1) {
       setDirection(1);
@@ -120,7 +126,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
       
-      {/* TOP BAR (3-Tier System) */}
       <div className="flex-shrink-0">
         <TopBar
           title={lesson.topic || lesson.subject || "Classoni Lesson"}
@@ -134,7 +139,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         />
       </div>
 
-      {/* 1. THE UNDERLYING LOGIC (Scrollable with Title) */}
       <div className="mx-4 mt-2 mb-1 flex flex-col bg-[#FFFCE8] rounded-xl border border-classoni-yellow/40 overflow-hidden shadow-sm flex-shrink-0 h-[18vh]">
         <div className="bg-classoni-yellow/20 px-4 py-1.5 border-b border-classoni-yellow/30">
           <h3 className="text-xs font-bold text-classoni-navy tracking-wider uppercase">The Underlying Logic</h3>
@@ -144,7 +148,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </div>
       </div>
 
-      {/* 2. AUDIO PLAYER */}
       <div className="flex items-center gap-3 px-6 py-2 flex-shrink-0 relative">
         <button 
           onClick={handlePlayClick}
@@ -173,9 +176,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         <span className="text-xs text-classoni-navy/60 font-semibold">1.00x</span>
       </div>
 
-      {/* 3. VISUAL BLOCK (Single continuous paragraph) */}
       <div className="flex-1 min-h-0 relative mx-4 mb-2">
-        
         <button
           onClick={handlePrev}
           disabled={currentStepIndex === 0}
@@ -197,13 +198,9 @@ export default function Player({ navigate, lesson }: PlayerProps) {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="absolute inset-0 flex flex-col overflow-y-auto p-6" 
             >
-              {/* Continuous Flow Container */}
               <div className="flex flex-col pb-12">
-                
-                {/* 1. Title */}
                 <h2 className="text-xl font-extrabold text-classoni-navy mb-2">{currentStep.micro_step_title}</h2>
                 
-                {/* 2. Description & Skeleton (Flowing together) */}
                 <p className="text-sm text-classoni-navy/60 italic leading-relaxed mb-3">
                   {currentStep.summary_text || "Understanding this core concept is crucial."}
                 </p>
@@ -212,7 +209,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                   {currentStep.visual_skeleton_text}
                 </p>
 
-                {/* 3. Openverse Visual */}
                 <div className="w-full rounded-xl overflow-hidden bg-gray-50 flex flex-col items-center justify-center min-h-[150px]">
                   {isImageLoading ? (
                     <div className="flex flex-col items-center text-gray-400">
@@ -224,6 +220,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                       alt={currentStep.micro_step_title} 
                       className="w-full h-auto object-cover rounded-xl shadow-sm" 
                       loading="lazy"
+                      onError={() => setVisualImage("https://loremflickr.com/600/400/education")} // Ultimate Fallback
                     />
                   ) : (
                     <div className="flex flex-col items-center text-gray-400 p-4 text-center">
@@ -232,7 +229,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                     </div>
                   )}
                 </div>
-                
               </div>
             </motion.div>
           </AnimatePresence>
@@ -246,7 +242,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </button>
       </div>
 
-      {/* 4. FLOATING SHARE & FEEDBACK */}
       <div className="absolute bottom-[130px] right-3 z-40 flex flex-col gap-2">
         <button className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
           <Share2 size={18} className="text-classoni-navy" />
@@ -256,7 +251,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </button>
       </div>
 
-      {/* 5. ACTION BUTTONS */}
       <div className="flex-shrink-0 px-4 py-3 flex gap-2 relative z-30">
         <button onClick={() => setActiveSheet("apply")} className="flex-1 bg-classoni-blue text-white rounded-full py-2.5 font-bold text-sm shadow-md active:scale-95 transition-transform">Apply</button>
         <button onClick={() => setActiveSheet("explain")} className="flex-1 bg-classoni-yellow text-classoni-navy rounded-full py-2.5 font-bold text-sm shadow-md active:scale-95 transition-transform">Explain</button>
@@ -273,7 +267,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         }}
       />
 
-      {/* MODALS & BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet === "explain" && (
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="fixed inset-0 bg-classoni-navy z-50 flex flex-col p-6 text-white">
@@ -324,7 +317,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         )}
       </AnimatePresence>
       
-      {/* COMPLETION PROMPTS */}
       <AnimatePresence>
         {showExplainPrompt && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-6">
@@ -356,4 +348,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-        }
+          }
