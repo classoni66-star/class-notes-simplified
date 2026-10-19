@@ -14,14 +14,12 @@ export default function Player({ navigate, lesson }: PlayerProps) {
   const [direction, setDirection] = useState(0);
   const [activeSheet, setActiveSheet] = useState<"apply" | "quiz" | "posts" | "explain" | null>(null);
 
-  // Flash Test State
   const [showFlashTest, setShowFlashTest] = useState(false);
   const [flashTestAnswer, setFlashTestAnswer] = useState<boolean | null>(null);
   const [flashTestResult, setFlashTestResult] = useState<"correct" | "wrong" | "timeout" | null>(null);
   const [flashTestTimer, setFlashTestTimer] = useState(3);
   const [pendingDirection, setPendingDirection] = useState<0 | 1 | -1>(0);
 
-  // Points & completion
   const [dailyPoints, setDailyPoints] = useState(12);
   const awardedStepsRef = useRef<Set<number>>(new Set());
   const [showExplainPrompt, setShowExplainPrompt] = useState(false);
@@ -122,6 +120,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
 
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
+      
       {/* 1. TOP BAR (Main Topic) */}
       <div className="flex-shrink-0">
         <TopBar
@@ -147,8 +146,8 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </button>
       </div>
 
-      {/* 3. CAPTIONS / WALKTHROUGH (Yellow Box) - Fixed height so it doesn't steal space */}
-      <div className="mx-4 mt-2 mb-1 flex flex-col bg-[#FFFCE8] rounded-xl border border-classoni-yellow/40 overflow-hidden shadow-sm flex-shrink-0 h-[18vh]">
+      {/* 3. CAPTIONS / WALKTHROUGH */}
+      <div className="mx-4 mt-2 mb-1 flex flex-col bg-[#FFFCE8] rounded-xl border border-classoni-yellow/40 overflow-hidden shadow-sm flex-shrink-0 h-[16vh]">
         <div ref={walkthroughRef} className="overflow-y-auto p-4 h-full">
           <p className="text-classoni-navy/90 text-sm leading-relaxed font-medium">{walkthroughText}</p>
         </div>
@@ -166,7 +165,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         <span className="text-xs text-classoni-navy/60 font-semibold">1.00x</span>
       </div>
 
-      {/* 5. VISUAL BLOCK (Now takes up ALL remaining space) */}
+      {/* 5. VISUAL BLOCK (Single scrollable card) */}
       <div className="flex-1 min-h-0 relative mx-4 mb-2">
         <button
           onClick={() => triggerNavigation(-1)}
@@ -179,17 +178,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </button>
 
         <div className="w-full h-full bg-white rounded-2xl shadow-sm border border-classoni-navy/10 relative overflow-hidden">
-          
-          {/* FLOATING SHARE & FEEDBACK (Moved inside visual card, right side, above bottom edge) */}
-          <div className="absolute right-2 bottom-16 z-40 flex flex-col gap-2">
-            <button className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
-              <Share2 size={18} className="text-classoni-navy" />
-            </button>
-            <button className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
-              <ThumbsUp size={18} className="text-classoni-navy" />
-            </button>
-          </div>
-
           <AnimatePresence>
             {showFlashTest && (
               <motion.div
@@ -237,10 +225,10 @@ export default function Player({ navigate, lesson }: PlayerProps) {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: direction > 0 ? -400 : 400, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="absolute inset-0 flex flex-col overflow-y-auto p-6 pb-24" 
+              className="absolute inset-0 flex flex-col overflow-y-auto p-6" 
             >
-              <div className="flex flex-col space-y-4">
-                <h2 className="text-xl font-extrabold text-classoni-navy pr-12">{currentStep.micro_step_title}</h2>
+              <div className="flex flex-col space-y-4 pb-10">
+                <h2 className="text-xl font-extrabold text-classoni-navy">{currentStep.micro_step_title}</h2>
                 <p className="text-sm text-classoni-navy/60 italic leading-relaxed">{currentStep.summary_text || "Understanding this core concept is crucial."}</p>
                 <div className="bg-classoni-lavender/60 p-4 rounded-xl border-l-4 border-classoni-blue">
                   <p className="text-classoni-navy whitespace-pre-wrap leading-relaxed font-medium text-sm">{currentStep.visual_skeleton_text}</p>
@@ -262,7 +250,17 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </button>
       </div>
 
-      {/* 6. ACTION BUTTONS */}
+      {/* 6. FLOATING SHARE & FEEDBACK (Moved out of the card, floating on screen) */}
+      <div className="absolute bottom-[90px] right-3 z-40 flex flex-col gap-2">
+        <button className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
+          <Share2 size={18} className="text-classoni-navy" />
+        </button>
+        <button className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
+          <ThumbsUp size={18} className="text-classoni-navy" />
+        </button>
+      </div>
+
+      {/* 7. ACTION BUTTONS */}
       <div className="flex-shrink-0 px-4 py-3 flex gap-2 relative z-30">
         <button onClick={() => setActiveSheet("apply")} className="flex-1 bg-classoni-blue text-white rounded-full py-2.5 font-bold text-sm shadow-md active:scale-95 transition-transform">Apply</button>
         <button onClick={() => setActiveSheet("explain")} className="flex-1 bg-classoni-yellow text-classoni-navy rounded-full py-2.5 font-bold text-sm shadow-md active:scale-95 transition-transform">Explain</button>
@@ -280,7 +278,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       />
 
       {/* MODALS (Apply, Quiz, Explain, etc.) */}
-      {/* EXPLAIN ARENA MODAL */}
       <AnimatePresence>
         {activeSheet === "explain" && (
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="fixed inset-0 bg-classoni-navy z-50 flex flex-col p-6 text-white">
@@ -297,7 +294,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         )}
       </AnimatePresence>
 
-      {/* BASIC BOTTOM SHEETS */}
       <AnimatePresence>
         {activeSheet && activeSheet !== "explain" && (
           <>
@@ -332,7 +328,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         )}
       </AnimatePresence>
       
-      {/* PROMPTS (Explain, Apply) */}
       <AnimatePresence>
         {showExplainPrompt && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-6">
@@ -347,6 +342,21 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {showApplyPrompt && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-3xl p-6 max-w-sm w-full text-center">
+              <h2 className="text-xl font-extrabold text-classoni-navy mb-2">Don't just memorize knowledge</h2>
+              <p className="text-sm text-classoni-navy/70 mb-6">Put "{lesson.keypoint_title}" to work to solve a real problem...</p>
+              <div className="space-y-2">
+                <button onClick={() => { setShowApplyPrompt(false); setActiveSheet("apply"); }} className="w-full bg-classoni-yellow text-classoni-navy py-3 rounded-full font-bold">Practice Now</button>
+                <button onClick={() => { setShowApplyPrompt(false); navigate("courses"); }} className="w-full text-classoni-navy/60 py-2 text-sm font-semibold">Skip for Now</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
-    }
+      }
