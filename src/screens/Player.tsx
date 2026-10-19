@@ -53,9 +53,12 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     ? currentStep.audio_segments.join(" ")
     : "Understanding this concept is crucial for your mastery of the topic.";
 
+  // Auto-prepare audio when step changes
   useEffect(() => {
+    // In the future, this will trigger the chunking and TTS generation
+    console.log(`Preparing audio for: ${currentStep.micro_step_title}`);
     if (walkthroughRef.current) walkthroughRef.current.scrollTop = 0;
-  }, [currentStepIndex]);
+  }, [currentStepIndex, currentStep.micro_step_title]);
 
   useEffect(() => {
     return () => {
@@ -142,11 +145,14 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     setActiveSheet("apply");
   };
 
+  // Dynamic TopBar Title format: Keypoint 1.2: Primary Data Collection Methods
+  const dynamicTitle = `Keypoint ${lesson.keypoint_number || 1}.${currentStep.step_number || currentStepIndex + 1}: ${currentStep.micro_step_title}`;
+
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
       <div className="flex-shrink-0">
         <TopBar
-          title={currentStep.micro_step_title}
+          title={dynamicTitle}
           uploader="By You"
           points={dailyPoints}
           onProfileTap={() => navigate("profile")}
@@ -155,18 +161,31 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         />
       </div>
 
-      {/* 1. WALKTHROUGH — above visuals, scrollable */}
+      {/* 1. CAPTIONS / WALKTHROUGH — scrollable section above visuals */}
       <div className="flex-1 min-h-0 mx-4 mt-2 mb-2 flex flex-col bg-white rounded-2xl shadow-sm border border-classoni-navy/10 overflow-hidden">
-        <div className="bg-classoni-navy/5 px-4 py-2 border-b border-classoni-navy/10">
+        <div className="bg-classoni-navy/5 px-4 py-2 border-b border-classoni-navy/10 flex justify-between items-center">
           <h3 className="text-xs font-bold text-classoni-navy tracking-wider uppercase">Walkthrough</h3>
+          <span className="text-[10px] font-semibold text-classoni-blue bg-classoni-blue/10 px-2 py-1 rounded-full">
+            Audio Ready ▶
+          </span>
         </div>
         <div ref={walkthroughRef} className="flex-1 overflow-y-auto p-4">
           <p className="text-classoni-navy/80 text-sm leading-relaxed">{walkthroughText}</p>
         </div>
       </div>
 
-      {/* 2. VISUAL — memory part */}
-      <div className="flex-shrink-0 relative mx-4 mb-2 h-[42vh]">
+      {/* FLOATING SHARE & FEEDBACK BUTTONS — Moved outside visual card */}
+      <div className="absolute right-2 top-[35%] z-30 flex flex-col gap-3">
+        <button className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
+          <Share2 size={18} className="text-classoni-navy" />
+        </button>
+        <button className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
+          <ThumbsUp size={18} className="text-classoni-navy" />
+        </button>
+      </div>
+
+      {/* 2. VISUAL BLOCK — Single scrollable block */}
+      <div className="flex-shrink-0 relative mx-4 mb-2 h-[46vh]">
         <button
           onClick={() => triggerNavigation(-1)}
           disabled={currentStepIndex === 0}
@@ -239,15 +258,25 @@ export default function Player({ navigate, lesson }: PlayerProps) {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="absolute inset-0 flex flex-col p-6 overflow-y-auto"
             >
-              <div className="flex-1 flex flex-col">
-                <h2 className="text-xl font-extrabold text-classoni-navy mb-2">{currentStep.micro_step_title}</h2>
-                <p className="text-sm text-classoni-navy/60 italic mb-4">
+              <div className="flex-1 flex flex-col space-y-4">
+                {/* 1. Title of micro concept */}
+                <h2 className="text-xl font-extrabold text-classoni-navy">{currentStep.micro_step_title}</h2>
+                
+                {/* 2. Text describing concept skeleton */}
+                <p className="text-sm text-classoni-navy/60 italic">
                   {currentStep.summary_text || "Understanding this core concept is crucial."}
                 </p>
-                <div className="bg-classoni-lavender/60 p-4 rounded-xl border-l-4 border-classoni-blue flex-1">
+
+                {/* 3. The concept skeleton */}
+                <div className="bg-classoni-lavender/60 p-4 rounded-xl border-l-4 border-classoni-blue">
                   <p className="text-classoni-navy whitespace-pre-wrap leading-relaxed font-medium text-sm">
                     {currentStep.visual_skeleton_text}
                   </p>
+                </div>
+
+                {/* 4. Visual Placeholder (OpenVerse coming soon) */}
+                <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center">
+                   <span className="text-xs text-gray-400 font-medium">Visual / OpenVerse Integration</span>
                 </div>
               </div>
             </motion.div>
@@ -260,16 +289,6 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         >
           <ChevronRight size={24} className="text-classoni-navy" />
         </button>
-
-        {/* Floating share & feedback — outside motion.div, won't animate */}
-        <div className="absolute bottom-3 right-3 z-20 flex flex-col gap-2">
-          <button className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center border border-classoni-navy/10">
-            <Share2 size={18} className="text-classoni-navy" />
-          </button>
-          <button className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center border border-classoni-navy/10">
-            <ThumbsUp size={18} className="text-classoni-navy" />
-          </button>
-        </div>
       </div>
 
       {/* 3. ACTION BUTTONS */}
@@ -488,4 +507,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-}
+    }
