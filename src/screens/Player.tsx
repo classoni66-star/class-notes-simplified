@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, Share2, ThumbsUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Share2, ThumbsUp, Play } from "lucide-react";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 
@@ -53,9 +53,8 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     ? currentStep.audio_segments.join(" ")
     : "Understanding this concept is crucial for your mastery of the topic.";
 
-  // Auto-prepare audio when step changes
+  // Auto-prepare audio when step changes (backend logic comes next)
   useEffect(() => {
-    // In the future, this will trigger the chunking and TTS generation
     console.log(`Preparing audio for: ${currentStep.micro_step_title}`);
     if (walkthroughRef.current) walkthroughRef.current.scrollTop = 0;
   }, [currentStepIndex, currentStep.micro_step_title]);
@@ -145,14 +144,12 @@ export default function Player({ navigate, lesson }: PlayerProps) {
     setActiveSheet("apply");
   };
 
-  // Dynamic TopBar Title format: Keypoint 1.2: Primary Data Collection Methods
-  const dynamicTitle = `Keypoint ${lesson.keypoint_number || 1}.${currentStep.step_number || currentStepIndex + 1}: ${currentStep.micro_step_title}`;
-
   return (
     <div className="h-[100dvh] bg-classoni-lavender flex flex-col overflow-hidden relative">
+      {/* 1. TOP BAR (User Input Topic) */}
       <div className="flex-shrink-0">
         <TopBar
-          title={dynamicTitle}
+          title={lesson.topic || lesson.keypoint_title || "Classoni Lesson"}
           uploader="By You"
           points={dailyPoints}
           onProfileTap={() => navigate("profile")}
@@ -161,31 +158,40 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         />
       </div>
 
-      {/* 1. CAPTIONS / WALKTHROUGH — scrollable section above visuals */}
-      <div className="flex-1 min-h-0 mx-4 mt-2 mb-2 flex flex-col bg-white rounded-2xl shadow-sm border border-classoni-navy/10 overflow-hidden">
-        <div className="bg-classoni-navy/5 px-4 py-2 border-b border-classoni-navy/10 flex justify-between items-center">
-          <h3 className="text-xs font-bold text-classoni-navy tracking-wider uppercase">Walkthrough</h3>
-          <span className="text-[10px] font-semibold text-classoni-blue bg-classoni-blue/10 px-2 py-1 rounded-full">
-            Audio Ready ▶
-          </span>
-        </div>
-        <div ref={walkthroughRef} className="flex-1 overflow-y-auto p-4">
-          <p className="text-classoni-navy/80 text-sm leading-relaxed">{walkthroughText}</p>
-        </div>
-      </div>
-
-      {/* FLOATING SHARE & FEEDBACK BUTTONS — Moved outside visual card */}
-      <div className="absolute right-2 top-[35%] z-30 flex flex-col gap-3">
-        <button className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
-          <Share2 size={18} className="text-classoni-navy" />
-        </button>
-        <button className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
-          <ThumbsUp size={18} className="text-classoni-navy" />
+      {/* 2. SUB-BAR (Dynamic Keypoint Title & Premium) */}
+      <div className="flex-shrink-0 flex justify-between items-center px-4 py-2 bg-white border-b border-classoni-navy/10 z-10 shadow-sm relative">
+        <h2 className="text-sm font-bold text-classoni-navy truncate pr-2">
+          Keypoint {lesson.keypoint_number || 1}.{currentStep.step_number || currentStepIndex + 1}: {currentStep.micro_step_title}
+        </h2>
+        <button 
+          onClick={() => navigate("premiumPlans")} 
+          className="bg-classoni-yellow text-classoni-navy px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap active:scale-95 transition-transform"
+        >
+          Go Premium
         </button>
       </div>
 
-      {/* 2. VISUAL BLOCK — Single scrollable block */}
-      <div className="flex-shrink-0 relative mx-4 mb-2 h-[46vh]">
+      {/* 3. CAPTIONS / WALKTHROUGH (Yellow Box) */}
+      <div className="mx-4 mt-3 mb-1 flex flex-col bg-[#FFFCE8] rounded-xl border border-classoni-yellow/40 overflow-hidden shadow-sm flex-shrink-0">
+        <div ref={walkthroughRef} className="overflow-y-auto p-4 max-h-[18vh]">
+          <p className="text-classoni-navy/90 text-sm leading-relaxed font-medium">{walkthroughText}</p>
+        </div>
+      </div>
+
+      {/* 4. AUDIO PLAYER (Visual only for now, backend coming next) */}
+      <div className="flex items-center gap-3 px-6 py-2 flex-shrink-0">
+        <button className="w-10 h-10 rounded-full bg-classoni-navy text-white flex items-center justify-center flex-shrink-0 shadow-md active:scale-95">
+          <Play size={18} fill="currentColor" className="ml-1" />
+        </button>
+        <div className="flex-1 h-1.5 bg-classoni-navy/10 rounded-full relative">
+          <div className="absolute left-0 top-0 h-full w-1/4 bg-classoni-yellow rounded-full" />
+          <div className="absolute left-1/4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-classoni-yellow rounded-full border-2 border-white shadow" />
+        </div>
+        <span className="text-xs text-classoni-navy/60 font-semibold">1.00x</span>
+      </div>
+
+      {/* 5. VISUAL BLOCK (Single scrollable card) */}
+      <div className="flex-1 min-h-0 relative mx-4 mb-2">
         <button
           onClick={() => triggerNavigation(-1)}
           disabled={currentStepIndex === 0}
@@ -196,7 +202,7 @@ export default function Player({ navigate, lesson }: PlayerProps) {
           <ChevronLeft size={24} className="text-classoni-navy" />
         </button>
 
-        <div className="w-full h-full bg-white rounded-2xl shadow-xl border border-classoni-navy/10 relative overflow-hidden">
+        <div className="w-full h-full bg-white rounded-2xl shadow-sm border border-classoni-navy/10 relative overflow-hidden">
           <AnimatePresence>
             {showFlashTest && (
               <motion.div
@@ -256,18 +262,18 @@ export default function Player({ navigate, lesson }: PlayerProps) {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: direction > 0 ? -400 : 400, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="absolute inset-0 flex flex-col p-6 overflow-y-auto"
+              className="absolute inset-0 flex flex-col overflow-y-auto p-6"
             >
-              <div className="flex-1 flex flex-col space-y-4">
-                {/* 1. Title of micro concept */}
+              <div className="flex flex-col space-y-4 pb-6">
+                {/* 1. Title */}
                 <h2 className="text-xl font-extrabold text-classoni-navy">{currentStep.micro_step_title}</h2>
                 
-                {/* 2. Text describing concept skeleton */}
-                <p className="text-sm text-classoni-navy/60 italic">
+                {/* 2. Description Text */}
+                <p className="text-sm text-classoni-navy/60 italic leading-relaxed">
                   {currentStep.summary_text || "Understanding this core concept is crucial."}
                 </p>
 
-                {/* 3. The concept skeleton */}
+                {/* 3. Concept Skeleton */}
                 <div className="bg-classoni-lavender/60 p-4 rounded-xl border-l-4 border-classoni-blue">
                   <p className="text-classoni-navy whitespace-pre-wrap leading-relaxed font-medium text-sm">
                     {currentStep.visual_skeleton_text}
@@ -275,8 +281,9 @@ export default function Player({ navigate, lesson }: PlayerProps) {
                 </div>
 
                 {/* 4. Visual Placeholder (OpenVerse coming soon) */}
-                <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center">
-                   <span className="text-xs text-gray-400 font-medium">Visual / OpenVerse Integration</span>
+                <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl h-32 flex flex-col items-center justify-center">
+                   <span className="text-xs text-gray-400 font-medium">Visual / OpenVerse</span>
+                   <span className="text-[10px] text-gray-400">Coming Soon</span>
                 </div>
               </div>
             </motion.div>
@@ -291,29 +298,39 @@ export default function Player({ navigate, lesson }: PlayerProps) {
         </button>
       </div>
 
-      {/* 3. ACTION BUTTONS */}
-      <div className="flex-shrink-0 px-4 py-3 flex gap-2">
+      {/* 6. FLOATING SHARE & FEEDBACK (Outside visual, just above bottom buttons) */}
+      <div className="absolute bottom-20 right-4 z-40 flex flex-col gap-2">
+        <button className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
+          <Share2 size={18} className="text-classoni-navy" />
+        </button>
+        <button className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center border border-classoni-navy/10 active:scale-95 transition-transform">
+          <ThumbsUp size={18} className="text-classoni-navy" />
+        </button>
+      </div>
+
+      {/* 7. ACTION BUTTONS (Matching Image 2 Colors) */}
+      <div className="flex-shrink-0 px-4 py-3 flex gap-2 relative z-30">
         <button
           onClick={() => setActiveSheet("apply")}
-          className="flex-1 bg-white text-classoni-navy rounded-full py-3 font-semibold text-sm shadow-sm border border-classoni-navy/10 active:scale-95 transition-transform"
+          className="flex-1 bg-classoni-blue text-white rounded-full py-3 font-bold text-sm shadow-md active:scale-95 transition-transform"
         >
           Apply
         </button>
         <button
           onClick={() => setActiveSheet("explain")}
-          className="flex-[2] bg-classoni-blue text-white rounded-full py-3 font-bold text-sm shadow-md active:scale-95 transition-transform"
+          className="flex-1 bg-classoni-yellow text-classoni-navy rounded-full py-3 font-bold text-sm shadow-md active:scale-95 transition-transform"
         >
           Explain
         </button>
         <button
           onClick={() => setActiveSheet("quiz")}
-          className="flex-1 bg-white text-classoni-navy rounded-full py-3 font-semibold text-sm shadow-sm border border-classoni-navy/10 active:scale-95 transition-transform"
+          className="flex-1 bg-white text-classoni-blue border border-classoni-blue rounded-full py-3 font-bold text-sm shadow-sm active:scale-95 transition-transform"
         >
           Quiz
         </button>
         <button
           onClick={() => setActiveSheet("posts")}
-          className="flex-1 bg-white text-classoni-navy rounded-full py-3 font-semibold text-sm shadow-sm border border-classoni-navy/10 active:scale-95 transition-transform"
+          className="flex-1 bg-white text-classoni-navy border border-classoni-navy/20 rounded-full py-3 font-bold text-sm shadow-sm active:scale-95 transition-transform"
         >
           Posts
         </button>
@@ -507,4 +524,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-    }
+  }
