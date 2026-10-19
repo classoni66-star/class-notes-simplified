@@ -307,4 +307,4 @@ export default function Player({ navigate, lesson }: PlayerProps) {
       </AnimatePresence>
     </div>
   );
-  }
+        }
