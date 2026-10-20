@@ -4,6 +4,15 @@ import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeI
 export default function Home({ navigate, businessInfo, language }: any) {
   const [greeting, setGreeting] = useState("Hello");
   const [todayDate, setTodayDate] = useState("");
+  
+  // Real stats state
+  const [stats, setStats] = useState({
+    sales: 0,
+    profit: 0,
+    debtors: 0,
+    creditors: 0,
+    stock: 0
+  });
 
   useEffect(() => {
     const now = new Date();
@@ -15,6 +24,43 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
     setTodayDate(now.toLocaleDateString('en-GB', options));
   }, []);
+
+  // 🔄 READ FROM LOCAL STORAGE TO CALCULATE MATH
+  useEffect(() => {
+    // 1. Get Sales
+    const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
+    const todayStr = new Date().toDateString();
+
+    // Filter sales for TODAY only
+    const todaySales = savedSales.filter((sale: any) => new Date(sale.date).toDateString() === todayStr);
+
+    let totalSales = 0;
+    let totalProfit = 0;
+
+    todaySales.forEach((sale: any) => {
+      totalSales += sale.total;
+      // Profit = (Selling Price - Buying Price) * Quantity
+      const itemProfit = (sale.sellingPrice - sale.buyingPrice) * sale.quantity;
+      totalProfit += itemProfit;
+    });
+
+    // 2. Get Debtors (People who owe)
+    const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
+    // Filter active debtors (amount > 0)
+    const activeDebtors = savedDebtors.filter((d: any) => d.amountOwed > 0).length;
+
+    // 3. Get Stock (Just count unique items in price list for now)
+    const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
+    
+    setStats({
+      sales: totalSales,
+      profit: totalProfit,
+      debtors: activeDebtors,
+      creditors: 0, // Will build this later
+      stock: savedPriceList.length
+    });
+    
+  }, [businessInfo]); // Re-run if businessInfo changes
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
@@ -29,24 +75,16 @@ export default function Home({ navigate, businessInfo, language }: any) {
     );
   }
 
-  const salesToday = businessInfo.isDemo ? 150000 : 0;
-  const profitToday = businessInfo.isDemo ? 25000 : 0;
-  const stockToday = businessInfo.isDemo ? 120 : 0;
-  const debtorsTotal = businessInfo.isDemo ? 3 : 0;
-  const creditorsTotal = businessInfo.isDemo ? 1 : 0;
-
   const formatMoney = (amount: number) => `UGX ${amount.toLocaleString()}`;
 
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
       
-      {/* HEADER (Compressed & Unified) */}
       <header className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10">
         <div>
           <p className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">{greeting}</p>
           <h1 className="text-lg font-extrabold text-gray-800 leading-tight">{businessInfo.name}</h1>
           
-          {/* Date & Buy Storage Button on the same line */}
           <div className="flex items-center gap-2 mt-1">
             <p className="text-[10px] text-gray-400 font-medium">{todayDate}</p>
             <span className="text-gray-300 text-[10px]">•</span>
@@ -66,46 +104,44 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </div>
       </header>
 
-      {/* MAIN CONTENT (Flex-grow to fill screen perfectly) */}
       <div className="flex-1 flex flex-col justify-between p-4 pb-[75px]">
         
-        {/* STATS GRID */}
         <div className="grid grid-cols-2 gap-2.5">
           
           <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
-            <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(salesToday)}</p>
+            <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
             <div className="flex items-center gap-1 mt-1 text-green-500">
               <ArrowUpRight size={12} />
-              <span className="text-[9px] font-bold">+12% vs yesterday</span>
+              <span className="text-[9px] font-bold">Today</span>
             </div>
           </div>
 
           <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
-            <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(profitToday)}</p>
+            <p className="text-base font-extrabold text-[#0055FF] mt-0.5">{formatMoney(stats.profit)}</p>
             <div className="flex items-center gap-1 mt-1 text-green-500">
               <ArrowUpRight size={12} />
-              <span className="text-[9px] font-bold">+5% vs yesterday</span>
+              <span className="text-[9px] font-bold">Today</span>
             </div>
           </div>
 
           <div onClick={() => navigate("debtors")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
-            <p className="text-lg font-extrabold text-red-500 mt-0.5">{debtorsTotal}</p>
+            <p className="text-lg font-extrabold text-red-500 mt-0.5">{stats.debtors}</p>
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
           <div onClick={() => navigate("creditors")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
-            <p className="text-lg font-extrabold text-orange-500 mt-0.5">{creditorsTotal}</p>
+            <p className="text-lg font-extrabold text-orange-500 mt-0.5">{stats.creditors}</p>
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
           <div onClick={() => navigate("stock")} className="col-span-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition-transform">
             <div>
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Stock", "Okugula")}</p>
-              <p className="text-base font-extrabold text-gray-800 mt-0.5">{stockToday} Items</p>
+              <p className="text-base font-extrabold text-gray-800 mt-0.5">{stats.stock} Items</p>
             </div>
             <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-[#FF9800]">
               <Package size={16} />
@@ -114,7 +150,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
         </div>
 
-        {/* BOTTOM ACTIONS */}
         <div className="mt-2">
           <button 
             onClick={() => navigate("addSale")}
@@ -142,7 +177,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       </div>
 
-      {/* BOTTOM NAVIGATION */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-[65px] z-30 pb-1">
         <button onClick={() => navigate("stock")} className="flex flex-col items-center gap-1 text-gray-400">
           <Package size={20} />
@@ -150,7 +184,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </button>
         
         <button className="flex flex-col items-center gap-1 text-[#FF9800]">
-          {/* 🏠 Restored Home Icon */}
           <HomeIcon size={20} strokeWidth={2.5} />
           <span className="text-[9px] font-bold">{t("Home", "Aha")}</span>
         </button>
@@ -167,4 +200,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-          }
+            }
