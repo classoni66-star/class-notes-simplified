@@ -60,7 +60,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
       sellingPrice: item.sellingPrice.toString()
     });
     setIsAdding(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top so they see the edit form
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
   return (
@@ -72,16 +72,22 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </button>
           <h1 className="text-lg font-extrabold text-gray-800">{t("Price List", "Ebihenda")}</h1>
         </div>
-        <button 
-          onClick={() => { setIsAdding(true); setEditingId(null); setFormData({ name: "", unit: "", buyingPrice: "", sellingPrice: "" }); }} 
-          className="bg-[#FF9800] text-white p-2 rounded-full shadow-md"
-        >
-          <Plus size={20} />
-        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
-        <p className="text-[10px] text-gray-500 font-bold mb-4 uppercase text-center">
+        
+        {/* BIG NEW BUTTON */}
+        {!isAdding && !editingId && (
+          <button 
+            onClick={() => { setIsAdding(true); setEditingId(null); setFormData({ name: "", unit: "", buyingPrice: "", sellingPrice: "" }); }} 
+            className="w-full bg-white border-2 border-dashed border-[#FF9800] text-[#FF9800] font-bold py-3.5 rounded-xl mb-4 flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-sm"
+          >
+            <Plus size={18} />
+            Click here to add any missing item
+          </button>
+        )}
+
+        <p className="text-[10px] text-gray-500 font-bold mb-4 uppercase text-center mt-2">
           Tap any item below to edit its price.
         </p>
 
@@ -101,47 +107,4 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
               </div>
               <div className="w-1/3">
                 <label className="text-[9px] text-gray-500 font-bold ml-1">Buy Price</label>
-                <input type="number" placeholder="0" value={formData.buyingPrice} onChange={(e) => setFormData({...formData, buyingPrice: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm" />
-              </div>
-              <div className="w-1/3">
-                <label className="text-[9px] text-gray-500 font-bold ml-1">Sell Price</label>
-                <input type="number" placeholder="0" value={formData.sellingPrice} onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-bold text-[#0055FF]" />
-              </div>
-            </div>
-            
-            <button onClick={handleSave} className="w-full py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md">
-              {editingId ? "Save Changes" : "Add to List"}
-            </button>
-          </div>
-        )}
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="grid grid-cols-4 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
-            <div className="col-span-2">Item / Unit</div>
-            <div className="text-right">Buy</div>
-            <div className="text-right">Sell</div>
-          </div>
-          {items.map((item) => (
-            <div 
-              key={item.id} 
-              onClick={() => startEdit(item)}
-              className="grid grid-cols-4 p-3 border-b border-gray-50 text-sm items-center cursor-pointer hover:bg-orange-50 active:bg-orange-100 transition-colors"
-            >
-              <div className="col-span-2 pr-1">
-                <p className="font-bold text-gray-800 leading-tight flex items-center gap-1">
-                  {item.name} <Edit2 size={10} className="text-gray-400" />
-                </p>
-                <p className="text-[10px] text-gray-500">{item.unit}</p>
-              </div>
-              <div className="text-right text-gray-500 text-xs">{item.buyingPrice.toLocaleString()}</div>
-              <div className="text-right font-bold text-[#0055FF] text-xs">{item.sellingPrice.toLocaleString()}</div>
-            </div>
-          ))}
-          {items.length === 0 && (
-            <p className="text-center text-gray-400 py-6 text-sm">No items yet. Tap + to add.</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-                                            }
+                <input type="number" placeholder="0" value={formData.buyingPrice} onChange={(e) => setFormData
