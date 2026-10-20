@@ -5,8 +5,13 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   const [stockData, setStockData] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState("");
+  
+  // Add Stock Form State
   const [addQty, setAddQty] = useState<number | "">("");
-  const [addBuyPrice, setAddBuyPrice] = useState<number | "">("");
+  const [addBuyPrice, setAddBuyPrice] = useState<number | "">(""); // Total Cost
+  const [isPaid, setIsPaid] = useState(true);
+  const [amountPaid, setAmountPaid] = useState<number | "">("");
+  const [supplierName, setSupplierName] = useState("");
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
@@ -52,12 +57,13 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     }
     
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
-    loadStock(); // Recalculate immediately
+    loadStock(); 
   };
 
   const handleAddStock = () => {
     if (!selectedItemId || !addQty) return;
 
+    // 1. Update Stock Quantity
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const existingIndex = initialStock.findIndex((s: any) => s.itemId === selectedItemId);
 
@@ -66,14 +72,40 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     } else {
       initialStock.push({ itemId: selectedItemId, quantity: Number(addQty) });
     }
-
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
+    // 2. Handle Credit (Creditors) if Not Paid
+    if (!isPaid && addBuyPrice) {
+      const totalCost = Number(addBuyPrice);
+      const paid = Number(amountPaid) || 0;
+      const balance = totalCost - paid;
+
+      if (balance > 0) {
+        if (!supplierName) return alert("Please enter the supplier's name for the balance owed.");
+        
+        const creditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
+        creditors.push({
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          supplierName: supplierName,
+          amountOwed: balance
+        });
+        localStorage.setItem("smartsale_creditors", JSON.stringify(creditors));
+      }
+    }
+
+    // Reset and close
     setIsAdding(false);
     setAddQty("");
     setAddBuyPrice("");
+    setIsPaid(true);
+    setAmountPaid("");
+    setSupplierName("");
     loadStock(); 
   };
+
+  const selectedItem = stockData.find(i => i.id === selectedItemId);
+  const calculatedBalance = (Number(addBuyPrice) || 0) - (Number(amountPaid) || 0);
 
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
@@ -119,28 +151,42 @@ export default function Stock({ navigate, businessInfo, language }: any) {
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity Bought</label>
-                  <input 
-                    type="number" 
-                    value={addQty}
-                    onChange={(e) => setAddQty(Number(e.target.value))}
-                    placeholder="e.g. 10"
-                    className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]"
-                  />
+                  <input type="number" value={addQty} onChange={(e) => setAddQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
                 </div>
                 <div className="flex-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase">Total Cost (UGX)</label>
-                  <input 
-                    type="number" 
-                    value={addBuyPrice}
-                    onChange={(e) => setAddBuyPrice(Number(e.target.value))}
-                    placeholder="Optional"
-                    className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]"
-                  />
+                  <input type="number" value={addBuyPrice} onChange={(e) => setAddBuyPrice(Number(e.target.value))} placeholder="e.g. 40000" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
                 </div>
               </div>
 
-              <button onClick={handleAddStock} className="w-full py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md mt-2">
-                Add to Stock
+              {/* PAYMENT STATUS */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Payment Status</label>
+                <div className="flex gap-2 mt-1">
+                  <button onClick={() => setIsPaid(true)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${isPaid ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}>Paid in Full</button>
+                  <button onClick={() => setIsPaid(false)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>Credit (Not Paid)</button>
+                </div>
+              </div>
+
+              {/* IF NOT PAID */}
+              {!isPaid && (
+                <div className="bg-red-50 p-3 rounded-lg border border-red-100 space-y-2 mt-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-red-800 uppercase">Amount Paid Now (Optional)</label>
+                    <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Number(e.target.value))} placeholder="e.g. 10000" className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-red-800 uppercase">Supplier Name</label>
+                    <input type="text" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="Who supplied this stock?" className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
+                  </div>
+                  {calculatedBalance > 0 && (
+                    <p className="text-xs font-bold text-red-600 mt-1">Balance to owe: UGX {calculatedBalance.toLocaleString()}</p>
+                  )}
+                </div>
+              )}
+
+              <button onClick={handleAddStock} className="w-full py-3 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md mt-2">
+                Confirm Stock Addition
               </button>
             </div>
           </div>
@@ -162,7 +208,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
                 <p className="text-[9px] text-gray-500">{item.unit}</p>
               </div>
               
-              {/* EDITABLE "IN" FIELD */}
               <div className="flex justify-center">
                 <input 
                   type="number" 
@@ -180,19 +225,8 @@ export default function Stock({ navigate, businessInfo, language }: any) {
               </div>
             </div>
           ))}
-          
-          {stockData.length === 0 && (
-            <p className="text-center text-gray-400 py-6 text-sm">Your stock is empty. Tap "+ Add Stock" to begin.</p>
-          )}
         </div>
-
-        <div className="mt-4 bg-blue-50 p-3 rounded-xl border border-blue-100 text-center">
-          <p className="text-[10px] text-blue-800 font-medium">
-            Tap the numbers under <strong>"IN"</strong> to edit them directly. "Left" is your current stock. Red means time to restock!
-          </p>
-        </div>
-
       </div>
     </div>
   );
-}
+                                                  }
