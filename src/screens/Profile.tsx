@@ -1,5 +1,64 @@
 import { useState } from "react";
-import { Back,Button,Notice } from "@/components/ScreenUI";
-import type { Navigate } from "@/lib/classoni";
-const initial={Name:"John Doe",Email:"johndoe@gmail.com",Institution:"KIU Western Campus",Program:"Diploma in Pharmacy",Year:"1",Semester:"2"};
-export default function Profile({navigate}:{navigate:Navigate}) {const [fields,setFields]=useState(initial);const [notice,setNotice]=useState("");const [privacy,setPrivacy]=useState(false);return <main className="flex h-screen h-dvh flex-col overflow-hidden bg-classoni-lavender px-6 py-4"><Back navigate={navigate}/><h1 className="mt-2 text-xl font-bold">Your profile</h1><form className="mt-3 flex min-h-0 flex-1 flex-col gap-2" onSubmit={e=>{e.preventDefault();setNotice("Changes saved for this preview session.")}}>{Object.entries(fields).map(([key,value])=><label key={key} className="text-xs font-semibold">{key}<input className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-primary" value={value} type={key==="Email"?"email":"text"} inputMode={key==="Year"||key==="Semester"?"numeric":undefined} onChange={e=>setFields({...fields,[key]:e.target.value})}/></label>)}<Button variant="premium" type="submit" className="mt-2 h-11 w-full rounded-full font-bold" onClick={()=>{}}>Save Changes</Button>{notice&&<Notice>{notice}</Notice>}<Button variant="link" className="text-xs text-muted-foreground" onClick={()=>setPrivacy(!privacy)}>Privacy Policy</Button>{privacy&&<p className="text-center text-xs text-muted-foreground">This preview keeps edits in memory only. No account or personal information is submitted to a server.</p>}</form></main>}
+import { ArrowLeft, Save } from "lucide-react";
+
+export default function Profile({ navigate, businessInfo, language }: any) {
+  const [formData, setFormData] = useState(businessInfo || {});
+  const t = (en: string, run: string) => (language === "run" ? run : en);
+
+  const handleSave = () => {
+    localStorage.setItem("smartsale_business", JSON.stringify(formData));
+    alert("Profile updated successfully!");
+    navigate("home");
+  };
+
+  return (
+    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6]">
+      <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10">
+        <button onClick={() => navigate("home")} className="text-gray-500">
+          <ArrowLeft size={24} />
+        </button>
+        <h1 className="text-lg font-extrabold text-gray-800">{t("Profile", "Ebikukwatako")}</h1>
+      </header>
+
+      <div className="flex-1 p-4">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+          
+          <div>
+            <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Business Name</label>
+            <input 
+              type="text" 
+              value={formData.name || ""}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#FF9800] font-bold text-gray-800"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Phone Number</label>
+            <input 
+              type="tel" 
+              value={formData.phone || ""}
+              onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#FF9800] text-gray-800"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Business Type</label>
+            <input 
+              type="text" 
+              value={formData.type || "Retail"}
+              disabled
+              className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-medium"
+            />
+          </div>
+
+          <button onClick={handleSave} className="w-full bg-[#FF9800] text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 mt-4 active:scale-95 transition-transform">
+            <Save size={18} /> Save Profile
+          </button>
+
+        </div>
+      </div>
+    </div>
+  );
+}
