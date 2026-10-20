@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import InstallPrompt from "../components/InstallPrompt";import { useState, useEffect } from "react";
 import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt"; // Added InstallPrompt
 
@@ -211,6 +211,11 @@ export default function Home({ navigate, businessInfo, language }: any) {
       {/* Install Prompt shows up here */}
       <InstallPrompt />
 
+        {/* Install Prompt shows up here */}
+      <InstallPrompt />
+
     </div>
+  );
+      }  </div>
   );
       }
