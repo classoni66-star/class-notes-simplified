@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon } from "lucide-react";
+import InstallPrompt from "../components/InstallPrompt"; // Added InstallPrompt
 
 export default function Home({ navigate, businessInfo, language }: any) {
-  const [greeting, setGreeting] = useState("Hello");
+  const [timeOfDay, setTimeOfDay] = useState("morning");
   const [todayDate, setTodayDate] = useState("");
   
   const [stats, setStats] = useState({
@@ -16,9 +17,11 @@ export default function Home({ navigate, businessInfo, language }: any) {
   useEffect(() => {
     const now = new Date();
     const hour = now.getHours();
-    if (hour < 12) setGreeting("Good morning");
-    else if (hour < 18) setGreeting("Good afternoon");
-    else setGreeting("Good evening");
+    
+    // Time logic: Morning (5AM-12PM), Afternoon (12PM-5PM), Evening (5PM-5AM)
+    if (hour >= 5 && hour < 12) setTimeOfDay("morning");
+    else if (hour >= 12 && hour < 17) setTimeOfDay("afternoon");
+    else setTimeOfDay("evening");
 
     const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
     setTodayDate(now.toLocaleDateString('en-GB', options));
@@ -47,18 +50,23 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
     const activeDebtors = savedDebtors.filter((d: any) => Number(d.amountOwed) > 0).length;
+    
+    const savedCreditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
+    const activeCreditors = savedCreditors.filter((c: any) => Number(c.amountOwed) > 0).length;
+    
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
     
     setStats({
       sales: totalSales,
       profit: totalProfit,
       debtors: activeDebtors,
-      creditors: 0,
+      creditors: activeCreditors, 
       stock: savedPriceList.length
     });
     
   }, [businessInfo]);
 
+  // Translation helper
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   if (!businessInfo) {
@@ -73,6 +81,13 @@ export default function Home({ navigate, businessInfo, language }: any) {
   }
 
   const formatMoney = (amount: number) => `UGX ${Math.round(amount).toLocaleString()}`;
+
+  // Dynamic Greeting
+  const greeting = timeOfDay === "morning" 
+    ? t("Good morning", "Oraire gye") 
+    : timeOfDay === "afternoon" 
+    ? t("Good afternoon", "Osiiba gye") 
+    : t("Good evening", "Okwera gye");
 
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
@@ -93,7 +108,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
               <User size={16} />
             </button>
           </div>
-          {/* 👇 HERE IS THE FIX */}
           <button onClick={() => navigate("buyStorage")} className="text-[10px] font-bold text-white bg-[#0055FF] px-3 py-1 rounded shadow-sm active:scale-95 transition-transform">
             Buy Storage
           </button>
@@ -194,6 +208,9 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </button>
       </nav>
 
+      {/* Install Prompt shows up here */}
+      <InstallPrompt />
+
     </div>
   );
-             }
+      }
