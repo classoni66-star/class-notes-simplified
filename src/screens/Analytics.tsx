@@ -11,9 +11,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   useEffect(() => {
-    // 1. Load Sales & Group by Day
     const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]").reverse();
-    
     const grouped: Record<string, { items: any[], daySales: number, dayProfit: number }> = {};
     
     savedSales.forEach((sale: any) => {
@@ -26,21 +24,17 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       
       grouped[dayString].items.push(sale);
       grouped[dayString].daySales += Number(sale.total) || 0;
-      
       const profit = ((Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0)) * (Number(sale.quantity) || 0);
       grouped[dayString].dayProfit += profit;
     });
-    
     setGroupedSales(grouped);
 
-    // 2. Load Debtors & Creditors
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]").filter((d: any) => Number(d.amountOwed) > 0);
     setDebtors(savedDebtors);
 
     const savedCreditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]").filter((c: any) => Number(c.amountOwed) > 0);
     setCreditors(savedCreditors);
 
-    // 3. Calculate Monthly Summary
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -77,14 +71,27 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       if (d.id === debtId) return { ...d, amountOwed: d.amountOwed - paidNum };
       return d;
     });
-
     localStorage.setItem("smartsale_debtors", JSON.stringify(updatedDebtors));
     setDebtors(updatedDebtors.filter((d: any) => d.amountOwed > 0));
   };
 
+  const handleClearCreditor = (creditorId: string, amountOwed: number) => {
+    const amountPaid = prompt(`You owe supplier UGX ${amountOwed.toLocaleString()}. How much are you paying them now?`, amountOwed.toString());
+    if (amountPaid === null) return;
+    const paidNum = Number(amountPaid);
+    if (isNaN(paidNum) || paidNum <= 0) return alert("Invalid amount");
+
+    const savedCreditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
+    const updatedCreditors = savedCreditors.map((c: any) => {
+      if (c.id === creditorId) return { ...c, amountOwed: c.amountOwed - paidNum };
+      return c;
+    });
+    localStorage.setItem("smartsale_creditors", JSON.stringify(updatedCreditors));
+    setCreditors(updatedCreditors.filter((c: any) => c.amountOwed > 0));
+  };
+
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
-      
       <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10">
         <button onClick={() => navigate("home")} className="text-gray-500">
           <ArrowLeft size={24} />
@@ -108,7 +115,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         
-        {/* 1. SALES HISTORY (Grouped by Day) */}
         {activeTab === "sales" && (
           <div className="space-y-4">
             {Object.entries(groupedSales).map(([dayString, data]: any) => (
@@ -136,7 +142,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                   </div>
                 ))}
 
-                {/* DAY TOTALS */}
                 <div className="bg-orange-50 p-3 flex justify-between items-center text-xs font-bold text-[#FF9800]">
                   <span>TOTAL: UGX {data.daySales.toLocaleString()}</span>
                   <span>PROFIT: UGX {data.dayProfit.toLocaleString()}</span>
@@ -147,7 +152,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 2. DEBTORS */}
         {activeTab === "debtors" && (
           <div className="space-y-3">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100 flex justify-between items-center">
@@ -171,7 +175,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 3. CREDITORS */}
         {activeTab === "creditors" && (
           <div className="space-y-3">
              <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 flex justify-between items-center">
@@ -185,13 +188,15 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                   <p className="text-[10px] text-gray-500">{new Date(creditor.date).toLocaleDateString()}</p>
                   <p className="text-sm font-extrabold text-orange-500 mt-1">UGX {creditor.amountOwed.toLocaleString()}</p>
                 </div>
+                <button onClick={() => handleClearCreditor(creditor.id, creditor.amountOwed)} className="bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md active:scale-95">
+                  Pay
+                </button>
               </div>
             ))}
             {creditors.length === 0 && <p className="text-center text-gray-400 py-6 text-sm">No suppliers to pay.</p>}
           </div>
         )}
 
-        {/* 4. MONTHLY SUMMARY */}
         {activeTab === "summary" && (
           <div className="space-y-3">
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
