@@ -59,7 +59,7 @@ export default function SmartSaleApp() {
     addSale: <AddSale navigate={navigate} businessInfo={businessInfo} language={language} />,
     priceList: <PriceList navigate={navigate} businessInfo={businessInfo} language={language} />,
     stock: <Stock navigate={navigate} businessInfo={businessInfo} language={language} />,
-    analytics: <Analytics navigate={navigate} language={language} />,
+    analytics: <Analytics navigate={navigate} businessInfo={businessInfo} language={language} />,
   };
 
   if (!isHydrated) return <div className="h-screen bg-[#F3F4F6]" />;
@@ -80,4 +80,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-          }
+    }
