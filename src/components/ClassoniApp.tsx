@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Welcome from "../screens/Welcome";
@@ -6,6 +5,7 @@ import Onboarding from "../screens/Onboarding";
 import Home from "../screens/Home";
 import AddSale from "../screens/AddSale";
 import PriceList from "../screens/PriceList";
+import Stock from "../screens/Stock";
 
 export default function SmartSaleApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
@@ -57,6 +57,7 @@ export default function SmartSaleApp() {
     home: <Home navigate={navigate} businessInfo={businessInfo} language={language} />,
     addSale: <AddSale navigate={navigate} businessInfo={businessInfo} language={language} />,
     priceList: <PriceList navigate={navigate} businessInfo={businessInfo} language={language} />,
+    stock: <Stock navigate={navigate} businessInfo={businessInfo} language={language} />,
   };
 
   if (!isHydrated) return <div className="h-screen bg-[#F3F4F6]" />;
@@ -77,4 +78,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-  }
+               }
