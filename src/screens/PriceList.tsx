@@ -41,10 +41,8 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
     };
 
     if (editingId) {
-      // Update existing
       saveItems(items.map(i => i.id === editingId ? itemData : i));
     } else {
-      // Add new
       saveItems([...items, itemData]);
     }
 
@@ -62,6 +60,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
       sellingPrice: item.sellingPrice.toString()
     });
     setIsAdding(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top so they see the edit form
   };
 
   return (
@@ -83,12 +82,12 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         <p className="text-[10px] text-gray-500 font-bold mb-4 uppercase text-center">
-          Tap any item to edit prices.
+          Tap any item below to edit its price.
         </p>
 
         {(isAdding || editingId) && (
-          <div className="bg-white p-4 rounded-xl shadow-lg border border-orange-100 mb-4 relative">
-            <button onClick={() => { setIsAdding(false); setEditingId(null); }} className="absolute top-2 right-2 text-gray-400">
+          <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-[#FF9800] mb-4 relative">
+            <button onClick={() => { setIsAdding(false); setEditingId(null); }} className="absolute top-2 right-2 text-gray-400 p-1">
               <X size={20} />
             </button>
             <h3 className="font-bold text-gray-800 mb-3">{editingId ? "Edit Item" : "Add New Item"}</h3>
@@ -117,25 +116,25 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
         )}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
+          <div className="grid grid-cols-4 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
             <div className="col-span-2">Item / Unit</div>
             <div className="text-right">Buy</div>
             <div className="text-right">Sell</div>
-            <div className="text-center">Edit</div>
           </div>
           {items.map((item) => (
-            <div key={item.id} className="grid grid-cols-5 p-3 border-b border-gray-50 text-sm items-center">
+            <div 
+              key={item.id} 
+              onClick={() => startEdit(item)}
+              className="grid grid-cols-4 p-3 border-b border-gray-50 text-sm items-center cursor-pointer hover:bg-orange-50 active:bg-orange-100 transition-colors"
+            >
               <div className="col-span-2 pr-1">
-                <p className="font-bold text-gray-800 leading-tight">{item.name}</p>
+                <p className="font-bold text-gray-800 leading-tight flex items-center gap-1">
+                  {item.name} <Edit2 size={10} className="text-gray-400" />
+                </p>
                 <p className="text-[10px] text-gray-500">{item.unit}</p>
               </div>
               <div className="text-right text-gray-500 text-xs">{item.buyingPrice.toLocaleString()}</div>
               <div className="text-right font-bold text-[#0055FF] text-xs">{item.sellingPrice.toLocaleString()}</div>
-              <div className="flex justify-center">
-                <button onClick={() => startEdit(item)} className="p-1.5 bg-gray-100 rounded text-gray-600 active:scale-90">
-                  <Edit2 size={14} />
-                </button>
-              </div>
             </div>
           ))}
           {items.length === 0 && (
