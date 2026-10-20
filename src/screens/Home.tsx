@@ -1,6 +1,6 @@
-import InstallPrompt from "../components/InstallPrompt";import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon } from "lucide-react";
-import InstallPrompt from "../components/InstallPrompt"; // Added InstallPrompt
+import InstallPrompt from "../components/InstallPrompt";
 
 export default function Home({ navigate, businessInfo, language }: any) {
   const [timeOfDay, setTimeOfDay] = useState("morning");
@@ -18,7 +18,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const now = new Date();
     const hour = now.getHours();
     
-    // Time logic: Morning (5AM-12PM), Afternoon (12PM-5PM), Evening (5PM-5AM)
     if (hour >= 5 && hour < 12) setTimeOfDay("morning");
     else if (hour >= 12 && hour < 17) setTimeOfDay("afternoon");
     else setTimeOfDay("evening");
@@ -66,7 +65,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
     
   }, [businessInfo]);
 
-  // Translation helper
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   if (!businessInfo) {
@@ -82,7 +80,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
   const formatMoney = (amount: number) => `UGX ${Math.round(amount).toLocaleString()}`;
 
-  // Dynamic Greeting
   const greeting = timeOfDay === "morning" 
     ? t("Good morning", "Oraire gye") 
     : timeOfDay === "afternoon" 
@@ -208,14 +205,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </button>
       </nav>
 
-      {/* Install Prompt shows up here */}
-      <InstallPrompt />
-
-        {/* Install Prompt shows up here */}
       <InstallPrompt />
 
     </div>
   );
-      }  </div>
-  );
-      }
+        }
