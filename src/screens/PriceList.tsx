@@ -76,21 +76,32 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         
-        {/* BIG NEW BUTTON */}
+        {/* INSTRUCTION TEXT */}
+        <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 mb-4 text-center">
+          <p className="text-[11px] text-blue-800 font-medium leading-relaxed">
+            This list is used to calculate your profits. Confirm or edit the prices of the items or add any item missing. The listed items are the general items for your business but you can add items specific to you missing on this list.
+          </p>
+        </div>
+
+        {/* BIG ADD BUTTON */}
         {!isAdding && !editingId && (
           <button 
             onClick={() => { setIsAdding(true); setEditingId(null); setFormData({ name: "", unit: "", buyingPrice: "", sellingPrice: "" }); }} 
-            className="w-full bg-white border-2 border-dashed border-[#FF9800] text-[#FF9800] font-bold py-3.5 rounded-xl mb-4 flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-sm"
+            className="w-full bg-white border-2 border-dashed border-[#FF9800] text-[#FF9800] font-bold py-4 rounded-xl mb-4 flex flex-col justify-center items-center gap-1 active:scale-95 transition-transform shadow-sm"
           >
-            <Plus size={18} />
-            Click here to add any missing item
+            <div className="flex items-center gap-1">
+              <Plus size={18} />
+              <span>Click here to add any missing item</span>
+            </div>
+            <span className="text-[9px] font-medium text-gray-400">Tap to enter item name, unit, buying & selling price</span>
           </button>
         )}
 
-        <p className="text-[10px] text-gray-500 font-bold mb-4 uppercase text-center mt-2">
+        <p className="text-[10px] text-gray-500 font-bold mb-2 uppercase text-center">
           Tap any item below to edit its price.
         </p>
 
+        {/* EDIT / ADD FORM */}
         {(isAdding || editingId) && (
           <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-[#FF9800] mb-4 relative">
             <button onClick={() => { setIsAdding(false); setEditingId(null); }} className="absolute top-2 right-2 text-gray-400 p-1">
@@ -98,13 +109,81 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
             </button>
             <h3 className="font-bold text-gray-800 mb-3">{editingId ? "Edit Item" : "Add New Item"}</h3>
             
-            <input type="text" placeholder="Item Name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full p-2 mb-2 bg-gray-50 border rounded-lg text-sm font-medium" />
+            <input 
+              type="text" 
+              placeholder="Item Name (e.g. Milk)" 
+              value={formData.name} 
+              onChange={(e) => setFormData({...formData, name: e.target.value})} 
+              className="w-full p-2 mb-2 bg-gray-50 border rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-[#FF9800]" 
+            />
             
             <div className="flex gap-2 mb-3">
               <div className="w-1/3">
                 <label className="text-[9px] text-gray-500 font-bold ml-1">Unit</label>
-                <input type="text" placeholder="kg" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm" />
+                <input 
+                  type="text" 
+                  placeholder="kg" 
+                  value={formData.unit} 
+                  onChange={(e) => setFormData({...formData, unit: e.target.value})} 
+                  className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" 
+                />
               </div>
               <div className="w-1/3">
                 <label className="text-[9px] text-gray-500 font-bold ml-1">Buy Price</label>
-                <input type="number" placeholder="0" value={formData.buyingPrice} onChange={(e) => setFormData
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={formData.buyingPrice} 
+                  onChange={(e) => setFormData({...formData, buyingPrice: e.target.value})} 
+                  className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" 
+                />
+              </div>
+              <div className="w-1/3">
+                <label className="text-[9px] text-gray-500 font-bold ml-1">Sell Price</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={formData.sellingPrice} 
+                  onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})} 
+                  className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" 
+                />
+              </div>
+            </div>
+            
+            <button onClick={handleSave} className="w-full py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md">
+              {editingId ? "Save Changes" : "Add to List"}
+            </button>
+          </div>
+        )}
+
+        {/* ITEMS TABLE */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="grid grid-cols-4 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
+            <div className="col-span-2">Item / Unit</div>
+            <div className="text-right">Buy</div>
+            <div className="text-right">Sell</div>
+          </div>
+          {items.map((item) => (
+            <div 
+              key={item.id} 
+              onClick={() => startEdit(item)}
+              className="grid grid-cols-4 p-3 border-b border-gray-50 text-sm items-center cursor-pointer hover:bg-orange-50 active:bg-orange-100 transition-colors"
+            >
+              <div className="col-span-2 pr-1">
+                <p className="font-bold text-gray-800 leading-tight flex items-center gap-1">
+                  {item.name} <Edit2 size={10} className="text-gray-400" />
+                </p>
+                <p className="text-[10px] text-gray-500">{item.unit}</p>
+              </div>
+              <div className="text-right text-gray-500 text-xs">{item.buyingPrice.toLocaleString()}</div>
+              <div className="text-right font-bold text-[#0055FF] text-xs">{item.sellingPrice.toLocaleString()}</div>
+            </div>
+          ))}
+          {items.length === 0 && (
+            <p className="text-center text-gray-400 py-6 text-sm">No items yet. Tap the button above to add.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+        }
