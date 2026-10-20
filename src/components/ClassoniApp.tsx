@@ -6,6 +6,7 @@ import Home from "../screens/Home";
 import AddSale from "../screens/AddSale";
 import PriceList from "../screens/PriceList";
 import Stock from "../screens/Stock";
+import Analytics from "../screens/Analytics";
 
 export default function SmartSaleApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
@@ -58,6 +59,7 @@ export default function SmartSaleApp() {
     addSale: <AddSale navigate={navigate} businessInfo={businessInfo} language={language} />,
     priceList: <PriceList navigate={navigate} businessInfo={businessInfo} language={language} />,
     stock: <Stock navigate={navigate} businessInfo={businessInfo} language={language} />,
+    analytics: <Analytics navigate={navigate} language={language} />,
   };
 
   if (!isHydrated) return <div className="h-screen bg-[#F3F4F6]" />;
@@ -78,4 +80,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-               }
+          }
