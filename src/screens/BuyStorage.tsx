@@ -69,4 +69,4 @@ export default function BuyStorage({ navigate, language }: any) {
       </div>
     </div>
   );
-          }
+}
