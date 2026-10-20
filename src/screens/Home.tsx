@@ -5,7 +5,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
   const [greeting, setGreeting] = useState("Hello");
   const [todayDate, setTodayDate] = useState("");
   
-  // Real stats state
   const [stats, setStats] = useState({
     sales: 0,
     profit: 0,
@@ -25,42 +24,41 @@ export default function Home({ navigate, businessInfo, language }: any) {
     setTodayDate(now.toLocaleDateString('en-GB', options));
   }, []);
 
-  // 🔄 READ FROM LOCAL STORAGE TO CALCULATE MATH
   useEffect(() => {
-    // 1. Get Sales
     const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const todayStr = new Date().toDateString();
 
-    // Filter sales for TODAY only
     const todaySales = savedSales.filter((sale: any) => new Date(sale.date).toDateString() === todayStr);
 
     let totalSales = 0;
     let totalProfit = 0;
 
     todaySales.forEach((sale: any) => {
-      totalSales += sale.total;
-      // Profit = (Selling Price - Buying Price) * Quantity
-      const itemProfit = (sale.sellingPrice - sale.buyingPrice) * sale.quantity;
-      totalProfit += itemProfit;
+      totalSales += Number(sale.total) || 0;
+      // 🛠️ FIXED NaN BUG: Force numbers and default to 0 if missing
+      const sellPrice = Number(sale.sellingPrice) || 0;
+      const buyPrice = Number(sale.buyingPrice) || 0;
+      const qty = Number(sale.quantity) || 0;
+      
+      const itemProfit = (sellPrice - buyPrice) * qty;
+      if (!isNaN(itemProfit)) {
+        totalProfit += itemProfit;
+      }
     });
 
-    // 2. Get Debtors (People who owe)
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
-    // Filter active debtors (amount > 0)
-    const activeDebtors = savedDebtors.filter((d: any) => d.amountOwed > 0).length;
-
-    // 3. Get Stock (Just count unique items in price list for now)
+    const activeDebtors = savedDebtors.filter((d: any) => Number(d.amountOwed) > 0).length;
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
     
     setStats({
       sales: totalSales,
       profit: totalProfit,
       debtors: activeDebtors,
-      creditors: 0, // Will build this later
+      creditors: 0,
       stock: savedPriceList.length
     });
     
-  }, [businessInfo]); // Re-run if businessInfo changes
+  }, [businessInfo]);
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
@@ -75,7 +73,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
     );
   }
 
-  const formatMoney = (amount: number) => `UGX ${amount.toLocaleString()}`;
+  const formatMoney = (amount: number) => `UGX ${Math.round(amount).toLocaleString()}`;
 
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
@@ -84,22 +82,22 @@ export default function Home({ navigate, businessInfo, language }: any) {
         <div>
           <p className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">{greeting}</p>
           <h1 className="text-lg font-extrabold text-gray-800 leading-tight">{businessInfo.name}</h1>
-          
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-[10px] text-gray-400 font-medium">{todayDate}</p>
-            <span className="text-gray-300 text-[10px]">•</span>
-            <button className="text-[10px] font-bold text-[#0055FF] bg-blue-50 px-2 py-0.5 rounded">
-              Buy Storage
-            </button>
-          </div>
+          <p className="text-[10px] text-gray-400 font-medium mt-1">{todayDate}</p>
         </div>
 
-        <div className="flex gap-2">
-          <button onClick={() => navigate("rewards")} className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-[#FF9800]">
-            <Gift size={16} />
-          </button>
-          <button onClick={() => navigate("profile")} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
-            <User size={16} />
+        {/* Right side: Icons + Buy Storage */}
+        <div className="flex flex-col items-end">
+          <div className="flex gap-2 mb-1">
+            <button onClick={() => navigate("rewards")} className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-[#FF9800]">
+              <Gift size={16} />
+            </button>
+            <button onClick={() => navigate("profile")} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
+              <User size={16} />
+            </button>
+          </div>
+          {/* Buy Storage Button (Moved here and made more visible) */}
+          <button className="text-[10px] font-bold text-white bg-[#0055FF] px-3 py-1 rounded shadow-sm active:scale-95 transition-transform">
+            Buy Storage
           </button>
         </div>
       </header>
@@ -108,7 +106,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
         
         <div className="grid grid-cols-2 gap-2.5">
           
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
+          {/* Sales Card -> Goes to Analytics */}
+          <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
             <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
             <div className="flex items-center gap-1 mt-1 text-green-500">
@@ -117,7 +116,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
+          {/* Profit Card -> Goes to Analytics */}
+          <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
             <p className="text-base font-extrabold text-[#0055FF] mt-0.5">{formatMoney(stats.profit)}</p>
             <div className="flex items-center gap-1 mt-1 text-green-500">
@@ -126,18 +126,21 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          <div onClick={() => navigate("debtors")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
+          {/* Debtors Card -> Goes to Analytics */}
+          <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
             <p className="text-lg font-extrabold text-red-500 mt-0.5">{stats.debtors}</p>
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          <div onClick={() => navigate("creditors")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
+          {/* Creditors Card -> Goes to Analytics */}
+          <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
             <p className="text-lg font-extrabold text-orange-500 mt-0.5">{stats.creditors}</p>
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
+          {/* Stock Card -> Goes to Stock Screen */}
           <div onClick={() => navigate("stock")} className="col-span-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition-transform">
             <div>
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Stock", "Okugula")}</p>
@@ -200,4 +203,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-            }
+      }
