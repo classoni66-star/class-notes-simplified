@@ -35,7 +35,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     todaySales.forEach((sale: any) => {
       totalSales += Number(sale.total) || 0;
-      // 🛠️ FIXED NaN BUG: Force numbers and default to 0 if missing
       const sellPrice = Number(sale.sellingPrice) || 0;
       const buyPrice = Number(sale.buyingPrice) || 0;
       const qty = Number(sale.quantity) || 0;
@@ -85,7 +84,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
           <p className="text-[10px] text-gray-400 font-medium mt-1">{todayDate}</p>
         </div>
 
-        {/* Right side: Icons + Buy Storage */}
         <div className="flex flex-col items-end">
           <div className="flex gap-2 mb-1">
             <button onClick={() => navigate("rewards")} className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-[#FF9800]">
@@ -95,8 +93,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
               <User size={16} />
             </button>
           </div>
-          {/* Buy Storage Button (Moved here and made more visible) */}
-          <button className="text-[10px] font-bold text-white bg-[#0055FF] px-3 py-1 rounded shadow-sm active:scale-95 transition-transform">
+          {/* 👇 HERE IS THE FIX */}
+          <button onClick={() => navigate("buyStorage")} className="text-[10px] font-bold text-white bg-[#0055FF] px-3 py-1 rounded shadow-sm active:scale-95 transition-transform">
             Buy Storage
           </button>
         </div>
@@ -106,7 +104,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         
         <div className="grid grid-cols-2 gap-2.5">
           
-          {/* Sales Card -> Goes to Analytics */}
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
             <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
@@ -116,7 +113,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          {/* Profit Card -> Goes to Analytics */}
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
             <p className="text-base font-extrabold text-[#0055FF] mt-0.5">{formatMoney(stats.profit)}</p>
@@ -126,21 +122,18 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          {/* Debtors Card -> Goes to Analytics */}
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
             <p className="text-lg font-extrabold text-red-500 mt-0.5">{stats.debtors}</p>
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          {/* Creditors Card -> Goes to Analytics */}
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
             <p className="text-lg font-extrabold text-orange-500 mt-0.5">{stats.creditors}</p>
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          {/* Stock Card -> Goes to Stock Screen */}
           <div onClick={() => navigate("stock")} className="col-span-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition-transform">
             <div>
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Stock", "Okugula")}</p>
@@ -203,4 +196,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-      }
+             }
