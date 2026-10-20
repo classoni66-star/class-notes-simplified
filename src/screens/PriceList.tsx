@@ -1,6 +1,36 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Edit2, X } from "lucide-react";
 
+const DEFAULT_UGANDA_RETAIL_ITEMS = [
+  // Staples & Grains
+  { name: "Sugar (Sukari)", unit: "kg", buyingPrice: 3200, sellingPrice: 3600 },
+  { name: "Rice (Mchele)", unit: "kg", buyingPrice: 4800, sellingPrice: 5300 },
+  { name: "Maize Flour (Posho)", unit: "kg", buyingPrice: 2500, sellingPrice: 2800 },
+  { name: "Bread (Omugati)", unit: "loaf", buyingPrice: 2800, sellingPrice: 3200 },
+  { name: "Beans (Yellow)", unit: "kg", buyingPrice: 5200, sellingPrice: 5800 },
+  { name: "Groundnuts (Ebinjagiro)", unit: "kg", buyingPrice: 7000, sellingPrice: 7700 },
+  { name: "Cassava Flour", unit: "kg", buyingPrice: 2300, sellingPrice: 2600 },
+  
+  // Cooking Essentials
+  { name: "Cooking Oil (Mafuta)", unit: "liter", buyingPrice: 8500, sellingPrice: 9400 },
+  { name: "Salt (Omunyo)", unit: "packet", buyingPrice: 1000, sellingPrice: 1200 },
+  { name: "Tomatoes (Nyanya)", unit: "kg", buyingPrice: 2700, sellingPrice: 3100 },
+  { name: "Onions (Bitunguru)", unit: "kg", buyingPrice: 3300, sellingPrice: 3800 },
+  
+  // Household & Toiletries
+  { name: "Laundry Soap (Sabuni)", unit: "bar", buyingPrice: 4900, sellingPrice: 5400 },
+  { name: "Bathing Soap (White Star)", unit: "bar", buyingPrice: 5500, sellingPrice: 6200 },
+  { name: "Toothpaste", unit: "tube", buyingPrice: 3500, sellingPrice: 4000 },
+  { name: "Sanitary Pads", unit: "packet", buyingPrice: 3000, sellingPrice: 3500 },
+  
+  // Beverages & Snacks
+  { name: "Tea Leaves (Chai)", unit: "packet", buyingPrice: 4000, sellingPrice: 4500 },
+  { name: "Soda (300ml)", unit: "bottle", buyingPrice: 1500, sellingPrice: 2000 },
+  { name: "Bottled Water (500ml)", unit: "bottle", buyingPrice: 800, sellingPrice: 1000 },
+  { name: "Biscuits", unit: "packet", buyingPrice: 1000, sellingPrice: 1300 },
+  { name: "Eggs (Traysta)", unit: "tray", buyingPrice: 11000, sellingPrice: 12000 },
+];
+
 export default function PriceList({ navigate, businessInfo, language }: any) {
   const [items, setItems] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
@@ -13,14 +43,26 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
   useEffect(() => {
     const saved = localStorage.getItem("smartsale_pricelist");
     if (saved) {
-      setItems(JSON.parse(saved));
+      const parsed = JSON.parse(saved);
+      // If the saved list is empty, load the Uganda defaults
+      if (parsed.length === 0) {
+        const seededList = DEFAULT_UGANDA_RETAIL_ITEMS.map((item, index) => ({
+          ...item,
+          id: (index + 1).toString()
+        }));
+        setItems(seededList);
+        localStorage.setItem("smartsale_pricelist", JSON.stringify(seededList));
+      } else {
+        setItems(parsed);
+      }
     } else {
-      const demoList = [
-        { id: "1", name: "Sugar (Sukari)", unit: "kg", buyingPrice: 4000, sellingPrice: 4500 },
-        { id: "2", name: "Soap (Sabuni)", unit: "bar", buyingPrice: 2500, sellingPrice: 3000 },
-      ];
-      setItems(demoList);
-      localStorage.setItem("smartsale_pricelist", JSON.stringify(demoList));
+      // First time opening: Load defaults
+      const seededList = DEFAULT_UGANDA_RETAIL_ITEMS.map((item, index) => ({
+        ...item,
+        id: (index + 1).toString()
+      }));
+      setItems(seededList);
+      localStorage.setItem("smartsale_pricelist", JSON.stringify(seededList));
     }
   }, []);
 
@@ -133,7 +175,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           Tap any item below to edit its price.
         </p>
 
-        {/* CLEAN TABLE LAYOUT */}
+        {/* TABLE LAYOUT */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="grid grid-cols-4 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
             <div className="col-span-2">Item / Unit</div>
@@ -163,4 +205,4 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-      }
+    }
