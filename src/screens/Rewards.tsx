@@ -1,96 +1,61 @@
-import { useState } from "react";
+import { ArrowLeft, Gift, Share2, Users } from "lucide-react";
 
-interface Props {
-  setScreen: (s: string) => void;
-  navigate?: (s: string) => void;
-}
+export default function Rewards({ navigate, language }: any) {
+  const t = (en: string, run: string) => (language === "run" ? run : en);
 
-export default function Rewards({ setScreen, navigate }: Props) {
-  const [notice, setNotice] = useState("");
-
-  const goBack = () => {
-    if (navigate) navigate("player");
-    else setScreen("player");
-  };
-
-  const handleInvite = async () => {
-    const shareData = {
-      title: "Join Classoni",
-      text: "Join me on Classoni — the study app that turns notes into animated lessons. Use my link to get free unlimited learning days.",
-      url: window.location.href,
-    };
-
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
-        setNotice("Invite link copied!");
-        setTimeout(() => setNotice(""), 2000);
-      }
-    } catch {
-      // User cancelled the share sheet — no error, just do nothing
+  const handleInvite = () => {
+    const text = "Join me on SmartSale! Manage your business with less stress. Download here: smartsale.ug";
+    if (navigator.share) {
+      navigator.share({ title: "SmartSale", text: text, url: "https://smartsale.ug" });
+    } else {
+      alert("Link copied to clipboard!");
+      navigator.clipboard.writeText(text);
     }
   };
 
   return (
-    <div className="h-[100dvh] bg-classoni-navy flex flex-col overflow-hidden px-4 pt-4">
-      <button
-        onClick={goBack}
-        className="text-white text-2xl mb-2 self-start w-10 h-10 flex items-center justify-center"
-        aria-label="Back"
-      >
-        ←
-      </button>
+    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6]">
+      <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10">
+        <button onClick={() => navigate("home")} className="text-gray-500">
+          <ArrowLeft size={24} />
+        </button>
+        <h1 className="text-lg font-extrabold text-gray-800">{t("Rewards", "Empeera")}</h1>
+      </header>
 
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-2xl">🎁</span>
-        <h1 className="text-white font-bold text-xl">Your rewards</h1>
-      </div>
-
-      <div className="bg-white/10 rounded-2xl p-4 mb-3">
-        <p className="text-white/60 text-xs mb-1">Unlimited learning remaining</p>
-        <p className="text-white font-bold text-3xl">5 days</p>
-        <p className="text-white/60 text-xs mt-1">Keep inviting friends to add more days</p>
-      </div>
-
-      <div className="bg-white/10 rounded-2xl p-4 mb-3">
-        <p className="text-white font-bold text-sm">
-          Invite a friend and unlock more unlimited learning + points
+      <div className="flex-1 p-6 flex flex-col items-center">
+        
+        <div className="w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+          <Gift size={48} className="text-[#FF9800]" />
+        </div>
+        
+        <h2 className="text-xl font-extrabold text-gray-800 text-center mb-2">Get 7 Days Free!</h2>
+        <p className="text-sm text-gray-500 text-center mb-8">
+          Invite a fellow shopkeeper to SmartSale. When they join, you both get 1 week of unlimited storage and analytics free!
         </p>
-        <p className="text-white/60 text-xs mt-2">
-          1 free day of unlimited learning per invited friend plus 2 pts and climb the leaderboard
-        </p>
-      </div>
 
-      <div className="bg-white/10 rounded-2xl p-4 mb-3">
-        <p className="text-white/60 text-xs">Your points today</p>
-        <p className="text-classoni-yellow font-bold text-2xl mt-1">12 pts</p>
-      </div>
+        <button 
+          onClick={handleInvite}
+          className="w-full bg-[#FF9800] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform"
+        >
+          <Share2 size={20} /> Invite a Friend
+        </button>
 
-      <div className="bg-white/10 rounded-2xl p-4 mb-3">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-white/60 text-sm">Students in your class</p>
-          <p className="text-white font-bold">42</p>
+        <div className="mt-8 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full">
+          <div className="flex items-center gap-3 mb-2">
+            <Users size={20} className="text-[#0055FF]" />
+            <p className="font-bold text-gray-800 text-sm">Your Network</p>
+          </div>
+          <div className="flex justify-between items-center border-t border-gray-100 pt-3 mt-2">
+            <p className="text-xs text-gray-500 font-medium">Friends Joined</p>
+            <p className="font-extrabold text-[#0055FF]">0</p>
+          </div>
+          <div className="flex justify-between items-center mt-2">
+            <p className="text-xs text-gray-500 font-medium">Free Days Earned</p>
+            <p className="font-extrabold text-[#FF9800]">2 (Trial)</p>
+          </div>
         </div>
-        <div className="flex justify-between items-center">
-          <p className="text-white/60 text-sm">Friends you've invited</p>
-          <p className="text-white font-bold">3</p>
-        </div>
+
       </div>
-
-      <button
-        onClick={handleInvite}
-        className="mt-auto mb-4 w-full bg-classoni-yellow text-classoni-navy rounded-2xl py-4 font-bold"
-      >
-        Invite a friend and get my rewards when they create an account
-      </button>
-
-      {notice && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 bg-classoni-navy text-white text-xs px-4 py-2 rounded-full shadow-md z-50">
-          {notice}
-        </div>
-      )}
     </div>
   );
-          }
+}
