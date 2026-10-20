@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Store, Pill, Utensils } from "lucide-react";
+import { ArrowLeft, Store, Pill } from "lucide-react";
 
 export default function Onboarding({ navigate, onComplete, language }: any) {
   const [step, setStep] = useState(1);
@@ -32,14 +32,11 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
         <ArrowLeft size={24} />
       </button>
 
-      <div className="mt-16 flex flex-col items-center w-full max-w-xs mx-auto">
-        {/* Custom SVG Butterfly */}
-        <div className="w-20 h-20 bg-white shadow-sm rounded-full flex items-center justify-center mb-6">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
-            <path d="M12 12C12 12 8 4 3 6C-1 8 2 16 7 18C11 19.5 12 12 12 12Z" fill="#FF9800" />
-            <path d="M12 12C12 12 16 4 21 6C25 8 22 16 17 18C13 19.5 12 12 12 12Z" fill="#0055FF" />
-            <path d="M12 10C12 10 10 16 8 20C6 23 11 23 12 19C13 23 18 23 16 20C14 16 12 10 12 10Z" fill="#0055FF" opacity="0.8" />
-          </svg>
+      <div className="mt-12 flex flex-col items-center w-full max-w-xs mx-auto">
+        
+        {/* 🦋 The consistent butterfly with Orange Border */}
+        <div className="w-20 h-20 rounded-full border-4 border-[#FF9800] bg-white shadow-md flex items-center justify-center mb-6">
+          <span className="text-4xl">🦋</span>
         </div>
         
         <h2 className="text-xl font-extrabold text-gray-800 text-center mb-8">
@@ -74,7 +71,7 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
             <div className="grid grid-cols-1 gap-3">
               <button 
                 onClick={() => { setBusinessType("Retail"); setStep(3); }}
-                className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-[#FF9800] text-left"
+                className="flex items-center gap-3 p-4 bg-white border-2 border-[#FF9800] rounded-xl text-left shadow-sm"
               >
                 <div className="w-10 h-10 rounded-full bg-orange-50 text-[#FF9800] flex items-center justify-center"><Store size={20} /></div>
                 <div>
@@ -85,7 +82,7 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
               
               <button 
                 onClick={() => { setBusinessType("Pharmacy"); setStep(3); }}
-                className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-[#FF9800] text-left opacity-50"
+                className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl text-left opacity-50"
               >
                 <div className="w-10 h-10 rounded-full bg-blue-50 text-[#0055FF] flex items-center justify-center"><Pill size={20} /></div>
                 <div>
@@ -141,4 +138,4 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
       </div>
     </div>
   );
-                  }
+            }
