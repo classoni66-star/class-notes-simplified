@@ -8,7 +8,7 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   
   // Add Stock Form State
   const [addQty, setAddQty] = useState<number | "">("");
-  const [addBuyPrice, setAddBuyPrice] = useState<number | "">(""); // Total Cost
+  const [addBuyPrice, setAddBuyPrice] = useState<number | "">(""); 
   const [isPaid, setIsPaid] = useState(true);
   const [amountPaid, setAmountPaid] = useState<number | "">("");
   const [supplierName, setSupplierName] = useState("");
@@ -75,19 +75,21 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
     // 2. Handle Credit (Creditors) if Not Paid
-    if (!isPaid && addBuyPrice) {
-      const totalCost = Number(addBuyPrice);
+    if (!isPaid) {
+      const totalCost = Number(addBuyPrice) || 0;
       const paid = Number(amountPaid) || 0;
       const balance = totalCost - paid;
 
       if (balance > 0) {
-        if (!supplierName) return alert("Please enter the supplier's name for the balance owed.");
+        if (!supplierName.trim()) {
+          return alert("Please enter the supplier's name for the balance owed.");
+        }
         
         const creditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
         creditors.push({
           id: Date.now().toString(),
           date: new Date().toISOString(),
-          supplierName: supplierName,
+          supplierName: supplierName.trim(),
           amountOwed: balance
         });
         localStorage.setItem("smartsale_creditors", JSON.stringify(creditors));
@@ -104,7 +106,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     loadStock(); 
   };
 
-  const selectedItem = stockData.find(i => i.id === selectedItemId);
   const calculatedBalance = (Number(addBuyPrice) || 0) - (Number(amountPaid) || 0);
 
   return (
@@ -150,7 +151,7 @@ export default function Stock({ navigate, businessInfo, language }: any) {
 
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity Bought</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity</label>
                   <input type="number" value={addQty} onChange={(e) => setAddQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
                 </div>
                 <div className="flex-1">
@@ -159,7 +160,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
                 </div>
               </div>
 
-              {/* PAYMENT STATUS */}
               <div>
                 <label className="text-[10px] font-bold text-gray-500 uppercase">Payment Status</label>
                 <div className="flex gap-2 mt-1">
@@ -168,7 +168,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
                 </div>
               </div>
 
-              {/* IF NOT PAID */}
               {!isPaid && (
                 <div className="bg-red-50 p-3 rounded-lg border border-red-100 space-y-2 mt-2">
                   <div>
@@ -192,7 +191,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* STOCK TABLE */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="grid grid-cols-4 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100 text-center">
             <div className="text-left col-span-1">Item</div>
@@ -229,4 +227,4 @@ export default function Stock({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-                                                  }
+      }
