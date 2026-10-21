@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Zap, Star, Crown } from "lucide-react";
+import { ArrowLeft, Zap, Star, Crown, CheckCircle2 } from "lucide-react";
 
 export default function BuyStorage({ navigate, language }: any) {
   const t = (en: string, run: string) => (language === "run" ? run : en);
@@ -13,28 +13,30 @@ export default function BuyStorage({ navigate, language }: any) {
         <button onClick={() => navigate("home")} className="text-gray-500">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-lg font-extrabold text-gray-800">{t("Buy Storage", "Gura Storage")}</h1>
+        <h1 className="text-lg font-extrabold text-gray-800">Go Premium</h1>
       </header>
 
       <div className="p-4 pb-12 space-y-4">
         
-        <div className="text-center mb-2">
-          <h2 className="text-xl font-extrabold text-gray-800">Unlock Your Business Insights</h2>
-          <p className="text-xs text-gray-500 mt-1">Get unlimited records storage and full analytics to know exactly how your business is doing.</p>
-        </div>
-
-        {/* FREE PLAN (BASELINE) */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 opacity-80">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-extrabold text-gray-800 text-base">Free Plan</h3>
-            <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-md">Current</span>
+        {/* HEADER & FEATURES */}
+        <div className="text-center mb-4">
+          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Crown size={32} className="text-[#FF9800]" />
           </div>
-          <ul className="text-[11px] text-gray-600 space-y-1.5 mb-3">
-            <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> Record Sales</li>
-            <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> See Today's Total Sales</li>
-            <li className="flex items-center gap-2 text-gray-400"><CheckCircle2 size={12} className="text-gray-300" /> No Profit Tracking</li>
-            <li className="flex items-center gap-2 text-gray-400"><CheckCircle2 size={12} className="text-gray-300" /> No Stock Analytics</li>
-          </ul>
+          <h2 className="text-xl font-extrabold text-gray-800">Unlock SmartSale Premium</h2>
+          <p className="text-xs text-gray-500 mt-1 mb-4">Manage your business with zero stress.</p>
+          
+          {/* WHAT YOU GET */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-left space-y-2 mb-6">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-green-500 flex-shrink-0" />
+              <p className="text-sm font-bold text-gray-700">Unlimited records storage</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-green-500 flex-shrink-0" />
+              <p className="text-sm font-bold text-gray-700">Unlimited analytics (See how your business is performing)</p>
+            </div>
+          </div>
         </div>
 
         {/* DAILY PLAN */}
@@ -100,4 +102,4 @@ export default function BuyStorage({ navigate, language }: any) {
       </div>
     </div>
   );
-      }
+        }
