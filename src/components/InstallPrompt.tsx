@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Download, X, Info, MoreVertical } from "lucide-react";
+import { Download, X, Info, Loader2 } from "lucide-react";
 
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(true); 
   const [showManual, setShowManual] = useState(false);
 
   useEffect(() => {
@@ -17,10 +17,12 @@ export default function InstallPrompt() {
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      console.log("Native install prompt is ready!");
     };
 
     window.addEventListener("beforeinstallprompt", handler);
     
+    // 3. Hide if installed
     window.addEventListener("appinstalled", () => {
       setIsVisible(false);
       setDeferredPrompt(null);
@@ -33,6 +35,7 @@ export default function InstallPrompt() {
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
+      // Native prompt is ready
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") {
@@ -40,6 +43,7 @@ export default function InstallPrompt() {
       }
       setDeferredPrompt(null);
     } else {
+      // Native prompt hasn't fired yet (Chrome is waiting for 30s engagement)
       setShowManual(true);
     }
   };
@@ -51,7 +55,6 @@ export default function InstallPrompt() {
       
       <div className="bg-white rounded-3xl w-full max-w-sm p-6 relative animate-slide-up shadow-2xl">
         
-        {/* Close Button */}
         <button 
           onClick={() => setIsVisible(false)}
           className="absolute top-4 right-4 text-gray-400 p-1 bg-gray-100 rounded-full"
@@ -59,7 +62,6 @@ export default function InstallPrompt() {
           <X size={20} />
         </button>
 
-        {/* Icon and Text */}
         <div className="flex flex-col items-center text-center mt-2 mb-6">
           <div className="w-20 h-20 rounded-2xl bg-orange-50 flex items-center justify-center shadow-sm mb-4 border border-orange-100">
             <span className="text-4xl">🦋</span>
@@ -70,7 +72,6 @@ export default function InstallPrompt() {
           </p>
         </div>
 
-        {/* Action Area */}
         {showManual ? (
           <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-left">
             <div className="flex items-center gap-2 mb-2">
@@ -80,24 +81,40 @@ export default function InstallPrompt() {
             <div className="space-y-3 mt-3">
               <div className="flex items-center gap-3">
                 <div className="w-6 h-6 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
-                <p className="text-xs text-gray-700">Tap the <strong>3 dots</strong> menu <MoreVertical size={14} className="inline text-gray-600"/> at the top right of your browser.</p>
+                <p className="text-xs text-gray-700">Tap the <strong>3 dots</strong> menu at the top right of your browser.</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-6 h-6 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
                 <p className="text-xs text-gray-700">Select <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong>.</p>
               </div>
             </div>
+            <button 
+              onClick={() => setShowManual(false)}
+              className="w-full mt-4 bg-white border border-blue-200 text-[#0055FF] font-bold py-2 rounded-lg text-xs"
+            >
+              Back
+            </button>
           </div>
         ) : (
           <button
             onClick={handleInstallClick}
-            className="w-full bg-[#FF9800] text-white text-base font-bold py-4 rounded-xl shadow-lg shadow-orange-500/30 active:scale-95 transition-transform flex justify-center items-center gap-2"
+            className={`w-full text-white text-base font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 ${
+              deferredPrompt ? 'bg-[#FF9800] shadow-orange-500/30' : 'bg-gray-400'
+            }`}
           >
-            <Download size={20} /> Install App Now
+            {deferredPrompt ? (
+              <>
+                <Download size={20} /> Install App Now
+              </>
+            ) : (
+              <>
+                <Loader2 size={20} className="animate-spin" /> Preparing Install...
+              </>
+            )}
           </button>
         )}
 
       </div>
     </div>
   );
-        }
+          }
