@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
-import { Download } from "lucide-react";
+import { Download, X } from "lucide-react";
 
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Check if the app is already installed (standalone mode)
+    // Check if the app is already installed
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
-    if (isStandalone) return; // Don't show if already installed
+    if (isStandalone) return; 
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -40,25 +40,33 @@ export default function InstallPrompt() {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 bg-[#FF9800] text-white p-3 rounded-xl shadow-lg flex justify-between items-center z-50">
-      <div className="flex items-center gap-2">
-        <Download size={20} />
-        <p className="text-sm font-bold">Install SmartSale</p>
+    <div className="fixed bottom-20 left-4 right-4 bg-white border-2 border-[#FF9800] p-4 rounded-2xl shadow-2xl flex flex-col gap-3 z-[100] animate-bounce-short">
+      
+      {/* Close Button */}
+      <button 
+        onClick={() => setIsVisible(false)}
+        className="absolute top-2 right-2 text-gray-400 p-1 bg-gray-50 rounded-full"
+      >
+        <X size={16} />
+      </button>
+
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0 shadow-sm">
+          {/* Using the butterfly emoji as a fallback, but the real icon will appear on the home screen */}
+          <span className="text-2xl">🦋</span>
+        </div>
+        <div>
+          <h3 className="text-sm font-extrabold text-gray-800 leading-tight">Install SmartSale</h3>
+          <p className="text-[10px] text-gray-500 mt-0.5">SmartSale works better as an app on your home screen.</p>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <button
-          onClick={() => setIsVisible(false)}
-          className="text-xs font-bold underline opacity-80"
-        >
-          Later
-        </button>
-        <button
-          onClick={handleInstall}
-          className="bg-white text-[#FF9800] text-xs font-extrabold px-3 py-1.5 rounded-lg"
-        >
-          Install
-        </button>
-      </div>
+
+      <button
+        onClick={handleInstall}
+        className="w-full bg-[#FF9800] text-white text-sm font-bold py-2.5 rounded-xl shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2"
+      >
+        <Download size={16} /> Add to Home Screen
+      </button>
     </div>
   );
-      }
+}
