@@ -17,6 +17,21 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
 
   const handleVerify = () => {
     if (smsCode.length >= 4) {
+      
+      // 🎁 CHECK FOR REFERRAL REWARD
+      const invitedBy = localStorage.getItem("smartsale_invited_by");
+      if (invitedBy) {
+        // Give new user 7 days of premium
+        const currentPremium = Number(localStorage.getItem("smartsale_premium_until") || Date.now());
+        const newPremium = currentPremium + (7 * 24 * 60 * 60 * 1000);
+        localStorage.setItem("smartsale_premium_until", newPremium.toString());
+        
+        // Remove the invite tag so they don't get it again if they refresh
+        localStorage.removeItem("smartsale_invited_by");
+        
+        alert("🎉 Welcome! Because you were invited by a friend, you have received 7 days of free Premium access!");
+      }
+
       onComplete({
         name: businessName,
         type: businessType,
@@ -27,12 +42,12 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
   };
 
   return (
-    <div className="h-full flex flex-col p-6 bg-[#F3F4F6] relative">
+    <div className="h-full flex flex-col p-6 bg-[#F3F4F6] relative overflow-y-auto">
       <button onClick={() => navigate("welcome")} className="absolute top-6 left-6 text-gray-400">
         <ArrowLeft size={24} />
       </button>
 
-      <div className="mt-12 flex flex-col items-center w-full max-w-xs mx-auto">
+      <div className="mt-12 flex flex-col items-center w-full max-w-xs mx-auto pb-10">
         
         {/* 🦋 The consistent butterfly with Orange Border */}
         <div className="w-20 h-20 rounded-full border-4 border-[#FF9800] bg-white shadow-md flex items-center justify-center mb-6">
