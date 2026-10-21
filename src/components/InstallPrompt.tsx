@@ -20,6 +20,7 @@ export default function InstallPrompt() {
     window.addEventListener("appinstalled", () => {
       setIsVisible(false);
       setDeferredPrompt(null);
+      localStorage.setItem("smartsale_installed", "true");
     });
 
     return () => {
@@ -40,9 +41,9 @@ export default function InstallPrompt() {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 bg-white border-2 border-[#FF9800] p-4 rounded-2xl shadow-2xl flex flex-col gap-3 z-[100] animate-bounce-short">
+    <div className="absolute bottom-[75px] left-4 right-4 bg-white border-2 border-[#FF9800] p-4 rounded-2xl shadow-2xl flex flex-col gap-3 z-[100]">
       
-      {/* Close Button */}
+      {/* Close Button (Just in case they want to dismiss it for now) */}
       <button 
         onClick={() => setIsVisible(false)}
         className="absolute top-2 right-2 text-gray-400 p-1 bg-gray-50 rounded-full"
@@ -52,7 +53,6 @@ export default function InstallPrompt() {
 
       <div className="flex items-center gap-3">
         <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0 shadow-sm">
-          {/* Using the butterfly emoji as a fallback, but the real icon will appear on the home screen */}
           <span className="text-2xl">🦋</span>
         </div>
         <div>
@@ -69,4 +69,4 @@ export default function InstallPrompt() {
       </button>
     </div>
   );
-}
+      }
