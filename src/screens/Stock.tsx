@@ -1,12 +1,34 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, AlertTriangle, X } from "lucide-react";
 
+const DEFAULT_ITEMS = [
+  { name: "Sugar (Sukari)", unit: "kg", buyingPrice: 4300, sellingPrice: 5000 },
+  { name: "Rice (Mchele)", unit: "kg", buyingPrice: 4800, sellingPrice: 5300 },
+  { name: "Maize Flour (Posho)", unit: "kg", buyingPrice: 2500, sellingPrice: 2800 },
+  { name: "Bread (Omugati)", unit: "loaf", buyingPrice: 5300, sellingPrice: 6000 },
+  { name: "Beans (Yellow)", unit: "kg", buyingPrice: 5200, sellingPrice: 5800 },
+  { name: "Groundnuts (Ebinjagiro)", unit: "kg", buyingPrice: 7000, sellingPrice: 7700 },
+  { name: "Cassava Flour", unit: "kg", buyingPrice: 2300, sellingPrice: 2600 },
+  { name: "Cooking Oil (Mafuta)", unit: "liter", buyingPrice: 8500, sellingPrice: 9400 },
+  { name: "Salt (Omunyo)", unit: "packet", buyingPrice: 1000, sellingPrice: 1200 },
+  { name: "Tomatoes (Nyanya)", unit: "kg", buyingPrice: 2700, sellingPrice: 3100 },
+  { name: "Onions (Bitunguru)", unit: "kg", buyingPrice: 3300, sellingPrice: 3800 },
+  { name: "Laundry Soap (Sabuni)", unit: "bar", buyingPrice: 4900, sellingPrice: 5400 },
+  { name: "Bathing Soap (White Star)", unit: "bar", buyingPrice: 5500, sellingPrice: 6200 },
+  { name: "Toothpaste", unit: "tube", buyingPrice: 3500, sellingPrice: 4000 },
+  { name: "Sanitary Pads", unit: "packet", buyingPrice: 3000, sellingPrice: 3500 },
+  { name: "Tea Leaves (Chai)", unit: "packet", buyingPrice: 4000, sellingPrice: 4500 },
+  { name: "Soda (300ml)", unit: "bottle", buyingPrice: 1500, sellingPrice: 2000 },
+  { name: "Bottled Water (500ml)", unit: "bottle", buyingPrice: 800, sellingPrice: 1000 },
+  { name: "Biscuits", unit: "packet", buyingPrice: 1000, sellingPrice: 1300 },
+  { name: "Eggs (Traysta)", unit: "tray", buyingPrice: 11000, sellingPrice: 12000 },
+];
+
 export default function Stock({ navigate, businessInfo, language }: any) {
   const [stockData, setStockData] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState("");
   
-  // Add Stock Form State
   const [addQty, setAddQty] = useState<number | "">("");
   const [addBuyPrice, setAddBuyPrice] = useState<number | "">(""); 
   const [isPaid, setIsPaid] = useState(true);
@@ -16,7 +38,13 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   const loadStock = () => {
-    const priceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
+    // 1. Get or Seed Price List
+    let priceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
+    if (priceList.length === 0) {
+      priceList = DEFAULT_ITEMS.map((item, index) => ({ ...item, id: (index + 1).toString() }));
+      localStorage.setItem("smartsale_pricelist", JSON.stringify(priceList));
+    }
+
     const sales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
 
@@ -63,7 +91,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   const handleAddStock = () => {
     if (!selectedItemId || !addQty) return;
 
-    // 1. Update Stock Quantity
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const existingIndex = initialStock.findIndex((s: any) => s.itemId === selectedItemId);
 
@@ -74,7 +101,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     }
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
-    // 2. Handle Credit (Creditors) if Not Paid
     if (!isPaid) {
       const totalCost = Number(addBuyPrice) || 0;
       const paid = Number(amountPaid) || 0;
@@ -96,7 +122,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
       }
     }
 
-    // Reset and close
     setIsAdding(false);
     setAddQty("");
     setAddBuyPrice("");
@@ -227,4 +252,4 @@ export default function Stock({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-      }
+    }
