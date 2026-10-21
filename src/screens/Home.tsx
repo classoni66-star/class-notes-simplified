@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon } from "lucide-react";
-import InstallPrompt from "../components/InstallPrompt";
 
 export default function Home({ navigate, businessInfo, language }: any) {
   const [timeOfDay, setTimeOfDay] = useState("morning");
@@ -232,8 +231,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </button>
       </nav>
 
-      <InstallPrompt />
-
     </div>
   );
-                                                                     }
+                                        }
