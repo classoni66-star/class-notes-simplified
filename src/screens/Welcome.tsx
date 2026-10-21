@@ -1,17 +1,15 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Butterfly, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 export default function Welcome({ navigate, language, setLanguage, startDemo }: any) {
   const [showDemo, setShowDemo] = useState(false);
-
-  // Translation Helper
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 relative">
       
-      {/* Language Selector at top right */}
+      {/* Language Selector */}
       <div className="absolute top-6 right-6 flex bg-white rounded-full shadow-sm border border-gray-200 p-1">
         <button
           onClick={() => setLanguage("en")}
@@ -34,7 +32,6 @@ export default function Welcome({ navigate, language, setLanguage, startDemo }: 
         transition={{ type: "spring", stiffness: 200 }}
         className="w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-xl mb-6 relative"
       >
-        {/* Using an emoji as a placeholder for the Bright Orange/Blue Butterfly SVG */}
         <span className="text-6xl drop-shadow-md">🦋</span>
       </motion.div>
 
@@ -42,7 +39,7 @@ export default function Welcome({ navigate, language, setLanguage, startDemo }: 
         SmartSale
       </h1>
       <p className="text-gray-500 text-center mb-10 text-sm font-medium px-4">
-        {t("Manage your business with less stress", "Manage your business with less stress (Runyankole translation here)")}
+        {t("Manage your business with less stress", "Manage your business with less stress")}
       </p>
 
       {/* Main Action Buttons */}
@@ -63,7 +60,7 @@ export default function Welcome({ navigate, language, setLanguage, startDemo }: 
         </button>
       </div>
 
-      {/* 🦋 SECRET OWNER DEMO MENU */}
+      {/* Owner Demo Menu */}
       {showDemo && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }} 
@@ -91,9 +88,9 @@ export default function Welcome({ navigate, language, setLanguage, startDemo }: 
       {/* Footer */}
       <div className="absolute bottom-6 text-center w-full">
         <p className="text-[10px] text-gray-400 font-medium">
-          Made in Uganda 🇺🇬 | smartsale.ug
+        
         </p>
       </div>
     </div>
   );
-        }
+          }
