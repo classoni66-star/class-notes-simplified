@@ -24,7 +24,7 @@ export default function BuyStorage({ navigate, language }: any) {
             <Crown size={32} className="text-[#FF9800]" />
           </div>
           <h2 className="text-xl font-extrabold text-gray-800">Unlock SmartSale Premium</h2>
-          <p className="text-xs text-gray-500 mt-1 mb-4">Manage your business with zero stress.</p>
+          <p className="text-xs text-gray-500 mt-1 mb-4">Manage your business with less stress.</p>
           
           {/* WHAT YOU GET */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-left space-y-2 mb-6">
@@ -50,7 +50,9 @@ export default function BuyStorage({ navigate, language }: any) {
             <span className="text-xs text-gray-500 mb-1">/ day</span>
           </div>
           <p className="text-[10px] text-gray-500 mb-4">Perfect for trying out all premium features for a single day.</p>
-          <button onClick={() => handlePay("Daily Plan", 500)} className="w-full py-2.5 bg-gray-800 text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
+          
+          {/* Button changed to Orange */}
+          <button onClick={() => handlePay("Daily Plan", 500)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
             Pay 500 UGX
           </button>
         </div>
@@ -73,6 +75,8 @@ export default function BuyStorage({ navigate, language }: any) {
           <p className="text-[10px] text-green-600 font-bold mb-4 bg-green-50 inline-block px-2 py-1 rounded">
             Less than 357 UGX per day!
           </p>
+          
+          {/* Button is Orange */}
           <button onClick={() => handlePay("Weekly Plan", 2500)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
             Pay 2,500 UGX
           </button>
@@ -94,7 +98,9 @@ export default function BuyStorage({ navigate, language }: any) {
           <p className="text-[10px] text-green-600 font-bold mb-4 bg-green-50 inline-block px-2 py-1 rounded">
             Only 233 UGX per day!
           </p>
-          <button onClick={() => handlePay("Monthly Plan", 7000)} className="w-full py-2.5 bg-[#0055FF] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
+          
+          {/* Button changed to Orange */}
+          <button onClick={() => handlePay("Monthly Plan", 7000)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
             Pay 7,000 UGX
           </button>
         </div>
@@ -102,4 +108,4 @@ export default function BuyStorage({ navigate, language }: any) {
       </div>
     </div>
   );
-        }
+}
