@@ -64,8 +64,6 @@ export default function SmartSaleApp() {
   const handleOnboardingComplete = useCallback((data: any) => {
     setBusinessInfo(data);
     localStorage.setItem("smartsale_business", JSON.stringify(data));
-    
-    // Slight delay to ensure state updates before navigating
     setTimeout(() => {
       navigate("home");
     }, 100);
@@ -158,4 +156,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-               }
+                                               }
