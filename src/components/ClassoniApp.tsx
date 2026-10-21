@@ -17,14 +17,20 @@ export default function SmartSaleApp() {
   const [language, setLanguage] = useState("en");
   const [businessInfo, setBusinessInfo] = useState<any>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  
+  // State for the Premium Paywall Modal
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
+  // 1. Register Service Worker
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch((err) => console.log('SW failed:', err));
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.log('Service Worker registration failed:', err);
+      });
     }
   }, []);
 
+  // 2. Capture Referral Link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
@@ -34,6 +40,7 @@ export default function SmartSaleApp() {
     }
   }, []);
 
+  // 3. Load Saved Data
   useEffect(() => {
     const savedBusiness = localStorage.getItem("smartsale_business");
     if (savedBusiness && savedBusiness !== "null" && savedBusiness !== "undefined") {
@@ -50,20 +57,26 @@ export default function SmartSaleApp() {
     setIsHydrated(true);
   }, []);
 
+  // 4. THE GATEKEEPER: Check Premium before navigating
   const navigate = useCallback((screen: string) => {
     const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
-    const gatedScreens = ["analytics", "stock"];
+    
+    // 🔒 LIST OF SCREENS LOCKED FOR FREE USERS
+    const gatedScreens = ["analytics", "stock", "priceList"];
 
     if (!isPremium && gatedScreens.includes(screen)) {
       setShowPremiumModal(true);
       return;
     }
+    
     setCurrentScreen(screen);
   }, []);
 
   const handleOnboardingComplete = useCallback((data: any) => {
     setBusinessInfo(data);
     localStorage.setItem("smartsale_business", JSON.stringify(data));
+    
+    // Slight delay to ensure state updates before navigating
     setTimeout(() => {
       navigate("home");
     }, 100);
@@ -84,6 +97,7 @@ export default function SmartSaleApp() {
       };
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
+      // Give Demo user 2 days free premium
       localStorage.setItem("smartsale_premium_until", (Date.now() + (2 * 24 * 60 * 60 * 1000)).toString());
       navigate("home");
     }
@@ -119,11 +133,12 @@ export default function SmartSaleApp() {
         </motion.div>
       </AnimatePresence>
 
+      {/* 🛑 PREMIUM UPGRADE MODAL */}
       <AnimatePresence>
         {showPremiumModal && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-6 backdrop-blur-sm"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
@@ -154,6 +169,7 @@ export default function SmartSaleApp() {
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
-                                               }
+        }
