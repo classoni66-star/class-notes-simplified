@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Lock } from "lucide-react";
 import Welcome from "../screens/Welcome";
 import Onboarding from "../screens/Onboarding";
 import Home from "../screens/Home";
@@ -17,28 +18,25 @@ export default function SmartSaleApp() {
   const [language, setLanguage] = useState("en");
   const [businessInfo, setBusinessInfo] = useState<any>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  
+  // State for the Premium Popup
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
-  // 1. Register Service Worker for PWA
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch((err) => {
-        console.log('Service Worker registration failed:', err);
-      });
+      navigator.serviceWorker.register('/sw.js').catch((err) => console.log('SW failed:', err));
     }
   }, []);
 
-  // 2. Capture Referral Link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem("smartsale_invited_by", ref);
-      // Clean the URL so it looks pretty in the address bar
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  // 3. Load saved data
   useEffect(() => {
     const savedBusiness = localStorage.getItem("smartsale_business");
     if (savedBusiness) {
@@ -48,7 +46,15 @@ export default function SmartSaleApp() {
     setIsHydrated(true);
   }, []);
 
+  // 🛑 THE GATEKEEPER
   const navigate = useCallback((screen: string) => {
+    const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
+    const gatedScreens = ["analytics", "stock"]; // These require Premium
+
+    if (!isPremium && gatedScreens.includes(screen)) {
+      setShowPremiumModal(true);
+      return;
+    }
     setCurrentScreen(screen);
   }, []);
 
@@ -73,6 +79,8 @@ export default function SmartSaleApp() {
       };
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
+      // Give demo user 2 days premium for testing
+      localStorage.setItem("smartsale_premium_until", (Date.now() + (2 * 24 * 60 * 60 * 1000)).toString());
       navigate("home");
     }
   };
@@ -107,8 +115,45 @@ export default function SmartSaleApp() {
         </motion.div>
       </AnimatePresence>
 
-      {/* 🦋 Install Prompt is persistent across all screens */}
       <InstallPrompt />
+
+      {/* 🛑 PREMIUM UPGRADE MODAL */}
+      <AnimatePresence>
+        {showPremiumModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock size={32} className="text-[#FF9800]" />
+              </div>
+              <h2 className="text-xl font-extrabold text-gray-800 mb-2">Upgrade to Premium</h2>
+              <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                Free plan includes only making sales. For advanced analytics, upgrade to premium to unlock more analytics, manage your business with less stress, and know how you are performing.
+              </p>
+              <div className="space-y-2">
+                <button 
+                  onClick={() => { setShowPremiumModal(false); navigate("buyStorage"); }} 
+                  className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform"
+                >
+                  View Premium Plans
+                </button>
+                <button 
+                  onClick={() => setShowPremiumModal(false)} 
+                  className="w-full text-gray-500 py-2 text-sm font-bold"
+                >
+                  Maybe Later
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
-                                               }
+    }
