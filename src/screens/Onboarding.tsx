@@ -20,6 +20,7 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
       
       // 🎁 CHECK FOR REFERRAL REWARD
       const invitedBy = localStorage.getItem("smartsale_invited_by");
+      let daysToAdd = 2; // Default free trial is 2 days
       
       if (invitedBy) {
         // 🛑 ANTI-CHEAT: Prevent using your own invite link
@@ -27,22 +28,21 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
           alert("You cannot use your own invite link to get a reward.");
           localStorage.removeItem("smartsale_invited_by");
         } else {
-          // ✅ SUCCESS: Give new user 7 days of premium
-          const currentPremium = Number(localStorage.getItem("smartsale_premium_until") || Date.now());
-          const newPremium = currentPremium + (7 * 24 * 60 * 60 * 1000); // 7 days in milliseconds
-          localStorage.setItem("smartsale_premium_until", newPremium.toString());
-          
-          // Remove the invite tag so they don't get it again if they refresh
+          daysToAdd = 7; // Referral bonus is 7 days
           localStorage.removeItem("smartsale_invited_by");
-          
-          // Use a slight timeout so the alert doesn't block the screen transition abruptly
           setTimeout(() => {
             alert("🎉 Welcome! Because you were invited by a friend, you have received 7 days of free Premium access!");
           }, 500);
         }
       }
 
-      // Complete onboarding and move to Home
+      // Set the premium expiration date
+      const currentPremium = Number(localStorage.getItem("smartsale_premium_until") || 0);
+      // Add the days to either today, or to their existing premium time (whichever is later)
+      const newPremium = Math.max(Date.now(), currentPremium) + (daysToAdd * 24 * 60 * 60 * 1000);
+      localStorage.setItem("smartsale_premium_until", newPremium.toString());
+
+      // Complete onboarding and go to home
       onComplete({
         name: businessName,
         type: businessType,
@@ -164,4 +164,4 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
       </div>
     </div>
   );
-                }
+    }
