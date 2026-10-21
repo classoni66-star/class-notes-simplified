@@ -35,7 +35,6 @@ export default function BuyStorage({ navigate, language }: any) {
           <h2 className="text-xl font-extrabold text-gray-800">SmartSale Premium</h2>
           <p className="text-xs text-gray-500 mt-1 mb-4">Manage your business with less stress.</p>
           
-          {/* DYNAMIC STATUS CARD */}
           {premiumDaysLeft > 0 ? (
             <div className="bg-green-50 border border-green-200 p-4 rounded-xl shadow-sm mb-6 flex flex-col items-center">
               <CheckCircle2 size={32} className="text-green-500 mb-2" />
@@ -61,25 +60,24 @@ export default function BuyStorage({ navigate, language }: any) {
           )}
         </div>
 
-        {/* PLANS - ALWAYS VISIBLE */}
         <div className="space-y-4">
           
-          {/* DAILY PLAN */}
+          {/* DAILY PLAN - 1,000 UGX */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
             <div className="flex items-center gap-2 mb-1">
               <Zap size={18} className="text-yellow-500" />
               <h3 className="font-extrabold text-gray-800 text-base">Daily Unlimited</h3>
             </div>
             <div className="flex items-end gap-1 mb-3">
-              <span className="text-2xl font-extrabold text-gray-800">500 UGX</span>
+              <span className="text-2xl font-extrabold text-gray-800">1,000 UGX</span>
               <span className="text-xs text-gray-500 mb-1">/ day</span>
             </div>
-            <button onClick={() => handlePay("Daily Plan", 500)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
-              Pay 500 UGX
+            <button onClick={() => handlePay("Daily Plan", 1000)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
+              Pay 1,000 UGX
             </button>
           </div>
 
-          {/* WEEKLY PLAN */}
+          {/* WEEKLY PLAN - 6,000 UGX */}
           <div className="bg-white p-4 rounded-2xl shadow-lg border-2 border-[#FF9800] relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-[#FF9800] text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">MOST POPULAR</div>
             <div className="flex items-center gap-2 mb-1">
@@ -87,37 +85,36 @@ export default function BuyStorage({ navigate, language }: any) {
               <h3 className="font-extrabold text-[#FF9800] text-base">Weekly Unlimited</h3>
             </div>
             <div className="flex items-end gap-2 mb-1">
-              <span className="text-2xl font-extrabold text-gray-800">2,500 UGX</span>
+              <span className="text-2xl font-extrabold text-gray-800">6,000 UGX</span>
               <span className="text-xs text-gray-500 mb-1">/ week</span>
-              <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded ml-auto mb-1">SAVE 29%</span>
+              <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded ml-auto mb-1">SAVE 14%</span>
             </div>
             <p className="text-[10px] text-green-600 font-bold mb-4 bg-green-50 inline-block px-2 py-1 rounded">
-              Less than 357 UGX per day!
+              Less than 857 UGX per day!
             </p>
-            <button onClick={() => handlePay("Weekly Plan", 2500)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
-              Pay 2,500 UGX
+            <button onClick={() => handlePay("Weekly Plan", 6000)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
+              Pay 6,000 UGX
             </button>
           </div>
 
-          {/* MONTHLY PLAN */}
+          {/* MONTHLY PLAN - 20,000 UGX */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
             <div className="flex items-center gap-2 mb-1">
               <Crown size={18} className="text-[#0055FF]" />
               <h3 className="font-extrabold text-[#0055FF] text-base">Monthly Unlimited</h3>
             </div>
             <div className="flex items-end gap-2 mb-1">
-              <span className="text-2xl font-extrabold text-gray-800">7,000 UGX</span>
+              <span className="text-2xl font-extrabold text-gray-800">20,000 UGX</span>
               <span className="text-xs text-gray-500 mb-1">/ month</span>
-              <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded ml-auto mb-1">SAVE 53%</span>
+              <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded ml-auto mb-1">SAVE 33%</span>
             </div>
             <p className="text-[10px] text-green-600 font-bold mb-4 bg-green-50 inline-block px-2 py-1 rounded">
-              Only 233 UGX per day!
+              Only 666 UGX per day!
             </p>
-            <button onClick={() => handlePay("Monthly Plan", 7000)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
-              Pay 7,000 UGX
+            <button onClick={() => handlePay("Monthly Plan", 20000)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
+              Pay 20,000 UGX
             </button>
           </div>
-          
         </div>
 
       </div>
