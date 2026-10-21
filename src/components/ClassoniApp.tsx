@@ -10,7 +10,7 @@ import Analytics from "../screens/Analytics";
 import Rewards from "../screens/Rewards";
 import BuyStorage from "../screens/BuyStorage";
 import Profile from "../screens/Profile";
-import InstallPrompt from "../components/InstallPrompt"; // 👈 Imported here
+import InstallPrompt from "../components/InstallPrompt";
 
 export default function SmartSaleApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
@@ -90,4 +90,4 @@ export default function SmartSaleApp() {
       <InstallPrompt />
     </div>
   );
-    }
+        }
