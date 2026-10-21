@@ -18,6 +18,16 @@ export default function SmartSaleApp() {
   const [businessInfo, setBusinessInfo] = useState<any>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // 1. Register Service Worker for PWA Install Prompt
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.log('Service Worker registration failed:', err);
+      });
+    }
+  }, []);
+
+  // 2. Load saved data
   useEffect(() => {
     const savedBusiness = localStorage.getItem("smartsale_business");
     if (savedBusiness) {
@@ -86,7 +96,7 @@ export default function SmartSaleApp() {
         </motion.div>
       </AnimatePresence>
 
-      {/* 🦋 Install Prompt is now persistent across all screens! */}
+      {/* 🦋 Install Prompt is persistent across all screens */}
       <InstallPrompt />
     </div>
   );
