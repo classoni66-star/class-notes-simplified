@@ -18,6 +18,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const now = new Date();
     const hour = now.getHours();
     
+    // Time logic: Morning (5AM-12PM), Afternoon (12PM-5PM), Evening (5PM-5AM)
     if (hour >= 5 && hour < 12) setTimeOfDay("morning");
     else if (hour >= 12 && hour < 17) setTimeOfDay("afternoon");
     else setTimeOfDay("evening");
@@ -55,10 +56,11 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const savedCreditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
     const activeCreditors = savedCreditors.filter((c: any) => Number(c.amountOwed) > 0).length;
     
-    // 3. REAL Stock Calculation (Initial - Sold)
+    // 3. REAL Stock Calculation (Initial - Sold - Removed)
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
     const savedInitialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const allSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
+    const allRemovals = JSON.parse(localStorage.getItem("smartsale_removals") || "[]");
 
     let totalStockLeft = 0;
     savedPriceList.forEach((item: any) => {
@@ -67,8 +69,11 @@ export default function Home({ navigate, businessInfo, language }: any) {
       
       const itemSales = allSales.filter((s: any) => s.itemName === item.name);
       const sold = itemSales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
+
+      const itemRemovals = allRemovals.filter((r: any) => r.itemId === item.id);
+      const removed = itemRemovals.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
       
-      const current = initial - sold;
+      const current = initial - sold - removed;
       if (current > 0) {
         totalStockLeft += current; 
       }
@@ -84,6 +89,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
     
   }, [businessInfo]);
 
+  // Translation helper
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   if (!businessInfo) {
@@ -99,6 +105,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
   const formatMoney = (amount: number) => `UGX ${Math.round(amount).toLocaleString()}`;
 
+  // Dynamic Greeting
   const greeting = timeOfDay === "morning" 
     ? t("Good morning", "Oraire gye") 
     : timeOfDay === "afternoon" 
@@ -229,4 +236,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-  }
+                                                                     }
