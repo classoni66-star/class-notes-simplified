@@ -88,9 +88,9 @@ export default function Welcome({ navigate, language, setLanguage, startDemo }: 
       {/* Footer */}
       <div className="absolute bottom-6 text-center w-full">
         <p className="text-[10px] text-gray-400 font-medium">
-        
+          
         </p>
       </div>
     </div>
   );
-          }
+        }
