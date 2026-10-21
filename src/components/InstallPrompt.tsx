@@ -1,49 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Download, X } from "lucide-react";
 
 export default function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    // Check if the app is already installed
-    const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
-    if (isStandalone) return; 
-
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setIsVisible(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-    window.addEventListener("appinstalled", () => {
-      setIsVisible(false);
-      setDeferredPrompt(null);
-      localStorage.setItem("smartsale_installed", "true");
-    });
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
-    };
-  }, []);
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setIsVisible(false);
-    }
-    setDeferredPrompt(null);
-  };
+  // Force it to be visible no matter what
+  const [isVisible, setIsVisible] = useState(true);
 
   if (!isVisible) return null;
 
+  const handleInstall = () => {
+    alert("To install: Tap the 3 dots (⋮) at the top right of Chrome and select 'Add to Home screen' or 'Install app'.");
+  };
+
   return (
-    <div className="absolute bottom-[75px] left-4 right-4 bg-white border-2 border-[#FF9800] p-4 rounded-2xl shadow-2xl flex flex-col gap-3 z-[100]">
+    <div className="absolute bottom-[75px] left-4 right-4 bg-white border-2 border-red-500 p-4 rounded-2xl shadow-2xl flex flex-col gap-3 z-[9999]">
       
-      {/* Close Button (Just in case they want to dismiss it for now) */}
       <button 
         onClick={() => setIsVisible(false)}
         className="absolute top-2 right-2 text-gray-400 p-1 bg-gray-50 rounded-full"
@@ -69,4 +39,4 @@ export default function InstallPrompt() {
       </button>
     </div>
   );
-      }
+}
