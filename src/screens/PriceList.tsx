@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Edit2, X } from "lucide-react";
 
 const DEFAULT_UGANDA_RETAIL_ITEMS = [
-  // Staples & Grains
-  { name: "Sugar (Sukari)", unit: "kg", buyingPrice: 3200, sellingPrice: 3600 },
+  // Staples & Grains (Corrected Sugar & Bread prices)
+  { name: "Sugar (Sukari)", unit: "kg", buyingPrice: 4300, sellingPrice: 5000 },
   { name: "Rice (Mchele)", unit: "kg", buyingPrice: 4800, sellingPrice: 5300 },
   { name: "Maize Flour (Posho)", unit: "kg", buyingPrice: 2500, sellingPrice: 2800 },
-  { name: "Bread (Omugati)", unit: "loaf", buyingPrice: 2800, sellingPrice: 3200 },
+  { name: "Bread (Omugati)", unit: "loaf", buyingPrice: 5300, sellingPrice: 6000 },
   { name: "Beans (Yellow)", unit: "kg", buyingPrice: 5200, sellingPrice: 5800 },
   { name: "Groundnuts (Ebinjagiro)", unit: "kg", buyingPrice: 7000, sellingPrice: 7700 },
   { name: "Cassava Flour", unit: "kg", buyingPrice: 2300, sellingPrice: 2600 },
@@ -44,7 +44,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
     const saved = localStorage.getItem("smartsale_pricelist");
     if (saved) {
       const parsed = JSON.parse(saved);
-      // If the saved list is empty, load the Uganda defaults
       if (parsed.length === 0) {
         const seededList = DEFAULT_UGANDA_RETAIL_ITEMS.map((item, index) => ({
           ...item,
@@ -56,7 +55,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
         setItems(parsed);
       }
     } else {
-      // First time opening: Load defaults
       const seededList = DEFAULT_UGANDA_RETAIL_ITEMS.map((item, index) => ({
         ...item,
         id: (index + 1).toString()
@@ -124,7 +122,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </p>
         </div>
 
-        {/* SOLID ADD BUTTON */}
         {!isAdding && !editingId && (
           <button 
             onClick={() => { setIsAdding(true); setEditingId(null); setFormData({ name: "", unit: "", buyingPrice: "", sellingPrice: "" }); }} 
@@ -175,7 +172,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           Tap any item below to edit its price.
         </p>
 
-        {/* TABLE LAYOUT */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="grid grid-cols-4 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
             <div className="col-span-2">Item / Unit</div>
@@ -205,4 +201,4 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-    }
+   }
