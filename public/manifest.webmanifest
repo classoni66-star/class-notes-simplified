@@ -8,8 +8,14 @@
   "theme_color": "#FF9800",
   "icons": [
     {
-      "src": "/icon-512.png",
+      "src": "https://ui-avatars.com/api/?name=🦋&background=FF9800&color=fff&size=512&font-size=0.6",
       "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?name=🦋&background=FF9800&color=fff&size=192&font-size=0.6",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     }
