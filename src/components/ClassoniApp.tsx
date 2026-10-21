@@ -11,15 +11,12 @@ import Analytics from "../screens/Analytics";
 import Rewards from "../screens/Rewards";
 import BuyStorage from "../screens/BuyStorage";
 import Profile from "../screens/Profile";
-import InstallPrompt from "../components/InstallPrompt";
 
 export default function SmartSaleApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
   const [language, setLanguage] = useState("en");
   const [businessInfo, setBusinessInfo] = useState<any>(null);
   const [isHydrated, setIsHydrated] = useState(false);
-  
-  // State for the Premium Popup
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   useEffect(() => {
@@ -39,17 +36,23 @@ export default function SmartSaleApp() {
 
   useEffect(() => {
     const savedBusiness = localStorage.getItem("smartsale_business");
-    if (savedBusiness) {
-      setBusinessInfo(JSON.parse(savedBusiness));
-      setCurrentScreen("home");
+    if (savedBusiness && savedBusiness !== "null" && savedBusiness !== "undefined") {
+      try {
+        const parsed = JSON.parse(savedBusiness);
+        if (parsed && parsed.name) {
+          setBusinessInfo(parsed);
+          setCurrentScreen("home");
+        }
+      } catch (e) {
+        console.error("Failed to parse saved business data.");
+      }
     }
     setIsHydrated(true);
   }, []);
 
-  // 🛑 THE GATEKEEPER
   const navigate = useCallback((screen: string) => {
     const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
-    const gatedScreens = ["analytics", "stock"]; // These require Premium
+    const gatedScreens = ["analytics", "stock"];
 
     if (!isPremium && gatedScreens.includes(screen)) {
       setShowPremiumModal(true);
@@ -61,7 +64,11 @@ export default function SmartSaleApp() {
   const handleOnboardingComplete = useCallback((data: any) => {
     setBusinessInfo(data);
     localStorage.setItem("smartsale_business", JSON.stringify(data));
-    navigate("home");
+    
+    // Slight delay to ensure state updates before navigating
+    setTimeout(() => {
+      navigate("home");
+    }, 100);
   }, [navigate]);
 
   const startDemo = (type: "new" | "returning") => {
@@ -79,7 +86,6 @@ export default function SmartSaleApp() {
       };
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
-      // Give demo user 2 days premium for testing
       localStorage.setItem("smartsale_premium_until", (Date.now() + (2 * 24 * 60 * 60 * 1000)).toString());
       navigate("home");
     }
@@ -115,9 +121,6 @@ export default function SmartSaleApp() {
         </motion.div>
       </AnimatePresence>
 
-      <InstallPrompt />
-
-      {/* 🛑 PREMIUM UPGRADE MODAL */}
       <AnimatePresence>
         {showPremiumModal && (
           <motion.div 
@@ -153,7 +156,6 @@ export default function SmartSaleApp() {
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
-    }
+               }
