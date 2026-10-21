@@ -10,6 +10,7 @@ import Analytics from "../screens/Analytics";
 import Rewards from "../screens/Rewards";
 import BuyStorage from "../screens/BuyStorage";
 import Profile from "../screens/Profile";
+import InstallPrompt from "../components/InstallPrompt"; // 👈 Imported here
 
 export default function SmartSaleApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
@@ -71,7 +72,7 @@ export default function SmartSaleApp() {
   if (!isHydrated) return <div className="h-screen bg-[#F3F4F6]" />;
 
   return (
-    <div className="mx-auto h-[100dvh] w-full max-w-lg overflow-hidden bg-[#F3F4F6]">
+    <div className="mx-auto h-[100dvh] w-full max-w-lg overflow-hidden bg-[#F3F4F6] relative">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen}
@@ -84,6 +85,9 @@ export default function SmartSaleApp() {
           {screens[currentScreen] || <div className="p-4 text-center mt-10 font-bold text-gray-500">Screen not found</div>}
         </motion.div>
       </AnimatePresence>
+
+      {/* 🦋 Install Prompt is now persistent across all screens! */}
+      <InstallPrompt />
     </div>
   );
     }
