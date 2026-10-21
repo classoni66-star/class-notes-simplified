@@ -18,6 +18,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const now = new Date();
     const hour = now.getHours();
     
+    // Time logic: Morning (5AM-12PM), Afternoon (12PM-5PM), Evening (5PM-5AM)
     if (hour >= 5 && hour < 12) setTimeOfDay("morning");
     else if (hour >= 12 && hour < 17) setTimeOfDay("afternoon");
     else setTimeOfDay("evening");
@@ -65,6 +66,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
     
   }, [businessInfo]);
 
+  // Translation helper
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   if (!businessInfo) {
@@ -80,6 +82,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
   const formatMoney = (amount: number) => `UGX ${Math.round(amount).toLocaleString()}`;
 
+  // Dynamic Greeting
   const greeting = timeOfDay === "morning" 
     ? t("Good morning", "Oraire gye") 
     : timeOfDay === "afternoon" 
@@ -105,8 +108,10 @@ export default function Home({ navigate, businessInfo, language }: any) {
               <User size={16} />
             </button>
           </div>
+          
+          {/* 👇 UPDATED TO GO PREMIUM */}
           <button onClick={() => navigate("buyStorage")} className="text-[10px] font-bold text-white bg-[#0055FF] px-3 py-1 rounded shadow-sm active:scale-95 transition-transform">
-            Buy Storage
+            Go Premium
           </button>
         </div>
       </header>
@@ -209,4 +214,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-        }
+                                          }
