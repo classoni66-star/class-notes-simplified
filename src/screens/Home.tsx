@@ -18,7 +18,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const now = new Date();
     const hour = now.getHours();
     
-    // Time logic: Morning (5AM-12PM), Afternoon (12PM-5PM), Evening (5PM-5AM)
     if (hour >= 5 && hour < 12) setTimeOfDay("morning");
     else if (hour >= 12 && hour < 17) setTimeOfDay("afternoon");
     else setTimeOfDay("evening");
@@ -28,6 +27,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
   }, []);
 
   useEffect(() => {
+    // 1. Sales & Profit Calculations
     const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const todayStr = new Date().toDateString();
 
@@ -48,25 +48,42 @@ export default function Home({ navigate, businessInfo, language }: any) {
       }
     });
 
+    // 2. Debtors & Creditors
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
     const activeDebtors = savedDebtors.filter((d: any) => Number(d.amountOwed) > 0).length;
     
     const savedCreditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
     const activeCreditors = savedCreditors.filter((c: any) => Number(c.amountOwed) > 0).length;
     
+    // 3. REAL Stock Calculation (Initial - Sold)
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
+    const savedInitialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
+    const allSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
+
+    let totalStockLeft = 0;
+    savedPriceList.forEach((item: any) => {
+      const initialEntry = savedInitialStock.find((s: any) => s.itemId === item.id);
+      const initial = initialEntry ? Number(initialEntry.quantity) : 0;
+      
+      const itemSales = allSales.filter((s: any) => s.itemName === item.name);
+      const sold = itemSales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
+      
+      const current = initial - sold;
+      if (current > 0) {
+        totalStockLeft += current; 
+      }
+    });
     
     setStats({
       sales: totalSales,
       profit: totalProfit,
       debtors: activeDebtors,
       creditors: activeCreditors, 
-      stock: savedPriceList.length
+      stock: totalStockLeft
     });
     
   }, [businessInfo]);
 
-  // Translation helper
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   if (!businessInfo) {
@@ -82,7 +99,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
   const formatMoney = (amount: number) => `UGX ${Math.round(amount).toLocaleString()}`;
 
-  // Dynamic Greeting
   const greeting = timeOfDay === "morning" 
     ? t("Good morning", "Oraire gye") 
     : timeOfDay === "afternoon" 
@@ -109,7 +125,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </button>
           </div>
           
-          {/* 👇 UPDATED TO GO PREMIUM */}
           <button onClick={() => navigate("buyStorage")} className="text-[10px] font-bold text-white bg-[#0055FF] px-3 py-1 rounded shadow-sm active:scale-95 transition-transform">
             Go Premium
           </button>
@@ -214,4 +229,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-                                          }
+  }
