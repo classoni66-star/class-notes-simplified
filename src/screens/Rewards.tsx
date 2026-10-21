@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { ArrowLeft, Gift, Share2, Users, Check, CheckCircle2 } from "lucide-react";
 
