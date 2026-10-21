@@ -18,7 +18,7 @@ export default function SmartSaleApp() {
   const [businessInfo, setBusinessInfo] = useState<any>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // 1. Register Service Worker for PWA Install Prompt
+  // 1. Register Service Worker for PWA
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch((err) => {
@@ -27,7 +27,18 @@ export default function SmartSaleApp() {
     }
   }, []);
 
-  // 2. Load saved data
+  // 2. Capture Referral Link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+      localStorage.setItem("smartsale_invited_by", ref);
+      // Clean the URL so it looks pretty in the address bar
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  // 3. Load saved data
   useEffect(() => {
     const savedBusiness = localStorage.getItem("smartsale_business");
     if (savedBusiness) {
@@ -74,7 +85,7 @@ export default function SmartSaleApp() {
     priceList: <PriceList navigate={navigate} businessInfo={businessInfo} language={language} />,
     stock: <Stock navigate={navigate} businessInfo={businessInfo} language={language} />,
     analytics: <Analytics navigate={navigate} businessInfo={businessInfo} language={language} />,
-    rewards: <Rewards navigate={navigate} language={language} />,
+    rewards: <Rewards navigate={navigate} businessInfo={businessInfo} language={language} />,
     buyStorage: <BuyStorage navigate={navigate} language={language} />,
     profile: <Profile navigate={navigate} businessInfo={businessInfo} language={language} />,
   };
@@ -100,4 +111,4 @@ export default function SmartSaleApp() {
       <InstallPrompt />
     </div>
   );
-        }
+                                               }
