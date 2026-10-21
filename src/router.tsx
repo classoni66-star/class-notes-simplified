@@ -1,41 +1,22 @@
-import { Outlet, createRootRoute } from '@tanstack/react-router'
-import { Meta, Scripts } from '@tanstack/start'
+import { QueryClient } from "@tanstack/react-query";
+import { createRouter } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
 
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'SmartSale - Manage your business with less stress' },
-      { name: 'description', content: 'SmartSale is the easiest way to record sales, track stock, and manage your business with less stress.' },
-      
-      // 🦋 WhatsApp & Facebook Preview Tags
-      { property: 'og:title', content: 'SmartSale 🦋' },
-      { property: 'og:description', content: 'Manage your business with less stress. Track sales, debts, and stock easily.' },
-      { property: 'og:image', content: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Butterfly.png' },
-      { property: 'og:url', content: 'https://classoni.classoni66.workers.dev' },
-      { property: 'og:type', content: 'website' },
-      
-      // App Theme Color
-      { name: 'theme-color', content: '#FF9800' },
-    ],
-    links: [
-      { rel: 'manifest', href: '/manifest.webmanifest' },
-    ],
-  }),
-  component: RootComponent,
-})
+export const getRouter = () => {
+  const queryClient = new QueryClient();
 
-function RootComponent() {
-  return (
-    <html lang="en">
-      <head>
-        <Meta />
-      </head>
-      <body className="bg-[#F3F4F6]">
-        <Outlet />
-        <Scripts />
-      </body>
-    </html>
-  )
+  const router = createRouter({
+    routeTree,
+    context: { queryClient },
+    scrollRestoration: true,
+    defaultPreloadStaleTime: 0,
+  });
+
+  return router;
+};
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof getRouter>;
   }
+}
