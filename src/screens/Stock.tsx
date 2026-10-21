@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, AlertTriangle, X } from "lucide-react";
+import { ArrowLeft, Plus, AlertTriangle, X, PackageMinus, PackagePlus } from "lucide-react";
 
 const DEFAULT_ITEMS = [
   { name: "Sugar (Sukari)", unit: "kg", buyingPrice: 4300, sellingPrice: 5000 },
@@ -26,19 +26,24 @@ const DEFAULT_ITEMS = [
 
 export default function Stock({ navigate, businessInfo, language }: any) {
   const [stockData, setStockData] = useState<any[]>([]);
-  const [isAdding, setIsAdding] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState("");
   
-  const [addQty, setAddQty] = useState<number | "">("");
-  const [addBuyPrice, setAddBuyPrice] = useState<number | "">(""); 
+  // Modal State
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [modalMode, setModalMode] = useState<"menu" | "add" | "remove" | "newItem">("menu");
+  
+  // Form State
+  const [qty, setQty] = useState<number | "">("");
+  const [totalCost, setTotalCost] = useState<number | "">("");
   const [isPaid, setIsPaid] = useState(true);
   const [amountPaid, setAmountPaid] = useState<number | "">("");
   const [supplierName, setSupplierName] = useState("");
 
+  // New Item State
+  const [newItem, setNewItem] = useState({ name: "", unit: "pc", buyingPrice: "", sellingPrice: "" });
+
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   const loadStock = () => {
-    // 1. Get or Seed Price List
     let priceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
     if (priceList.length === 0) {
       priceList = DEFAULT_ITEMS.map((item, index) => ({ ...item, id: (index + 1).toString() }));
@@ -47,70 +52,59 @@ export default function Stock({ navigate, businessInfo, language }: any) {
 
     const sales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
+    const removals = JSON.parse(localStorage.getItem("smartsale_removals") || "[]");
 
     const combined = priceList.map((item: any) => {
       const itemSales = sales.filter((s: any) => s.itemName === item.name);
-      const totalSold = itemSales.reduce((sum: number, s: any) => sum + s.quantity, 0);
+      const totalSold = itemSales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
       
       const stockEntry = initialStock.find((s: any) => s.itemId === item.id);
-      const initial = stockEntry ? stockEntry.quantity : 0;
+      const initial = stockEntry ? Number(stockEntry.quantity) : 0;
+
+      const itemRemovals = removals.filter((r: any) => r.itemId === item.id);
+      const totalRemoved = itemRemovals.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
 
       return {
         ...item,
         initial,
         sold: totalSold,
-        current: initial - totalSold
+        removed: totalRemoved,
+        current: initial - totalSold - totalRemoved
       };
     });
 
     setStockData(combined);
-    if (combined.length > 0 && !selectedItemId) {
-      setSelectedItemId(combined[0].id);
-    }
   };
 
   useEffect(() => {
     loadStock();
   }, []);
 
-  const handleEditInitial = (itemId: string, newVal: string) => {
-    const val = Number(newVal) || 0;
-    const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
-    const existingIndex = initialStock.findIndex((s: any) => s.itemId === itemId);
-
-    if (existingIndex >= 0) {
-      initialStock[existingIndex].quantity = val;
-    } else {
-      initialStock.push({ itemId, quantity: val });
-    }
-    
-    localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
-    loadStock(); 
+  const resetForm = () => {
+    setQty(""); setTotalCost(""); setIsPaid(true); setAmountPaid(""); setSupplierName("");
+    setNewItem({ name: "", unit: "pc", buyingPrice: "", sellingPrice: "" });
   };
 
   const handleAddStock = () => {
-    if (!selectedItemId || !addQty) return;
+    if (!qty || !selectedItem) return;
 
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
-    const existingIndex = initialStock.findIndex((s: any) => s.itemId === selectedItemId);
+    const existingIndex = initialStock.findIndex((s: any) => s.itemId === selectedItem.id);
 
     if (existingIndex >= 0) {
-      initialStock[existingIndex].quantity += Number(addQty);
+      initialStock[existingIndex].quantity += Number(qty);
     } else {
-      initialStock.push({ itemId: selectedItemId, quantity: Number(addQty) });
+      initialStock.push({ itemId: selectedItem.id, quantity: Number(qty) });
     }
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
     if (!isPaid) {
-      const totalCost = Number(addBuyPrice) || 0;
+      const cost = Number(totalCost) || 0;
       const paid = Number(amountPaid) || 0;
-      const balance = totalCost - paid;
+      const balance = cost - paid;
 
       if (balance > 0) {
-        if (!supplierName.trim()) {
-          return alert("Please enter the supplier's name for the balance owed.");
-        }
-        
+        if (!supplierName.trim()) return alert("Please enter the supplier's name for the balance owed.");
         const creditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
         creditors.push({
           id: Date.now().toString(),
@@ -122,19 +116,53 @@ export default function Stock({ navigate, businessInfo, language }: any) {
       }
     }
 
-    setIsAdding(false);
-    setAddQty("");
-    setAddBuyPrice("");
-    setIsPaid(true);
-    setAmountPaid("");
-    setSupplierName("");
-    loadStock(); 
+    setSelectedItem(null);
+    resetForm();
+    loadStock();
   };
 
-  const calculatedBalance = (Number(addBuyPrice) || 0) - (Number(amountPaid) || 0);
+  const handleRemoveStock = () => {
+    if (!qty || !selectedItem) return;
+
+    const removals = JSON.parse(localStorage.getItem("smartsale_removals") || "[]");
+    removals.push({ itemId: selectedItem.id, quantity: Number(qty), date: new Date().toISOString() });
+    localStorage.setItem("smartsale_removals", JSON.stringify(removals));
+
+    setSelectedItem(null);
+    resetForm();
+    loadStock();
+  };
+
+  const handleCreateNewItem = () => {
+    if (!newItem.name || !newItem.sellingPrice || !qty) return;
+
+    const priceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
+    const newId = Date.now().toString();
+    
+    const itemToAdd = {
+      id: newId,
+      name: newItem.name,
+      unit: newItem.unit || "pc",
+      buyingPrice: Number(newItem.buyingPrice) || 0,
+      sellingPrice: Number(newItem.sellingPrice) || 0,
+    };
+    priceList.push(itemToAdd);
+    localStorage.setItem("smartsale_pricelist", JSON.stringify(priceList));
+
+    const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
+    initialStock.push({ itemId: newId, quantity: Number(qty) });
+    localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
+
+    setSelectedItem(null);
+    setModalMode("menu");
+    resetForm();
+    loadStock();
+  };
+
+  const calculatedBalance = (Number(totalCost) || 0) - (Number(amountPaid) || 0);
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
+    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden relative">
       <header className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate("home")} className="text-gray-500">
@@ -143,105 +171,34 @@ export default function Stock({ navigate, businessInfo, language }: any) {
           <h1 className="text-lg font-extrabold text-gray-800">{t("Stock", "Okugula")}</h1>
         </div>
         <button 
-          onClick={() => setIsAdding(true)} 
-          className="bg-[#FF9800] text-white px-3 py-1.5 rounded-full shadow-md text-xs font-bold flex items-center gap-1"
+          onClick={() => { setModalMode("newItem"); setSelectedItem({name: "New Item"}); }} 
+          className="bg-[#FF9800] text-white px-3 py-1.5 rounded-full shadow-md text-xs font-bold flex items-center gap-1 active:scale-95 transition-transform"
         >
-          <Plus size={14} /> Add Stock
+          <Plus size={14} /> Add Item
         </button>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
-        
-        {isAdding && (
-          <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-[#FF9800] mb-4 relative">
-            <button onClick={() => setIsAdding(false)} className="absolute top-2 right-2 text-gray-400">
-              <X size={20} />
-            </button>
-            <h3 className="font-bold text-gray-800 mb-3">Add New Stock</h3>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Select Item</label>
-                <select 
-                  value={selectedItemId}
-                  onChange={(e) => setSelectedItemId(e.target.value)}
-                  className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-medium outline-none"
-                >
-                  <option value="" disabled>Select item...</option>
-                  {stockData.map(item => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity</label>
-                  <input type="number" value={addQty} onChange={(e) => setAddQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Total Cost (UGX)</label>
-                  <input type="number" value={addBuyPrice} onChange={(e) => setAddBuyPrice(Number(e.target.value))} placeholder="e.g. 40000" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Payment Status</label>
-                <div className="flex gap-2 mt-1">
-                  <button onClick={() => setIsPaid(true)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${isPaid ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}>Paid in Full</button>
-                  <button onClick={() => setIsPaid(false)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>Credit (Not Paid)</button>
-                </div>
-              </div>
-
-              {!isPaid && (
-                <div className="bg-red-50 p-3 rounded-lg border border-red-100 space-y-2 mt-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-red-800 uppercase">Amount Paid Now (Optional)</label>
-                    <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Number(e.target.value))} placeholder="e.g. 10000" className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-red-800 uppercase">Supplier Name</label>
-                    <input type="text" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="Who supplied this stock?" className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
-                  </div>
-                  {calculatedBalance > 0 && (
-                    <p className="text-xs font-bold text-red-600 mt-1">Balance to owe: UGX {calculatedBalance.toLocaleString()}</p>
-                  )}
-                </div>
-              )}
-
-              <button onClick={handleAddStock} className="w-full py-3 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md mt-2">
-                Confirm Stock Addition
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="grid grid-cols-4 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100 text-center">
-            <div className="text-left col-span-1">Item</div>
-            <div>In (Edit)</div>
+          <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100 text-center">
+            <div className="text-left col-span-2">Item</div>
+            <div>In</div>
             <div>Out</div>
             <div className="text-[#FF9800]">Left</div>
           </div>
           
           {stockData.map((item) => (
-            <div key={item.id} className="grid grid-cols-4 p-2 border-b border-gray-50 text-sm items-center text-center">
-              <div className="text-left col-span-1 pr-1">
+            <div 
+              key={item.id} 
+              onClick={() => { setSelectedItem(item); setModalMode("menu"); }}
+              className="grid grid-cols-5 p-3 border-b border-gray-50 text-sm items-center text-center cursor-pointer hover:bg-orange-50 active:bg-orange-100 transition-colors"
+            >
+              <div className="text-left col-span-2 pr-1">
                 <p className="font-bold text-gray-800 leading-tight truncate">{item.name}</p>
                 <p className="text-[9px] text-gray-500">{item.unit}</p>
               </div>
-              
-              <div className="flex justify-center">
-                <input 
-                  type="number" 
-                  value={item.initial}
-                  onChange={(e) => handleEditInitial(item.id, e.target.value)}
-                  className="w-12 text-center border-b-2 border-gray-300 focus:border-[#FF9800] outline-none text-xs font-bold text-gray-700 bg-transparent"
-                />
-              </div>
-
-              <div className="text-gray-500 text-xs font-medium">{item.sold}</div>
-              
+              <div className="text-gray-500 text-xs font-medium">{item.initial}</div>
+              <div className="text-gray-500 text-xs font-medium">{item.sold + item.removed}</div>
               <div className={`font-extrabold text-sm ${item.current <= 5 ? 'text-red-500 flex items-center justify-center gap-1' : 'text-green-600'}`}>
                 {item.current <= 5 && <AlertTriangle size={12} />}
                 {item.current}
@@ -250,6 +207,122 @@ export default function Stock({ navigate, businessInfo, language }: any) {
           ))}
         </div>
       </div>
+
+      {/* BOTTOM SHEET MODAL */}
+      {selectedItem && (
+        <div className="absolute inset-0 bg-black/50 z-50 flex flex-col justify-end">
+          <div className="bg-white rounded-t-3xl p-5 w-full animate-slide-up max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-extrabold text-gray-800">{selectedItem.name}</h2>
+              <button onClick={() => setSelectedItem(null)} className="p-1 bg-gray-100 rounded-full text-gray-500">
+                <X size={20} />
+              </button>
+            </div>
+
+            {modalMode === "menu" && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 mb-4 text-center">What would you like to do with this item?</p>
+                <button onClick={() => setModalMode("add")} className="w-full py-3 bg-green-50 text-green-700 border border-green-200 rounded-xl font-bold flex items-center justify-center gap-2">
+                  <PackagePlus size={18} /> Add New Stock (Delivery)
+                </button>
+                <button onClick={() => setModalMode("remove")} className="w-full py-3 bg-red-50 text-red-700 border border-red-200 rounded-xl font-bold flex items-center justify-center gap-2">
+                  <PackageMinus size={18} /> Remove Stock (Spoiled/Loss)
+                </button>
+              </div>
+            )}
+
+            {modalMode === "add" && (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity Received</label>
+                    <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Total Cost (UGX)</label>
+                    <input type="number" value={totalCost} onChange={(e) => setTotalCost(Number(e.target.value))} placeholder="e.g. 40000" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Payment Status</label>
+                  <div className="flex gap-2 mt-1">
+                    <button onClick={() => setIsPaid(true)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${isPaid ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}>Paid in Full</button>
+                    <button onClick={() => setIsPaid(false)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>Credit (Not Paid)</button>
+                  </div>
+                </div>
+
+                {!isPaid && (
+                  <div className="bg-red-50 p-3 rounded-lg border border-red-100 space-y-2 mt-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-red-800 uppercase">Amount Paid Now (Optional)</label>
+                      <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Number(e.target.value))} placeholder="e.g. 10000" className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-red-800 uppercase">Supplier Name</label>
+                      <input type="text" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="Who supplied this?" className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
+                    </div>
+                    {calculatedBalance > 0 && <p className="text-xs font-bold text-red-600 mt-1">Balance to owe: UGX {calculatedBalance.toLocaleString()}</p>}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setModalMode("menu")} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-sm">Back</button>
+                  <button onClick={handleAddStock} disabled={!qty} className="flex-[2] py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md disabled:opacity-50">Add to Stock</button>
+                </div>
+              </div>
+            )}
+
+            {modalMode === "remove" && (
+              <div className="space-y-3">
+                <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center mb-2">
+                  <p className="text-xs text-red-800 font-medium">Use this to record items that spoiled, broke, or were lost. This will reduce your available stock.</p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity to Remove</label>
+                  <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 2" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setModalMode("menu")} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-sm">Back</button>
+                  <button onClick={handleRemoveStock} disabled={!qty} className="flex-[2] py-2.5 bg-red-500 text-white rounded-lg font-bold text-sm shadow-md disabled:opacity-50">Confirm Removal</button>
+                </div>
+              </div>
+            )}
+
+            {modalMode === "newItem" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Item Name</label>
+                  <input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} placeholder="e.g. Milk" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="w-1/3">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Unit</label>
+                    <input type="text" value={newItem.unit} onChange={(e) => setNewItem({...newItem, unit: e.target.value})} placeholder="kg" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                  </div>
+                  <div className="w-1/3">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Buy Price</label>
+                    <input type="number" value={newItem.buyingPrice} onChange={(e) => setNewItem({...newItem, buyingPrice: e.target.value})} placeholder="0" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                  </div>
+                  <div className="w-1/3">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Sell Price</label>
+                    <input type="number" value={newItem.sellingPrice} onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})} placeholder="0" className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Initial Quantity</label>
+                  <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setSelectedItem(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-sm">Cancel</button>
+                  <button onClick={handleCreateNewItem} disabled={!newItem.name || !newItem.sellingPrice || !qty} className="flex-[2] py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md disabled:opacity-50">Add to Stock & List</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
     }
