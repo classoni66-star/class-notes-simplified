@@ -1,9 +1,17 @@
 {
-  "id": "/", "name": "Classoni", "short_name": "Classoni", "start_url": "/", "scope": "/",
-  "display": "standalone", "background_color": "#0A1F44", "theme_color": "#0A1F44",
-  "description": "Learn with Raven. Your course, made clear.",
+  "name": "SmartSale",
+  "short_name": "SmartSale",
+  "description": "Manage your business with less stress",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F3F4F6",
+  "theme_color": "#FF9800",
   "icons": [
-    {"src":"/icons/classoni-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"/icons/classoni-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
