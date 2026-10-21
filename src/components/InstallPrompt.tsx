@@ -4,22 +4,24 @@ import { Download, X, Info } from "lucide-react";
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(true); 
-  const [showManualInstructions, setShowManualInstructions] = useState(false);
+  const [showManual, setShowManual] = useState(false);
 
   useEffect(() => {
-    const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
-    if (isStandalone) {
+    // 1. If already installed, hide immediately
+    if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsVisible(false);
-      return; 
+      return;
     }
 
-    const handler = (e: Event) => {
+    // 2. Catch the native install event
+    const handler = (e: any) => {
       e.preventDefault();
-      console.log("Native install prompt fired!");
       setDeferredPrompt(e);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
+    
+    // 3. Hide if installed
     window.addEventListener("appinstalled", () => {
       setIsVisible(false);
       setDeferredPrompt(null);
@@ -32,6 +34,7 @@ export default function InstallPrompt() {
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
+      // Try native popup
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") {
@@ -39,8 +42,8 @@ export default function InstallPrompt() {
       }
       setDeferredPrompt(null);
     } else {
-      // If Chrome still refuses, show the manual instructions
-      setShowManualInstructions(true);
+      // If Chrome blocks it, show the manual fallback immediately
+      setShowManual(true);
     }
   };
 
@@ -66,13 +69,17 @@ export default function InstallPrompt() {
         </div>
       </div>
 
-      {showManualInstructions ? (
-        <div className="bg-orange-50 p-2 rounded-lg border border-orange-200 mt-1">
-          <div className="flex items-start gap-1">
-            <Info size={14} className="text-[#FF9800] mt-0.5 flex-shrink-0" />
-            <p className="text-[10px] text-gray-700 font-medium leading-snug">
-              If the popup didn't appear, tap the <strong>3 dots (⋮)</strong> at the top right of your browser and select <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong>.
-            </p>
+      {showManual ? (
+        <div className="bg-blue-50 p-3 rounded-xl border border-blue-200 mt-1">
+          <div className="flex items-start gap-2">
+            <Info size={16} className="text-[#0055FF] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-[11px] text-gray-800 font-bold mb-1">To install, tap your browser menu:</p>
+              <p className="text-[10px] text-gray-600 leading-snug">
+                1. Tap the <strong>3 dots (⋮)</strong> at the top right.<br/>
+                2. Select <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong>.
+              </p>
+            </div>
           </div>
         </div>
       ) : (
