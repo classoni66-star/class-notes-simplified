@@ -11,6 +11,8 @@ import Analytics from "../screens/Analytics";
 import Rewards from "../screens/Rewards";
 import BuyStorage from "../screens/BuyStorage";
 import Profile from "../screens/Profile";
+import Collaborators from "../screens/Collaborators";
+import LockScreen from "../screens/LockScreen";
 
 export default function SmartSaleApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
@@ -18,6 +20,9 @@ export default function SmartSaleApp() {
   const [businessInfo, setBusinessInfo] = useState<any>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  
+  // 🔒 Security States
+  const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -36,12 +41,25 @@ export default function SmartSaleApp() {
 
   useEffect(() => {
     const savedBusiness = localStorage.getItem("smartsale_business");
+    const savedPassword = localStorage.getItem("smartsale_password");
+    
     if (savedBusiness && savedBusiness !== "null" && savedBusiness !== "undefined") {
       try {
         const parsed = JSON.parse(savedBusiness);
         if (parsed && parsed.name) {
           setBusinessInfo(parsed);
-          setCurrentScreen("home");
+          
+          // 🔒 If they have a password, check if they are unlocked
+          if (savedPassword) {
+            const isUnlocked = sessionStorage.getItem("smartsale_unlocked");
+            if (!isUnlocked) {
+              setIsLocked(true);
+            } else {
+              setCurrentScreen("home");
+            }
+          } else {
+            setCurrentScreen("home"); // Old accounts without passwords
+          }
         }
       } catch (e) {
         console.error("Failed to parse saved business data.");
@@ -50,10 +68,14 @@ export default function SmartSaleApp() {
     setIsHydrated(true);
   }, []);
 
+  const handleUnlock = () => {
+    sessionStorage.setItem("smartsale_unlocked", "true");
+    setIsLocked(false);
+    setCurrentScreen("home");
+  };
+
   const navigate = useCallback((screen: string) => {
     const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
-    
-    // 🔒 LOCKED SCREENS
     const gatedScreens = ["analytics", "stock", "priceList"];
 
     if (!isPremium && gatedScreens.includes(screen)) {
@@ -66,6 +88,7 @@ export default function SmartSaleApp() {
   const handleOnboardingComplete = useCallback((data: any) => {
     setBusinessInfo(data);
     localStorage.setItem("smartsale_business", JSON.stringify(data));
+    sessionStorage.setItem("smartsale_unlocked", "true"); // Auto unlock after creation
     setTimeout(() => {
       navigate("home");
     }, 100);
@@ -87,6 +110,7 @@ export default function SmartSaleApp() {
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
       localStorage.setItem("smartsale_premium_until", (Date.now() + (2 * 24 * 60 * 60 * 1000)).toString());
+      sessionStorage.setItem("smartsale_unlocked", "true");
       navigate("home");
     }
   };
@@ -102,9 +126,15 @@ export default function SmartSaleApp() {
     rewards: <Rewards navigate={navigate} businessInfo={businessInfo} language={language} />,
     buyStorage: <BuyStorage navigate={navigate} language={language} />,
     profile: <Profile navigate={navigate} businessInfo={businessInfo} language={language} />,
+    collaborators: <Collaborators navigate={navigate} language={language} />,
   };
 
   if (!isHydrated) return <div className="h-screen bg-[#F3F4F6]" />;
+
+  // 🔒 THE LOCK SCREEN
+  if (isLocked) {
+    return <LockScreen onUnlock={handleUnlock} />;
+  }
 
   return (
     <div className="mx-auto h-[100dvh] w-full max-w-lg overflow-hidden bg-[#F3F4F6] relative">
@@ -121,7 +151,6 @@ export default function SmartSaleApp() {
         </motion.div>
       </AnimatePresence>
 
-      {/* 🛑 PREMIUM UPGRADE MODAL */}
       <AnimatePresence>
         {showPremiumModal && (
           <motion.div 
@@ -140,16 +169,10 @@ export default function SmartSaleApp() {
                 Free plan includes only making sales. For advanced analytics, upgrade to premium to unlock more analytics, manage your business with less stress, and know how you are performing.
               </p>
               <div className="space-y-2">
-                <button 
-                  onClick={() => { setShowPremiumModal(false); navigate("buyStorage"); }} 
-                  className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform"
-                >
+                <button onClick={() => { setShowPremiumModal(false); navigate("buyStorage"); }} className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform">
                   View Premium Plans
                 </button>
-                <button 
-                  onClick={() => setShowPremiumModal(false)} 
-                  className="w-full text-gray-500 py-2 text-sm font-bold"
-                >
+                <button onClick={() => setShowPremiumModal(false)} className="w-full text-gray-500 py-2 text-sm font-bold">
                   Maybe Later
                 </button>
               </div>
@@ -159,4 +182,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-               }
+                                               }
