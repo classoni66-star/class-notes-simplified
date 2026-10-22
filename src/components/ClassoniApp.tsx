@@ -20,8 +20,6 @@ export default function SmartSaleApp() {
   const [businessInfo, setBusinessInfo] = useState<any>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
-  
-  // 🔒 Security States
   const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
@@ -30,8 +28,26 @@ export default function SmartSaleApp() {
     }
   }, []);
 
+  // Handle Referral & 15-Min Collaborator Links
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // 1. Collaborator Link
+    const joinOwner = params.get('join');
+    const expiry = params.get('exp');
+    if (joinOwner && expiry) {
+      if (Date.now() > Number(expiry)) {
+        alert("This invite link has expired. Please ask the owner for a new one.");
+      } else {
+        alert(`🎉 You have been invited to join a shop! Please set up your personal login details.`);
+        // In a real cloud app, this would fetch the owner's data. 
+        // Since it's local, we just let them create an account and we save the owner's phone.
+        localStorage.setItem("smartsale_joining_shop", joinOwner);
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // 2. Standard Referral Link
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem("smartsale_invited_by", ref);
@@ -42,34 +58,26 @@ export default function SmartSaleApp() {
   useEffect(() => {
     const savedBusiness = localStorage.getItem("smartsale_business");
     const savedPassword = localStorage.getItem("smartsale_password");
+    const isLoggedIn = localStorage.getItem("smartsale_is_logged_in");
     
-    if (savedBusiness && savedBusiness !== "null" && savedBusiness !== "undefined") {
+    if (savedBusiness && savedBusiness !== "null") {
       try {
         const parsed = JSON.parse(savedBusiness);
         if (parsed && parsed.name) {
           setBusinessInfo(parsed);
           
-          // 🔒 If they have a password, check if they are unlocked
-          if (savedPassword) {
-            const isUnlocked = sessionStorage.getItem("smartsale_unlocked");
-            if (!isUnlocked) {
-              setIsLocked(true);
-            } else {
-              setCurrentScreen("home");
-            }
+          if (savedPassword && !isLoggedIn) {
+            setIsLocked(true);
           } else {
-            setCurrentScreen("home"); // Old accounts without passwords
+            setCurrentScreen("home");
           }
         }
-      } catch (e) {
-        console.error("Failed to parse saved business data.");
-      }
+      } catch (e) {}
     }
     setIsHydrated(true);
   }, []);
 
   const handleUnlock = () => {
-    sessionStorage.setItem("smartsale_unlocked", "true");
     setIsLocked(false);
     setCurrentScreen("home");
   };
@@ -88,10 +96,8 @@ export default function SmartSaleApp() {
   const handleOnboardingComplete = useCallback((data: any) => {
     setBusinessInfo(data);
     localStorage.setItem("smartsale_business", JSON.stringify(data));
-    sessionStorage.setItem("smartsale_unlocked", "true"); // Auto unlock after creation
-    setTimeout(() => {
-      navigate("home");
-    }, 100);
+    localStorage.setItem("smartsale_is_logged_in", "true");
+    setTimeout(() => navigate("home"), 100);
   }, [navigate]);
 
   const startDemo = (type: "new" | "returning") => {
@@ -101,22 +107,18 @@ export default function SmartSaleApp() {
       setBusinessInfo(null);
       navigate("onboarding");
     } else {
-      const fakeData = {
-        name: "Saviour's Shop",
-        phone: "0700000000",
-        isDemo: true,
-        priceList: [],
-      };
+      const fakeData = { name: "Saviour's Shop", phone: "0700000000", isDemo: true, priceList: [] };
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
       localStorage.setItem("smartsale_premium_until", (Date.now() + (2 * 24 * 60 * 60 * 1000)).toString());
-      sessionStorage.setItem("smartsale_unlocked", "true");
+      localStorage.setItem("smartsale_is_logged_in", "true");
       navigate("home");
     }
   };
 
   const screens: Record<string, React.ReactNode> = {
     welcome: <Welcome navigate={navigate} language={language} setLanguage={setLanguage} startDemo={startDemo} />,
+    login: <LockScreen onUnlock={handleUnlock} />, // Reusing LockScreen for login
     onboarding: <Onboarding navigate={navigate} onComplete={handleOnboardingComplete} language={language} />,
     home: <Home navigate={navigate} businessInfo={businessInfo} language={language} />,
     addSale: <AddSale navigate={navigate} businessInfo={businessInfo} language={language} />,
@@ -126,12 +128,11 @@ export default function SmartSaleApp() {
     rewards: <Rewards navigate={navigate} businessInfo={businessInfo} language={language} />,
     buyStorage: <BuyStorage navigate={navigate} language={language} />,
     profile: <Profile navigate={navigate} businessInfo={businessInfo} language={language} />,
-    collaborators: <Collaborators navigate={navigate} language={language} />,
+    collaborators: <Collaborators navigate={navigate} businessInfo={businessInfo} language={language} />,
   };
 
   if (!isHydrated) return <div className="h-screen bg-[#F3F4F6]" />;
 
-  // 🔒 THE LOCK SCREEN
   if (isLocked) {
     return <LockScreen onUnlock={handleUnlock} />;
   }
@@ -153,28 +154,16 @@ export default function SmartSaleApp() {
 
       <AnimatePresence>
         {showPremiumModal && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-6 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl"
-            >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-6 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Lock size={32} className="text-[#FF9800]" />
               </div>
               <h2 className="text-xl font-extrabold text-gray-800 mb-2">Upgrade to Premium</h2>
-              <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                Free plan includes only making sales. For advanced analytics, upgrade to premium to unlock more analytics, manage your business with less stress, and know how you are performing.
-              </p>
+              <p className="text-sm text-gray-600 mb-6 leading-relaxed">Free plan includes only making sales. For advanced analytics, upgrade to premium to unlock more analytics, manage your business with less stress, and know how you are performing.</p>
               <div className="space-y-2">
-                <button onClick={() => { setShowPremiumModal(false); navigate("buyStorage"); }} className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform">
-                  View Premium Plans
-                </button>
-                <button onClick={() => setShowPremiumModal(false)} className="w-full text-gray-500 py-2 text-sm font-bold">
-                  Maybe Later
-                </button>
+                <button onClick={() => { setShowPremiumModal(false); navigate("buyStorage"); }} className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform">View Premium Plans</button>
+                <button onClick={() => setShowPremiumModal(false)} className="w-full text-gray-500 py-2 text-sm font-bold">Maybe Later</button>
               </div>
             </motion.div>
           </motion.div>
