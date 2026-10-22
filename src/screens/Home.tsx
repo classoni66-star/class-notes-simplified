@@ -122,7 +122,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         
         <div className="grid grid-cols-2 gap-2.5">
           
-          {/* SALES */}
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
             <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
@@ -132,7 +131,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          {/* PROFIT */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
@@ -147,7 +145,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          {/* DEBTORS */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
@@ -157,7 +154,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          {/* CREDITORS */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
@@ -167,7 +163,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          {/* STOCK */}
           <div onClick={() => navigate("stock")} className={`col-span-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div>
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Stock", "Okugula")}</p>
@@ -244,4 +239,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-                                      }
+      }
