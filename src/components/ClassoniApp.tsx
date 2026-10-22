@@ -11,7 +11,6 @@ import Analytics from "../screens/Analytics";
 import Rewards from "../screens/Rewards";
 import BuyStorage from "../screens/BuyStorage";
 import Profile from "../screens/Profile";
-import TrafficMode from "../screens/TrafficMode";
 
 export default function SmartSaleApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
@@ -42,7 +41,7 @@ export default function SmartSaleApp() {
         const parsed = JSON.parse(savedBusiness);
         if (parsed && parsed.name) {
           setBusinessInfo(parsed);
-          setCurrentScreen("home"); // Only go to home if data exists
+          setCurrentScreen("home");
         }
       } catch (e) {
         console.error("Failed to parse saved business data.");
@@ -53,7 +52,9 @@ export default function SmartSaleApp() {
 
   const navigate = useCallback((screen: string) => {
     const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
-    const gatedScreens = ["analytics", "stock", "priceList", "traffic"];
+    
+    // 🔒 LOCKED SCREENS
+    const gatedScreens = ["analytics", "stock", "priceList"];
 
     if (!isPremium && gatedScreens.includes(screen)) {
       setShowPremiumModal(true);
@@ -101,7 +102,6 @@ export default function SmartSaleApp() {
     rewards: <Rewards navigate={navigate} businessInfo={businessInfo} language={language} />,
     buyStorage: <BuyStorage navigate={navigate} language={language} />,
     profile: <Profile navigate={navigate} businessInfo={businessInfo} language={language} />,
-    traffic: <TrafficMode navigate={navigate} language={language} />,
   };
 
   if (!isHydrated) return <div className="h-screen bg-[#F3F4F6]" />;
@@ -121,6 +121,7 @@ export default function SmartSaleApp() {
         </motion.div>
       </AnimatePresence>
 
+      {/* 🛑 PREMIUM UPGRADE MODAL */}
       <AnimatePresence>
         {showPremiumModal && (
           <motion.div 
@@ -158,4 +159,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-        }
+               }
