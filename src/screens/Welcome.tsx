@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, LogIn } from "lucide-react";
 
 export default function Welcome({ navigate, language, setLanguage, startDemo }: any) {
   const [showDemo, setShowDemo] = useState(false);
@@ -53,8 +53,15 @@ export default function Welcome({ navigate, language, setLanguage, startDemo }: 
         </button>
 
         <button
+          onClick={() => navigate("login")}
+          className="w-full bg-white text-gray-700 border-2 border-gray-200 py-3.5 rounded-2xl font-bold text-md shadow-sm active:scale-95 transition-transform flex justify-center items-center gap-2"
+        >
+          <LogIn size={18} /> Log In to Existing Account
+        </button>
+
+        <button
           onClick={() => setShowDemo(!showDemo)}
-          className="w-full bg-white text-gray-600 py-3 rounded-2xl font-semibold text-sm shadow-sm border border-gray-200 active:scale-95 transition-transform"
+          className="w-full text-gray-400 py-3 rounded-2xl font-semibold text-xs active:scale-95 transition-transform underline"
         >
           {t("Try Demo", "Linga Demo")}
         </button>
@@ -79,7 +86,7 @@ export default function Welcome({ navigate, language, setLanguage, startDemo }: 
               onClick={() => startDemo("returning")}
               className="w-full bg-[#10B981] text-white py-2 rounded-lg text-sm font-bold active:scale-95 transition-transform"
             >
-              Simulate Returning User (Morning)
+              Simulate Returning User
             </button>
           </div>
         </motion.div>
@@ -88,9 +95,12 @@ export default function Welcome({ navigate, language, setLanguage, startDemo }: 
       {/* Footer */}
       <div className="absolute bottom-6 text-center w-full">
         <p className="text-[10px] text-gray-400 font-medium">
-          
+          Your data strictly stays on your phone and you control it.
+          🇺🇬 smartsale.work
+          Buy Uganda Build Uganda 
+        
         </p>
       </div>
     </div>
   );
-        }
+}
