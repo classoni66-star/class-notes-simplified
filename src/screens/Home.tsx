@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Mic } from "lucide-react";
+import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt";
+import TrafficModal from "./TrafficModal";
 
 export default function Home({ navigate, businessInfo, language }: any) {
   const [timeOfDay, setTimeOfDay] = useState("morning");
   const [todayDate, setTodayDate] = useState("");
   const [isPremium, setIsPremium] = useState(true);
+  const [isTrafficOpen, setIsTrafficOpen] = useState(false);
   
   const [stats, setStats] = useState({
     sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0
@@ -125,7 +127,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         
         <div className="grid grid-cols-2 gap-2.5">
           
-          {/* SALES (Always unlocked) */}
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
             <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
@@ -135,7 +136,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          {/* PROFIT (Locked) */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
@@ -150,7 +150,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          {/* DEBTORS (Locked) */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
@@ -160,7 +159,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          {/* CREDITORS (Locked) */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
@@ -170,7 +168,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          {/* STOCK (Locked) */}
           <div onClick={() => navigate("stock")} className={`col-span-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div>
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Stock", "Okugula")}</p>
@@ -212,12 +209,12 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       </div>
 
-      {/* FLOATING TRAFFIC BUTTON (Moved up to 210px) */}
+      {/* FLOATING TRAFFIC BUTTON (Now uses Play Icon) */}
       <button 
-        onClick={() => navigate("traffic")}
+        onClick={() => setIsTrafficOpen(true)}
         className="fixed bottom-[210px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
       >
-        <Mic size={18} />
+        <Play size={18} fill="currentColor" className="ml-1" />
         <span className="text-[8px] font-bold mt-0.5">Traffic</span>
       </button>
 
@@ -244,6 +241,13 @@ export default function Home({ navigate, businessInfo, language }: any) {
       </nav>
 
       <InstallPrompt />
+
+      {/* 🚦 TRAFFIC POPUP MODAL */}
+      <TrafficModal 
+        isOpen={isTrafficOpen} 
+        onClose={() => setIsTrafficOpen(false)} 
+        navigate={navigate} 
+      />
 
     </div>
   );
