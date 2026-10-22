@@ -1,22 +1,25 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Square, Play, Pause, ShieldCheck, Trash2, X } from "lucide-react";
+import { Square, Play, Pause, ShieldCheck, Trash2, X, Activity } from "lucide-react";
 
 export default function TrafficModal({ isOpen, onClose, navigate }: any) {
-  const [isRecording, setIsRecording] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
+  const isTrackingRef = useRef(false); // Needed for the VAD loop
+  
   const [consentGiven, setConsentGiven] = useState(false);
   const [recordings, setRecordings] = useState<{ id: string, url: string, time: string, blob: Blob, duration: number }[]>([]);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<{ id: string, progress: number } | null>(null);
   const [useAiVoice, setUseAiVoice] = useState(true);
 
+  // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const isCapturingRef = useRef(false);
+  const silenceTimeoutRef = useRef<any>(null);
   const wakeLockRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const silenceTimerRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   useEffect(() => {
@@ -47,108 +50,114 @@ export default function TrafficModal({ isOpen, onClose, navigate }: any) {
   };
 
   const startVAD = (stream: MediaStream) => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const analyser = audioContext.createAnalyser();
-    const microphone = audioContext.createMediaStreamSource(stream);
-    microphone.connect(analyser);
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    const source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
     
-    analyser.fftSize = 512;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    
-    audioContextRef.current = audioContext;
-    analyserRef.current = analyser;
+    audioContextRef.current = audioCtx;
+    const dataArray = new Uint8Array(analyser.fftSize);
 
-    const checkSilence = () => {
-      if (!analyserRef.current || mediaRecorderRef.current?.state !== "recording") return;
+    const checkAudio = () => {
+      if (!isTrackingRef.current) return;
+
+      analyser.getByteTimeDomainData(dataArray);
       
-      analyserRef.current.getByteFrequencyData(dataArray);
       let sum = 0;
-      for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
-      const averageVolume = sum / bufferLength;
+      for (let i = 0; i < dataArray.length; i++) {
+        const v = (dataArray[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / dataArray.length);
 
-      if (averageVolume < 10) {
-        if (!silenceTimerRef.current) {
-          silenceTimerRef.current = setTimeout(() => {
-            stopChunkAndSave();
-          }, 2500); 
+      // Threshold for background/quiet voices
+      const isSpeaking = rms > 0.015; 
+
+      if (isSpeaking) {
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+        if (!isCapturingRef.current) {
+          startChunk();
         }
       } else {
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
+        if (isCapturingRef.current && !silenceTimeoutRef.current) {
+          silenceTimeoutRef.current = setTimeout(() => {
+            stopChunk();
+          }, 1500); // 1.5 seconds of silence
         }
       }
-      
-      if (mediaRecorderRef.current?.state === "recording") {
-        requestAnimationFrame(checkSilence);
-      }
+
+      requestAnimationFrame(checkAudio);
     };
-    
-    requestAnimationFrame(checkSilence);
+
+    checkAudio();
   };
 
-  const startRecording = async () => {
+  const startChunk = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "inactive") {
+      isCapturingRef.current = true;
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.start();
+    }
+  };
+
+  const stopChunk = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      isCapturingRef.current = false;
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const startTracking = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        const audio = new Audio(audioUrl);
-        audio.onloadedmetadata = () => {
-          const duration = audio.duration;
-          setRecordings(prev => [...prev, { 
-            id: Date.now().toString(), 
-            url: audioUrl, 
-            time, 
-            blob: audioBlob,
-            duration: isNaN(duration) ? 0 : duration
-          }]);
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           
-          if (mediaRecorderRef.current && streamRef.current?.active) {
-             startChunk();
-          }
-        };
+          const audio = new Audio(audioUrl);
+          audio.onloadedmetadata = () => {
+            const duration = audio.duration;
+            setRecordings(prev => [...prev, { 
+              id: Date.now().toString(), 
+              url: audioUrl, 
+              time, 
+              blob: audioBlob,
+              duration: isNaN(duration) ? 0 : duration
+            }]);
+          };
+        }
       };
 
-      startChunk();
-      startVAD(stream);
-      setIsRecording(true);
+      setIsTracking(true);
+      isTrackingRef.current = true;
       requestWakeLock();
+      startVAD(stream);
       
     } catch (err) {
       alert("Microphone access denied or unavailable.");
     }
   };
 
-  const startChunk = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "recording") {
-      audioChunksRef.current = [];
-      mediaRecorderRef.current.start();
-    }
-  };
-
-  const stopChunkAndSave = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.stop(); 
-    }
-  };
-
-  const stopRecording = () => {
-    setIsRecording(false);
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+  const stopTracking = () => {
+    setIsTracking(false);
+    isTrackingRef.current = false;
+    
+    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
     }
@@ -232,7 +241,9 @@ export default function TrafficModal({ isOpen, onClose, navigate }: any) {
   };
 
   useEffect(() => {
-    if (!isOpen) stopRecording();
+    if (!isOpen) {
+      stopTracking();
+    }
   }, [isOpen]);
 
   const formatDuration = (seconds: number) => {
@@ -298,9 +309,9 @@ export default function TrafficModal({ isOpen, onClose, navigate }: any) {
                 </div>
               ) : recordings.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                  <Mic size={48} className="mb-4 opacity-20" />
+                  <Activity size={48} className="mb-4 opacity-20" />
                   <p className="text-sm font-medium text-center px-8">
-                    Press "Record Order" to begin. The app will automatically split recordings when a customer stops speaking.
+                    Press "Track Order" to begin. The app will automatically split recordings when a customer stops speaking.
                   </p>
                 </div>
               ) : (
@@ -351,19 +362,19 @@ export default function TrafficModal({ isOpen, onClose, navigate }: any) {
 
             {consentGiven && (
               <div className="p-4 bg-white border-t border-gray-200 pb-6">
-                {!isRecording ? (
+                {!isTracking ? (
                   <button 
-                    onClick={startRecording}
+                    onClick={startTracking}
                     className="w-full bg-[#FF9800] text-white py-3.5 rounded-xl font-extrabold text-lg shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2"
                   >
-                    <Mic size={20} /> Record Order
+                    Track Order
                   </button>
                 ) : (
                   <button 
-                    onClick={stopRecording}
-                    className="w-full bg-red-500 text-white py-3.5 rounded-xl font-extrabold text-lg shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 animate-pulse"
+                    onClick={stopTracking}
+                    className="w-full bg-green-500 text-white py-3.5 rounded-xl font-extrabold text-lg shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 animate-pulse"
                   >
-                    <Square size={20} fill="currentColor" /> Stop Recording
+                    <Square size={20} fill="currentColor" /> Stop Tracking
                   </button>
                 )}
               </div>
@@ -373,4 +384,4 @@ export default function TrafficModal({ isOpen, onClose, navigate }: any) {
       )}
     </AnimatePresence>
   );
-    }
+}
