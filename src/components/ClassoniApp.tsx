@@ -53,8 +53,6 @@ export default function SmartSaleApp() {
 
   const navigate = useCallback((screen: string) => {
     const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
-    
-    // 🔒 LOCKED SCREENS
     const gatedScreens = ["analytics", "stock", "priceList", "traffic"];
 
     if (!isPremium && gatedScreens.includes(screen)) {
@@ -123,7 +121,6 @@ export default function SmartSaleApp() {
         </motion.div>
       </AnimatePresence>
 
-      {/* 🛑 PREMIUM UPGRADE MODAL */}
       <AnimatePresence>
         {showPremiumModal && (
           <motion.div 
@@ -161,4 +158,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-        }
+                                                       }
