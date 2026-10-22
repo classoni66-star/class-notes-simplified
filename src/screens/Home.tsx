@@ -12,7 +12,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
   const [financeModalType, setFinanceModalType] = useState<"fund" | "spend" | null>(null);
   
   const [stats, setStats] = useState({
-    sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0, cashAtHand: 0
+    sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0
   });
 
   useEffect(() => {
@@ -37,16 +37,12 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     let totalSales = 0;
     let totalProfit = 0;
-    let cashSales = 0;
-    let newDebts = 0;
 
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
     const hasConfirmedPrices = savedPriceList.some((item: any) => item.buyingPrice > 0 && item.sellingPrice > 0);
 
     todaySales.forEach((sale: any) => {
       totalSales += Number(sale.total) || 0;
-      if (sale.isPaid) cashSales += Number(sale.total) || 0;
-      else newDebts += Number(sale.total) || 0;
       
       const sellPrice = Number(sale.sellingPrice) || 0;
       const buyPrice = Number(sale.buyingPrice) || 0;
@@ -59,26 +55,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         totalProfit = -1; // Indicate profit not ready
       }
     });
-
-    // Funds & Expenses
-    const todayFunds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]")
-      .filter((f: any) => new Date(f.date).toDateString() === todayStr)
-      .reduce((sum: number, f: any) => sum + Number(f.amount), 0);
-
-    const todayExpenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]")
-      .filter((e: any) => new Date(e.date).toDateString() === todayStr)
-      .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-
-    // Yesterday's Cash (Simulated as 0 for now, we will store it explicitly later)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayCash = Number(localStorage.getItem(`smartsale_cash_${yesterday.toDateString()}`) || 0);
-
-    // Cash at Hand Math
-    const cashAtHand = yesterdayCash + cashSales + todayFunds - todayExpenses;
-
-    // Store today's cash for tomorrow
-    localStorage.setItem(`smartsale_cash_${new Date().toDateString()}`, cashAtHand.toString());
 
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
     const activeDebtors = savedDebtors.filter((d: any) => Number(d.amountOwed) > 0).length;
@@ -103,7 +79,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
     });
     
     setStats({
-      sales: totalSales, profit: totalProfit, debtors: activeDebtors, creditors: activeCreditors, stock: totalStockLeft, cashAtHand: cashAtHand
+      sales: totalSales, profit: totalProfit, debtors: activeDebtors, creditors: activeCreditors, stock: totalStockLeft
     });
   };
 
@@ -154,18 +130,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
       <div className="flex-1 flex flex-col justify-between p-4 pb-[75px] overflow-y-auto">
         
         <div className="space-y-2.5">
-          
-          {/* CASH AT HAND CARD */}
-          <div className="bg-[#0055FF] p-4 rounded-xl shadow-lg text-white flex justify-between items-center">
-             <div>
-               <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">{t("Cash at Hand", "Sente eziri mu mukono")}</p>
-               <p className="text-2xl font-extrabold mt-1">{formatMoney(stats.cashAtHand)}</p>
-             </div>
-             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <span className="text-xl font-bold">$</span>
-             </div>
-          </div>
-
           <div className="grid grid-cols-2 gap-2.5">
             <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
@@ -284,4 +248,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
     </div>
   );
-    }
+                                        }
