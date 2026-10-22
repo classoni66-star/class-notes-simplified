@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Mic, Square, Play, Pause, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, Mic, Square, Play, Pause, ShieldCheck, Trash2, X } from "lucide-react";
 
 export default function TrafficMode({ navigate, language }: any) {
   const [isRecording, setIsRecording] = useState(false);
   const [consentGiven, setConsentGiven] = useState(false);
-  const [recordings, setRecordings] = useState<{ id: string, url: string, time: string, blob: Blob }[]>([]);
+  const [recordings, setRecordings] = useState<{ id: string, url: string, time: string, blob: Blob, duration: number }[]>([]);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [audioProgress, setAudioProgress] = useState<{ id: string, progress: number } | null>(null);
   const [useAiVoice, setUseAiVoice] = useState(true);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -16,6 +17,18 @@ export default function TrafficMode({ navigate, language }: any) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  useEffect(() => {
+    const savedConsent = localStorage.getItem("smartsale_traffic_consent");
+    if (savedConsent === "true") {
+      setConsentGiven(true);
+    }
+  }, []);
+
+  const handleAcceptConsent = () => {
+    localStorage.setItem("smartsale_traffic_consent", "true");
+    setConsentGiven(true);
+  };
 
   const requestWakeLock = async () => {
     try {
@@ -57,7 +70,7 @@ export default function TrafficMode({ navigate, language }: any) {
         if (!silenceTimerRef.current) {
           silenceTimerRef.current = setTimeout(() => {
             stopChunkAndSave();
-          }, 2500); // 2.5 seconds of silence
+          }, 2500); 
         }
       } else {
         if (silenceTimerRef.current) {
@@ -92,11 +105,21 @@ export default function TrafficMode({ navigate, language }: any) {
         const audioUrl = URL.createObjectURL(audioBlob);
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        setRecordings(prev => [...prev, { id: Date.now().toString(), url: audioUrl, time, blob: audioBlob }]);
-        
-        if (mediaRecorderRef.current && streamRef.current?.active) {
-           startChunk();
-        }
+        const audio = new Audio(audioUrl);
+        audio.onloadedmetadata = () => {
+          const duration = audio.duration;
+          setRecordings(prev => [...prev, { 
+            id: Date.now().toString(), 
+            url: audioUrl, 
+            time, 
+            blob: audioBlob,
+            duration: isNaN(duration) ? 0 : duration
+          }]);
+          
+          if (mediaRecorderRef.current && streamRef.current?.active) {
+             startChunk();
+          }
+        };
       };
 
       startChunk();
@@ -140,11 +163,13 @@ export default function TrafficMode({ navigate, language }: any) {
     if (playingId === id) {
       if (audioSourceRef.current) audioSourceRef.current.stop();
       setPlayingId(null);
+      setAudioProgress(null);
       return;
     }
 
     if (audioSourceRef.current) audioSourceRef.current.stop();
     setPlayingId(id);
+    setAudioProgress({ id, progress: 0 });
 
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -154,11 +179,12 @@ export default function TrafficMode({ navigate, language }: any) {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       
+      let playbackDuration = audioBuffer.duration;
+
       if (useAiVoice) {
-        // 🎙️ NATIVE AI VOICE EFFECT (Disguises the voice completely)
-        source.playbackRate.value = 1.5; // Speeds up and raises pitch
+        source.playbackRate.value = 1.5; 
+        playbackDuration = audioBuffer.duration / 1.5;
         
-        // Adds a telephone/radio filter
         const filter = ctx.createBiquadFilter();
         filter.type = "bandpass";
         filter.frequency.value = 1000;
@@ -167,17 +193,39 @@ export default function TrafficMode({ navigate, language }: any) {
         source.connect(filter);
         filter.connect(ctx.destination);
       } else {
-        // 🔈 ORIGINAL VOICE
         source.connect(ctx.destination);
       }
 
-      source.onended = () => setPlayingId(null);
+      const startTime = ctx.currentTime;
+      const interval = setInterval(() => {
+        const elapsed = (ctx.currentTime - startTime) * (useAiVoice ? 1.5 : 1);
+        let percent = (elapsed / audioBuffer.duration) * 100;
+        if (percent > 100) percent = 100;
+        setAudioProgress({ id, progress: percent });
+      }, 100);
+
+      source.onended = () => {
+        clearInterval(interval);
+        setPlayingId(null);
+        setAudioProgress(null);
+      };
+      
       source.start();
       audioSourceRef.current = source;
       
     } catch (e) {
       console.error(e);
       setPlayingId(null);
+      setAudioProgress(null);
+    }
+  };
+
+  const handleDeleteRecording = (id: string) => {
+    setRecordings(prev => prev.filter(rec => rec.id !== id));
+    if (playingId === id) {
+      if (audioSourceRef.current) audioSourceRef.current.stop();
+      setPlayingId(null);
+      setAudioProgress(null);
     }
   };
 
@@ -192,6 +240,13 @@ export default function TrafficMode({ navigate, language }: any) {
   useEffect(() => {
     return () => stopRecording();
   }, []);
+
+  const formatDuration = (seconds: number) => {
+    if (isNaN(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   if (!consentGiven) {
     return (
@@ -213,7 +268,7 @@ export default function TrafficMode({ navigate, language }: any) {
             By continuing, you agree to inform your customers that their voice is being recorded for order accuracy.
           </p>
           <button 
-            onClick={() => setConsentGiven(true)}
+            onClick={handleAcceptConsent}
             className="w-full max-w-xs bg-[#FF9800] text-white py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
           >
             I Understand & Agree
@@ -257,34 +312,51 @@ export default function TrafficMode({ navigate, language }: any) {
         )}
 
         {recordings.map((rec, index) => (
-          <div key={rec.id} className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => handlePlay(rec.id, rec.blob)}
-                className="w-10 h-10 rounded-full bg-orange-50 text-[#FF9800] flex items-center justify-center flex-shrink-0"
-              >
-                {playingId === rec.id ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-1" />}
-              </button>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Order {index + 1}</p>
-                <p className="text-[10px] text-gray-500">{rec.time}</p>
+          <div key={rec.id} className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => handlePlay(rec.id, rec.blob)}
+                  className="w-10 h-10 rounded-full bg-orange-50 text-[#FF9800] flex items-center justify-center flex-shrink-0"
+                >
+                  {playingId === rec.id ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-1" />}
+                </button>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">Order {index + 1}</p>
+                  <p className="text-[10px] text-gray-500">{rec.time} • {formatDuration(rec.duration)}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    navigate("addSale");
+                  }}
+                  className="bg-[#0055FF] text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md active:scale-95"
+                >
+                  Enter Sale
+                </button>
+                <button 
+                  onClick={() => handleDeleteRecording(rec.id)}
+                  className="bg-red-50 text-red-500 p-2 rounded-lg shadow-sm active:scale-95 border border-red-100"
+                >
+                  <X size={16} />
+                </button>
               </div>
             </div>
             
-            <button 
-              onClick={() => {
-                alert("Opening Add Sale screen to record this order.");
-                navigate("addSale");
-              }}
-              className="bg-[#0055FF] text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md active:scale-95"
-            >
-              Enter Sale
-            </button>
+            {playingId === rec.id && audioProgress?.id === rec.id && (
+              <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1 overflow-hidden">
+                <div 
+                  className="bg-[#FF9800] h-1.5 rounded-full transition-all duration-100 ease-linear"
+                  style={{ width: `${audioProgress.progress}%` }}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* FLOATING ACTION BUTTON */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200">
         {!isRecording ? (
           <button 
@@ -305,4 +377,4 @@ export default function TrafficMode({ navigate, language }: any) {
 
     </div>
   );
-          }
+                                                      }
