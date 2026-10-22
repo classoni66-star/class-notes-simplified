@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Mic, Square, Play, Pause, ShieldCheck, Trash2 } from "lucide-react";
-import { PitchShifter } from "soundtouchjs";
 
 export default function TrafficMode({ navigate, language }: any) {
   const [isRecording, setIsRecording] = useState(false);
@@ -144,9 +143,7 @@ export default function TrafficMode({ navigate, language }: any) {
       return;
     }
 
-    // Stop any currently playing audio
     if (audioSourceRef.current) audioSourceRef.current.stop();
-
     setPlayingId(id);
 
     try {
@@ -154,23 +151,31 @@ export default function TrafficMode({ navigate, language }: any) {
       const arrayBuffer = await blob.arrayBuffer();
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
 
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      
       if (useAiVoice) {
-        // 🎙️ PITCH SHIFT (Synthetic Female Voice)
-        const shifter = new PitchShifter(ctx, audioBuffer, 1024);
-        shifter.tempo = 1.0;
-        shifter.pitch = 1.4; // Raise pitch for female tone
-        shifter.connect(ctx.destination);
-        shifter.on('play', () => setPlayingId(null));
-        shifter.play();
+        // 🎙️ NATIVE AI VOICE EFFECT (Disguises the voice completely)
+        // Speed up the audio to raise pitch (like a chipmunk/robot)
+        source.playbackRate.value = 1.5; 
+        
+        // Add a telephone/radio filter to distort the original voice further
+        const filter = ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.value = 1000;
+        filter.Q.value = 0.5;
+
+        source.connect(filter);
+        filter.connect(ctx.destination);
       } else {
         // 🔈 ORIGINAL VOICE
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
         source.connect(ctx.destination);
-        source.onended = () => setPlayingId(null);
-        source.start();
-        audioSourceRef.current = source;
       }
+
+      source.onended = () => setPlayingId(null);
+      source.start();
+      audioSourceRef.current = source;
+      
     } catch (e) {
       console.error(e);
       setPlayingId(null);
@@ -301,4 +306,4 @@ export default function TrafficMode({ navigate, language }: any) {
 
     </div>
   );
-    }
+                                                      }
