@@ -12,8 +12,8 @@ export default function Profile({ navigate, businessInfo, language }: any) {
   };
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to log out?")) {
-      sessionStorage.removeItem("smartsale_unlocked");
+    if (window.confirm("Are you sure you want to log out? Your records will be safely locked.")) {
+      localStorage.removeItem("smartsale_is_logged_in");
       window.location.reload(); // Reload triggers the Lock Screen
     }
   };
@@ -76,4 +76,4 @@ export default function Profile({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-  }
+}
