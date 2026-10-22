@@ -10,7 +10,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
   
   const [summary, setSummary] = useState({ 
     totalSales: 0, totalProfit: 0, totalDebts: 0, totalCreditors: 0, 
-    totalFunds: 0, totalExpenses: 0, cashAtHand: 0, yesterdayCash: 0
+    totalFunds: 0, totalExpenses: 0, cashAtHand: 0
   });
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
@@ -24,10 +24,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const grouped: Record<string, any> = {};
     const uniqueDates = new Set<string>();
 
-    savedSales.forEach((sale: any) => {
-      const d = new Date(sale.date);
-      uniqueDates.add(d.toDateString());
-    });
+    savedSales.forEach((sale: any) => uniqueDates.add(new Date(sale.date).toDateString()));
     allExpenses.forEach((e: any) => uniqueDates.add(new Date(e.date).toDateString()));
     allFunds.forEach((f: any) => uniqueDates.add(new Date(f.date).toDateString()));
 
@@ -36,7 +33,11 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       
       const daySalesItems = savedSales.filter((s: any) => new Date(s.date).toDateString() === dateStr);
       const dayExpenses = allExpenses.filter((e: any) => new Date(e.date).toDateString() === dateStr).reduce((sum, e) => sum + Number(e.amount), 0);
-      const dayFunds = allFunds.filter((f: any) => new Date(f.date).toDateString() === dateStr).reduce((sum, f) => sum + Number(f.amount), 0);
+      
+      // SPLIT FUNDS AND RECOVERIES
+      const dayFundsList = allFunds.filter((f: any) => new Date(f.date).toDateString() === dateStr);
+      const dayRecovery = dayFundsList.filter((f: any) => f.reason === "Debt Recovery").reduce((sum, f) => sum + Number(f.amount), 0);
+      const dayFunds = dayFundsList.filter((f: any) => f.reason !== "Debt Recovery").reduce((sum, f) => sum + Number(f.amount), 0);
 
       let totalDaySales = 0;
       let totalDayProfit = 0;
@@ -57,12 +58,13 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       prevDate.setDate(prevDate.getDate() - 1);
       const prevCash = Number(localStorage.getItem(`smartsale_cash_${prevDate.toDateString()}`) || 0);
 
-      const cashAtHand = prevCash + totalDayCashSales + dayFunds - dayExpenses;
+      // UPDATED MATH: Now includes dayRecovery
+      const cashAtHand = prevCash + totalDayCashSales + dayFunds + dayRecovery - dayExpenses;
       localStorage.setItem(`smartsale_cash_${dateStr}`, cashAtHand.toString());
 
       grouped[dayString] = { 
         dateStr, items: daySalesItems, totalDaySales, totalDayProfit, totalDayDebts, 
-        dayFunds, dayExpenses, prevCash, cashAtHand 
+        dayFunds, dayRecovery, dayExpenses, prevCash, cashAtHand 
       };
     });
 
@@ -78,7 +80,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    const todayStr = now.toDateString();
     
     let mSales = 0, mProfit = 0, mDebts = 0, mCreditors = 0, mFunds = 0, mExpenses = 0;
 
@@ -105,7 +106,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
 
     setSummary({ 
       totalSales: mSales, totalProfit: mProfit, totalDebts: mDebts, totalCreditors: mCreditors, 
-      totalFunds: mFunds, totalExpenses: mExpenses, cashAtHand: currentCashAtHand, yesterdayCash: 0
+      totalFunds: mFunds, totalExpenses: mExpenses, cashAtHand: currentCashAtHand
     });
   }, []);
 
@@ -130,7 +131,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     });
     localStorage.setItem("smartsale_debtors", JSON.stringify(updatedDebtors));
     
-    // Log as fund (cash injected)
+    // Log as fund (cash injected) with specific reason for Recovery
     const funds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
     funds.push({ id: Date.now().toString(), date: new Date().toISOString(), amount: paidNum, reason: "Debt Recovery" });
     localStorage.setItem("smartsale_funds", JSON.stringify(funds));
@@ -217,7 +218,10 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                     <span>PROFIT</span>
                     <span>UGX {data.totalDayProfit.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-gray-600 mt-2">
+                  
+                  <div className="border-t border-orange-200 my-1"></div>
+                  
+                  <div className="flex justify-between text-gray-600">
                     <span>Money from yesterday</span>
                     <span>+ UGX {data.prevCash.toLocaleString()}</span>
                   </div>
@@ -225,12 +229,19 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                     <span>Funds added</span>
                     <span>+ UGX {data.dayFunds.toLocaleString()}</span>
                   </div>
+                  
+                  {/* 👇 NEW RECOVERY ROW 👇 */}
+                  <div className="flex justify-between text-gray-600">
+                    <span>Recovery (Debts paid)</span>
+                    <span>+ UGX {data.dayRecovery.toLocaleString()}</span>
+                  </div>
+                  
                   <div className="flex justify-between text-gray-600">
                     <span>Expenses</span>
                     <span>- UGX {data.dayExpenses.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
-                    <span>Debts created</span>
+                    <span>New debts created</span>
                     <span>- UGX {data.totalDayDebts.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-white font-extrabold text-sm pt-2 mt-1 border-t border-orange-200 bg-[#0055FF] -mx-3 px-3 pb-1 rounded-b-xl">
@@ -346,4 +357,4 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-                                }
+  }
