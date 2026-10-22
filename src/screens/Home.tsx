@@ -212,10 +212,10 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       </div>
 
-      {/* FLOATING TRAFFIC BUTTON (Moved up) */}
+      {/* FLOATING TRAFFIC BUTTON (Moved up to 210px) */}
       <button 
         onClick={() => navigate("traffic")}
-        className="fixed bottom-[150px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
+        className="fixed bottom-[210px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
       >
         <Mic size={18} />
         <span className="text-[8px] font-bold mt-0.5">Traffic</span>
@@ -247,4 +247,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-                       }
+            }
