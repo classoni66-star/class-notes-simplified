@@ -10,7 +10,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
   
   const [summary, setSummary] = useState({ 
     totalSales: 0, totalProfit: 0, totalDebts: 0, totalCreditors: 0, 
-    totalFunds: 0, totalExpenses: 0, cashAtHand: 0
+    totalFunds: 0, totalExpenses: 0, totalRecoveries: 0, cashAtHand: 0
   });
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
@@ -34,7 +34,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       const daySalesItems = savedSales.filter((s: any) => new Date(s.date).toDateString() === dateStr);
       const dayExpenses = allExpenses.filter((e: any) => new Date(e.date).toDateString() === dateStr).reduce((sum, e) => sum + Number(e.amount), 0);
       
-      // SPLIT FUNDS AND RECOVERIES
       const dayFundsList = allFunds.filter((f: any) => new Date(f.date).toDateString() === dateStr);
       const dayRecovery = dayFundsList.filter((f: any) => f.reason === "Debt Recovery").reduce((sum, f) => sum + Number(f.amount), 0);
       const dayFunds = dayFundsList.filter((f: any) => f.reason !== "Debt Recovery").reduce((sum, f) => sum + Number(f.amount), 0);
@@ -53,12 +52,10 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
         totalDayProfit += profit;
       });
 
-      // Get Yesterday's Cash
       const prevDate = new Date(dateStr);
       prevDate.setDate(prevDate.getDate() - 1);
       const prevCash = Number(localStorage.getItem(`smartsale_cash_${prevDate.toDateString()}`) || 0);
 
-      // UPDATED MATH: Now includes dayRecovery
       const cashAtHand = prevCash + totalDayCashSales + dayFunds + dayRecovery - dayExpenses;
       localStorage.setItem(`smartsale_cash_${dateStr}`, cashAtHand.toString());
 
@@ -81,7 +78,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
-    let mSales = 0, mProfit = 0, mDebts = 0, mCreditors = 0, mFunds = 0, mExpenses = 0;
+    let mSales = 0, mProfit = 0, mDebts = 0, mCreditors = 0, mFunds = 0, mExpenses = 0, mRecoveries = 0;
 
     savedSales.forEach((s: any) => {
       const d = new Date(s.date);
@@ -99,14 +96,20 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
 
     allFunds.forEach((f: any) => {
       const d = new Date(f.date);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) mFunds += Number(f.amount) || 0;
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+        if (f.reason === "Debt Recovery") {
+          mRecoveries += Number(f.amount) || 0;
+        } else {
+          mFunds += Number(f.amount) || 0;
+        }
+      }
     });
 
     const currentCashAtHand = grouped[new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]?.cashAtHand || 0;
 
     setSummary({ 
       totalSales: mSales, totalProfit: mProfit, totalDebts: mDebts, totalCreditors: mCreditors, 
-      totalFunds: mFunds, totalExpenses: mExpenses, cashAtHand: currentCashAtHand
+      totalFunds: mFunds, totalExpenses: mExpenses, totalRecoveries: mRecoveries, cashAtHand: currentCashAtHand
     });
   }, []);
 
@@ -131,7 +134,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     });
     localStorage.setItem("smartsale_debtors", JSON.stringify(updatedDebtors));
     
-    // Log as fund (cash injected) with specific reason for Recovery
     const funds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
     funds.push({ id: Date.now().toString(), date: new Date().toISOString(), amount: paidNum, reason: "Debt Recovery" });
     localStorage.setItem("smartsale_funds", JSON.stringify(funds));
@@ -152,7 +154,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     });
     localStorage.setItem("smartsale_creditors", JSON.stringify(updatedCreditors));
 
-    // Log as expense (cash removed)
     const expensesList = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
     expensesList.push({ id: Date.now().toString(), date: new Date().toISOString(), amount: paidNum, reason: "Supplier Payment" });
     localStorage.setItem("smartsale_expenses", JSON.stringify(expensesList));
@@ -229,13 +230,10 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                     <span>Funds added</span>
                     <span>+ UGX {data.dayFunds.toLocaleString()}</span>
                   </div>
-                  
-                  {/* 👇 NEW RECOVERY ROW 👇 */}
                   <div className="flex justify-between text-gray-600">
                     <span>Recovery (Debts paid)</span>
                     <span>+ UGX {data.dayRecovery.toLocaleString()}</span>
                   </div>
-                  
                   <div className="flex justify-between text-gray-600">
                     <span>Expenses</span>
                     <span>- UGX {data.dayExpenses.toLocaleString()}</span>
@@ -339,6 +337,13 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
               <p className="text-xs font-bold text-gray-500 uppercase">Total Funds Added</p>
               <p className="text-2xl font-extrabold text-green-600 mt-1">UGX {summary.totalFunds.toLocaleString()}</p>
             </div>
+            
+            {/* 👇 NEW MONTHLY RECOVERY CARD 👇 */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <p className="text-xs font-bold text-gray-500 uppercase">Total Recovered Debts</p>
+              <p className="text-2xl font-extrabold text-green-600 mt-1">UGX {summary.totalRecoveries.toLocaleString()}</p>
+            </div>
+            
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <p className="text-xs font-bold text-gray-500 uppercase">Total Expenses</p>
               <p className="text-2xl font-extrabold text-red-500 mt-1">UGX {summary.totalExpenses.toLocaleString()}</p>
@@ -357,4 +362,4 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-  }
+      }
