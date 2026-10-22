@@ -53,23 +53,32 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     const sales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const removals = JSON.parse(localStorage.getItem("smartsale_removals") || "[]");
+    const todayStr = new Date().toDateString();
 
     const combined = priceList.map((item: any) => {
-      const itemSales = sales.filter((s: any) => s.itemName === item.name);
-      const totalSold = itemSales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
-      
+      // 1. ALL TIME IN
       const stockEntry = initialStock.find((s: any) => s.itemId === item.id);
       const initial = stockEntry ? Number(stockEntry.quantity) : 0;
 
-      const itemRemovals = removals.filter((r: any) => r.itemId === item.id);
-      const totalRemoved = itemRemovals.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
+      // 2. ALL TIME OUT (For calculating true Left)
+      const allItemSales = sales.filter((s: any) => s.itemName === item.name);
+      const allTimeSold = allItemSales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
+      
+      const allItemRemovals = removals.filter((r: any) => r.itemId === item.id);
+      const allTimeRemoved = allItemRemovals.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
+
+      // 3. TODAY'S OUT (For the "Out" column)
+      const todaySales = allItemSales.filter((s: any) => new Date(s.date).toDateString() === todayStr);
+      const todaySold = todaySales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
+
+      const todayRemovals = allItemRemovals.filter((r: any) => new Date(r.date).toDateString() === todayStr);
+      const todayRemoved = todayRemovals.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
 
       return {
         ...item,
         initial,
-        sold: totalSold,
-        removed: totalRemoved,
-        current: initial - totalSold - totalRemoved
+        todayOut: todaySold + todayRemoved,
+        current: initial - allTimeSold - allTimeRemoved
       };
     });
 
@@ -105,7 +114,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     const balance = cost - paid;
 
     if (isPaid && cost > 0) {
-      // Fully Paid -> Log as Expense
       const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
       expenses.push({
         id: Date.now().toString(),
@@ -115,7 +123,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
       });
       localStorage.setItem("smartsale_expenses", JSON.stringify(expenses));
     } else if (!isPaid) {
-      // Partially Paid -> Log partial amount as expense
       if (paid > 0) {
         const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
         expenses.push({
@@ -127,7 +134,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
         localStorage.setItem("smartsale_expenses", JSON.stringify(expenses));
       }
 
-      // Unpaid balance -> Log as Creditor
       if (balance > 0) {
         if (!supplierName.trim()) return alert("Please enter the supplier's name for the balance owed.");
         const creditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
@@ -178,7 +184,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     initialStock.push({ itemId: newId, quantity: Number(qty) });
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
-    // Auto-log expense for new item stock if marked paid
     const cost = (Number(newItem.buyingPrice) || 0) * Number(qty);
     if (isPaid && cost > 0) {
       const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
@@ -218,10 +223,11 @@ export default function Stock({ navigate, businessInfo, language }: any) {
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* UPDATED HEADERS */}
           <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100 text-center">
             <div className="text-left col-span-2">Item</div>
-            <div>In</div>
-            <div>Out</div>
+            <div>Total In</div>
+            <div>Today Out</div>
             <div className="text-[#FF9800]">Left</div>
           </div>
           
@@ -236,7 +242,7 @@ export default function Stock({ navigate, businessInfo, language }: any) {
                 <p className="text-[9px] text-gray-500">{item.unit}</p>
               </div>
               <div className="text-gray-500 text-xs font-medium">{item.initial}</div>
-              <div className="text-gray-500 text-xs font-medium">{item.sold + item.removed}</div>
+              <div className="text-gray-500 text-xs font-medium">{item.todayOut}</div>
               <div className={`font-extrabold text-sm ${item.current <= 5 ? 'text-red-500 flex items-center justify-center gap-1' : 'text-green-600'}`}>
                 {item.current <= 5 && <AlertTriangle size={12} />}
                 {item.current}
@@ -244,6 +250,7 @@ export default function Stock({ navigate, businessInfo, language }: any) {
             </div>
           ))}
         </div>
+        <p className="text-[10px] text-gray-400 mt-3 text-center">"Today Out" resets to 0 every morning. "Left" is your actual physical stock.</p>
       </div>
 
       {/* BOTTOM SHEET MODAL */}
@@ -370,4 +377,4 @@ export default function Stock({ navigate, businessInfo, language }: any) {
       )}
     </div>
   );
-    }
+  }
