@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Edit2, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 
 export default function Analytics({ navigate, businessInfo, language }: any) {
-  const [activeTab, setActiveTab] = useState<"sales" | "expenses" | "debtors" | "creditors" | "summary">("summary");
+  const [activeTab, setActiveTab] = useState<"sales" | "expenses" | "debtors" | "creditors" | "summary">("sales");
   const [groupedSales, setGroupedSales] = useState<Record<string, any>>({});
   const [expenses, setExpenses] = useState<any[]>([]);
   const [debtors, setDebtors] = useState<any[]>([]);
   const [creditors, setCreditors] = useState<any[]>([]);
+  
   const [summary, setSummary] = useState({ 
-    totalSales: 0, totalCashSales: 0, totalProfit: 0, totalDebts: 0, totalCreditors: 0, totalFunds: 0, totalExpenses: 0, cashAtHand: 0, yesterdayCash: 0
+    totalSales: 0, totalProfit: 0, totalDebts: 0, totalCreditors: 0, 
+    totalFunds: 0, totalExpenses: 0, cashAtHand: 0, yesterdayCash: 0
   });
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
@@ -18,17 +20,52 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const allExpenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]").reverse();
     const allFunds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
     
-    // Group Sales by Day
-    const grouped: Record<string, { items: any[], daySales: number, dayProfit: number }> = {};
+    // Group Sales by Day & Calculate Daily Cash at Hand
+    const grouped: Record<string, any> = {};
+    const uniqueDates = new Set<string>();
+
     savedSales.forEach((sale: any) => {
-      const dateObj = new Date(sale.date);
-      const dayString = dateObj.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-      if (!grouped[dayString]) grouped[dayString] = { items: [], daySales: 0, dayProfit: 0 };
-      grouped[dayString].items.push(sale);
-      grouped[dayString].daySales += Number(sale.total) || 0;
-      const profit = ((Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0)) * (Number(sale.quantity) || 0);
-      grouped[dayString].dayProfit += profit;
+      const d = new Date(sale.date);
+      uniqueDates.add(d.toDateString());
     });
+    allExpenses.forEach((e: any) => uniqueDates.add(new Date(e.date).toDateString()));
+    allFunds.forEach((f: any) => uniqueDates.add(new Date(f.date).toDateString()));
+
+    Array.from(uniqueDates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()).forEach(dateStr => {
+      const dayString = new Date(dateStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+      
+      const daySalesItems = savedSales.filter((s: any) => new Date(s.date).toDateString() === dateStr);
+      const dayExpenses = allExpenses.filter((e: any) => new Date(e.date).toDateString() === dateStr).reduce((sum, e) => sum + Number(e.amount), 0);
+      const dayFunds = allFunds.filter((f: any) => new Date(f.date).toDateString() === dateStr).reduce((sum, f) => sum + Number(f.amount), 0);
+
+      let totalDaySales = 0;
+      let totalDayProfit = 0;
+      let totalDayCashSales = 0;
+      let totalDayDebts = 0;
+
+      daySalesItems.forEach((s: any) => {
+        totalDaySales += Number(s.total) || 0;
+        if (s.isPaid) totalDayCashSales += Number(s.total) || 0;
+        else totalDayDebts += Number(s.total) || 0;
+        
+        const profit = ((Number(s.sellingPrice) || 0) - (Number(s.buyingPrice) || 0)) * (Number(s.quantity) || 0);
+        totalDayProfit += profit;
+      });
+
+      // Get Yesterday's Cash
+      const prevDate = new Date(dateStr);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevCash = Number(localStorage.getItem(`smartsale_cash_${prevDate.toDateString()}`) || 0);
+
+      const cashAtHand = prevCash + totalDayCashSales + dayFunds - dayExpenses;
+      localStorage.setItem(`smartsale_cash_${dateStr}`, cashAtHand.toString());
+
+      grouped[dayString] = { 
+        dateStr, items: daySalesItems, totalDaySales, totalDayProfit, totalDayDebts, 
+        dayFunds, dayExpenses, prevCash, cashAtHand 
+      };
+    });
+
     setGroupedSales(grouped);
     setExpenses(allExpenses);
 
@@ -37,51 +74,38 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const savedCreditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]").filter((c: any) => Number(c.amountOwed) > 0);
     setCreditors(savedCreditors);
 
-    // Calculate Monthly Summary
+    // Monthly Summary Math
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const todayStr = now.toDateString();
     
-    let mSales = 0, mCashSales = 0, mProfit = 0, mDebts = 0, mCreditors = 0, mFunds = 0, mExpenses = 0;
+    let mSales = 0, mProfit = 0, mDebts = 0, mCreditors = 0, mFunds = 0, mExpenses = 0;
 
-    // Today's Math (for cash at hand)
-    let tCashSales = 0;
-    let tFunds = 0;
-    let tExpenses = 0;
-    
     savedSales.forEach((s: any) => {
       const d = new Date(s.date);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         mSales += Number(s.total) || 0;
         mProfit += ((Number(s.sellingPrice) || 0) - (Number(s.buyingPrice) || 0)) * (Number(s.quantity) || 0);
         if (!s.isPaid) mDebts += Number(s.total) || 0;
-        else mCashSales += Number(s.total) || 0;
       }
-      if (d.toDateString() === todayStr && s.isPaid) tCashSales += Number(s.total) || 0;
     });
 
     allExpenses.forEach((e: any) => {
       const d = new Date(e.date);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) mExpenses += Number(e.amount) || 0;
-      if (d.toDateString() === todayStr) tExpenses += Number(e.amount) || 0;
     });
 
     allFunds.forEach((f: any) => {
       const d = new Date(f.date);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) mFunds += Number(f.amount) || 0;
-      if (d.toDateString() === todayStr) tFunds += Number(f.amount) || 0;
     });
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yCash = Number(localStorage.getItem(`smartsale_cash_${yesterday.toDateString()}`) || 0);
-
-    const cashAtHand = yCash + tCashSales + tFunds - tExpenses;
+    const currentCashAtHand = grouped[new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]?.cashAtHand || 0;
 
     setSummary({ 
-      totalSales: mSales, totalCashSales: mCashSales, totalProfit: mProfit, totalDebts: mDebts, 
-      totalCreditors: mCreditors, totalFunds: mFunds, totalExpenses: mExpenses, cashAtHand: cashAtHand, yesterdayCash: yCash
+      totalSales: mSales, totalProfit: mProfit, totalDebts: mDebts, totalCreditors: mCreditors, 
+      totalFunds: mFunds, totalExpenses: mExpenses, cashAtHand: currentCashAtHand, yesterdayCash: 0
     });
   }, []);
 
@@ -90,6 +114,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const updated = expenses.filter(e => e.id !== id);
     localStorage.setItem("smartsale_expenses", JSON.stringify(updated));
     setExpenses(updated);
+    window.location.reload();
   };
 
   const handleClearDebt = (debtId: string, amountOwed: number) => {
@@ -98,17 +123,12 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const paidNum = Number(amountPaid);
     if (isNaN(paidNum) || paidNum <= 0) return alert("Invalid amount");
 
-    // Add to cash sales
-    const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
-    // Note: To accurately reflect cash, we'd log a recovery. For now, just update debt.
-    
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
     const updatedDebtors = savedDebtors.map((d: any) => {
       if (d.id === debtId) return { ...d, amountOwed: d.amountOwed - paidNum };
       return d;
     });
     localStorage.setItem("smartsale_debtors", JSON.stringify(updatedDebtors));
-    setDebtors(updatedDebtors.filter((d: any) => d.amountOwed > 0));
     
     // Log as fund (cash injected)
     const funds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
@@ -130,12 +150,11 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       return c;
     });
     localStorage.setItem("smartsale_creditors", JSON.stringify(updatedCreditors));
-    setCreditors(updatedCreditors.filter((c: any) => c.amountOwed > 0));
 
     // Log as expense (cash removed)
-    const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
-    expenses.push({ id: Date.now().toString(), date: new Date().toISOString(), amount: paidNum, reason: "Supplier Payment" });
-    localStorage.setItem("smartsale_expenses", JSON.stringify(expenses));
+    const expensesList = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
+    expensesList.push({ id: Date.now().toString(), date: new Date().toISOString(), amount: paidNum, reason: "Supplier Payment" });
+    localStorage.setItem("smartsale_expenses", JSON.stringify(expensesList));
     
     window.location.reload();
   };
@@ -150,7 +169,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </header>
 
       <div className="bg-white px-2 flex justify-between border-b border-gray-200 sticky top-0 z-10 overflow-x-auto hide-scrollbar">
-        {(["summary", "sales", "expenses", "debtors", "creditors"] as const).map((tab) => (
+        {(["sales", "expenses", "debtors", "creditors", "summary"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -165,47 +184,16 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         
-        {/* 1. SUMMARY (CASH AT HAND MATH) */}
-        {activeTab === "summary" && (
-          <div className="space-y-3">
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <p className="text-xs font-bold text-gray-500 uppercase">Cash at Hand (Today)</p>
-              <p className="text-2xl font-extrabold text-[#0055FF] mt-1">UGX {summary.cashAtHand.toLocaleString()}</p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-3 border-b border-gray-100 flex justify-between text-sm">
-                <span className="text-gray-500 font-medium">Money from Yesterday</span>
-                <span className="font-bold text-gray-800">UGX {summary.yesterdayCash.toLocaleString()}</span>
-              </div>
-              <div className="p-3 border-b border-gray-100 flex justify-between text-sm">
-                <span className="text-gray-500 font-medium">Cash Sales Today</span>
-                <span className="font-bold text-green-600">+ UGX {summary.totalCashSales.toLocaleString()}</span>
-              </div>
-              <div className="p-3 border-b border-gray-100 flex justify-between text-sm">
-                <span className="text-gray-500 font-medium">Funds Added Today</span>
-                <span className="font-bold text-green-600">+ UGX {summary.totalFunds.toLocaleString()}</span>
-              </div>
-              <div className="p-3 border-b border-gray-100 flex justify-between text-sm">
-                <span className="text-gray-500 font-medium">Expenses Today</span>
-                <span className="font-bold text-red-500">- UGX {summary.totalExpenses.toLocaleString()}</span>
-              </div>
-              <div className="p-3 flex justify-between text-sm bg-gray-50">
-                <span className="text-gray-800 font-bold">Total Unpaid Debts</span>
-                <span className="font-bold text-orange-500">UGX {summary.totalDebts.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 2. SALES */}
+        {/* 1. SALES (Day-by-Day Ledger) */}
         {activeTab === "sales" && (
           <div className="space-y-4">
             {Object.entries(groupedSales).map(([dayString, data]: any) => (
               <div key={dayString} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                
                 <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
                   <span className="font-bold text-gray-700 text-xs uppercase">{dayString}</span>
                 </div>
+                
                 {data.items.map((sale: any) => (
                   <div key={sale.id} className="grid grid-cols-4 p-3 border-b border-gray-50 text-sm items-center">
                     <div className="col-span-2">
@@ -218,9 +206,37 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                     </div>
                   </div>
                 ))}
-                <div className="bg-orange-50 p-3 flex justify-between items-center text-xs font-bold text-[#FF9800]">
-                  <span>TOTAL: UGX {data.daySales.toLocaleString()}</span>
-                  <span>PROFIT: UGX {data.dayProfit.toLocaleString()}</span>
+
+                {/* DAY LEDGER BREAKDOWN */}
+                <div className="bg-orange-50 p-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between font-bold text-[#FF9800]">
+                    <span>TOTAL SALES</span>
+                    <span>UGX {data.totalDaySales.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-[#0055FF]">
+                    <span>PROFIT</span>
+                    <span>UGX {data.totalDayProfit.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600 mt-2">
+                    <span>Money from yesterday</span>
+                    <span>+ UGX {data.prevCash.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Funds added</span>
+                    <span>+ UGX {data.dayFunds.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Expenses</span>
+                    <span>- UGX {data.dayExpenses.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Debts created</span>
+                    <span>- UGX {data.totalDayDebts.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-white font-extrabold text-sm pt-2 mt-1 border-t border-orange-200 bg-[#0055FF] -mx-3 px-3 pb-1 rounded-b-xl">
+                    <span>CASH AT HAND</span>
+                    <span>UGX {data.cashAtHand.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -228,11 +244,11 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 3. EXPENSES */}
+        {/* 2. EXPENSES */}
         {activeTab === "expenses" && (
           <div className="space-y-3">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100 flex justify-between items-center">
-              <p className="text-xs font-bold text-red-800">Total Expenses</p>
+              <p className="text-xs font-bold text-red-800">Total Expenses (Month)</p>
               <p className="text-lg font-extrabold text-red-600">UGX {summary.totalExpenses.toLocaleString()}</p>
             </div>
             {expenses.map((expense) => (
@@ -251,7 +267,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 4. DEBTORS */}
+        {/* 3. DEBTORS */}
         {activeTab === "debtors" && (
           <div className="space-y-3">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100 flex justify-between items-center">
@@ -274,7 +290,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 5. CREDITORS */}
+        {/* 4. CREDITORS */}
         {activeTab === "creditors" && (
           <div className="space-y-3">
             <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 flex justify-between items-center">
@@ -297,7 +313,37 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
+        {/* 5. SUMMARY (Monthly) */}
+        {activeTab === "summary" && (
+          <div className="space-y-3">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <p className="text-xs font-bold text-gray-500 uppercase">Total Sales (This Month)</p>
+              <p className="text-2xl font-extrabold text-gray-800 mt-1">UGX {summary.totalSales.toLocaleString()}</p>
+            </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <p className="text-xs font-bold text-gray-500 uppercase">Total Profit (This Month)</p>
+              <p className="text-2xl font-extrabold text-[#0055FF] mt-1">UGX {summary.totalProfit.toLocaleString()}</p>
+            </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <p className="text-xs font-bold text-gray-500 uppercase">Total Funds Added</p>
+              <p className="text-2xl font-extrabold text-green-600 mt-1">UGX {summary.totalFunds.toLocaleString()}</p>
+            </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <p className="text-xs font-bold text-gray-500 uppercase">Total Expenses</p>
+              <p className="text-2xl font-extrabold text-red-500 mt-1">UGX {summary.totalExpenses.toLocaleString()}</p>
+            </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <p className="text-xs font-bold text-gray-500 uppercase">Total Unpaid Debts</p>
+              <p className="text-2xl font-extrabold text-orange-500 mt-1">UGX {summary.totalDebts.toLocaleString()}</p>
+            </div>
+            <div className="bg-[#0055FF] p-4 rounded-xl shadow-lg text-white">
+              <p className="text-xs font-bold uppercase opacity-80">Cash at Hand (Today)</p>
+              <p className="text-2xl font-extrabold mt-1">UGX {summary.cashAtHand.toLocaleString()}</p>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
-                                   }
+                                }
