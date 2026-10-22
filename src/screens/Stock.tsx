@@ -88,6 +88,7 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   const handleAddStock = () => {
     if (!qty || !selectedItem) return;
 
+    // 1. Update Stock Quantity
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const existingIndex = initialStock.findIndex((s: any) => s.itemId === selectedItem.id);
 
@@ -98,11 +99,35 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     }
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
-    if (!isPaid) {
-      const cost = Number(totalCost) || 0;
-      const paid = Number(amountPaid) || 0;
-      const balance = cost - paid;
+    // 2. Handle Expenses & Creditors
+    const cost = Number(totalCost) || 0;
+    const paid = Number(amountPaid) || 0;
+    const balance = cost - paid;
 
+    if (isPaid && cost > 0) {
+      // Fully Paid -> Log as Expense
+      const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
+      expenses.push({
+        id: Date.now().toString(),
+        date: new Date().toISOString(),
+        amount: cost,
+        reason: `Stock Purchase: ${selectedItem.name}`
+      });
+      localStorage.setItem("smartsale_expenses", JSON.stringify(expenses));
+    } else if (!isPaid) {
+      // Partially Paid -> Log partial amount as expense
+      if (paid > 0) {
+        const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
+        expenses.push({
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          amount: paid,
+          reason: `Partial Stock Pay: ${selectedItem.name}`
+        });
+        localStorage.setItem("smartsale_expenses", JSON.stringify(expenses));
+      }
+
+      // Unpaid balance -> Log as Creditor
       if (balance > 0) {
         if (!supplierName.trim()) return alert("Please enter the supplier's name for the balance owed.");
         const creditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
@@ -152,6 +177,19 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     initialStock.push({ itemId: newId, quantity: Number(qty) });
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
+
+    // Auto-log expense for new item stock if marked paid
+    const cost = (Number(newItem.buyingPrice) || 0) * Number(qty);
+    if (isPaid && cost > 0) {
+      const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
+      expenses.push({
+        id: Date.now().toString(),
+        date: new Date().toISOString(),
+        amount: cost,
+        reason: `New Item Purchase: ${newItem.name}`
+      });
+      localStorage.setItem("smartsale_expenses", JSON.stringify(expenses));
+    }
 
     setSelectedItem(null);
     setModalMode("menu");
@@ -215,7 +253,7 @@ export default function Stock({ navigate, businessInfo, language }: any) {
             
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-extrabold text-gray-800">{selectedItem.name}</h2>
-              <button onClick={() => setSelectedItem(null)} className="p-1 bg-gray-100 rounded-full text-gray-500">
+              <button onClick={() => { setSelectedItem(null); setModalMode("menu"); }} className="p-1 bg-gray-100 rounded-full text-gray-500">
                 <X size={20} />
               </button>
             </div>
@@ -313,6 +351,13 @@ export default function Stock({ navigate, businessInfo, language }: any) {
                 <div>
                   <label className="text-[10px] font-bold text-gray-500 uppercase">Initial Quantity</label>
                   <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Was this stock paid for?</label>
+                  <div className="flex gap-2 mt-1">
+                    <button onClick={() => setIsPaid(true)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${isPaid ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}>Yes (Paid)</button>
+                    <button onClick={() => setIsPaid(false)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>No (Credit)</button>
+                  </div>
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button onClick={() => setSelectedItem(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-sm">Cancel</button>
