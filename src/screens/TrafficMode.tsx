@@ -156,10 +156,9 @@ export default function TrafficMode({ navigate, language }: any) {
       
       if (useAiVoice) {
         // 🎙️ NATIVE AI VOICE EFFECT (Disguises the voice completely)
-        // Speed up the audio to raise pitch (like a chipmunk/robot)
-        source.playbackRate.value = 1.5; 
+        source.playbackRate.value = 1.5; // Speeds up and raises pitch
         
-        // Add a telephone/radio filter to distort the original voice further
+        // Adds a telephone/radio filter
         const filter = ctx.createBiquadFilter();
         filter.type = "bandpass";
         filter.frequency.value = 1000;
@@ -306,4 +305,4 @@ export default function TrafficMode({ navigate, language }: any) {
 
     </div>
   );
-                                                      }
+          }
