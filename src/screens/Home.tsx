@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock } from "lucide-react";
+import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Mic } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt";
 
 export default function Home({ navigate, businessInfo, language }: any) {
@@ -22,13 +22,11 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
     setTodayDate(now.toLocaleDateString('en-GB', options));
 
-    // Check Premium Status
     const premiumUntil = Number(localStorage.getItem("smartsale_premium_until") || 0);
     setIsPremium(premiumUntil > Date.now());
   }, []);
 
   useEffect(() => {
-    // 1. Sales & Profit Calculations
     const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const todayStr = new Date().toDateString();
     const todaySales = savedSales.filter((sale: any) => new Date(sale.date).toDateString() === todayStr);
@@ -45,14 +43,12 @@ export default function Home({ navigate, businessInfo, language }: any) {
       if (!isNaN(itemProfit)) totalProfit += itemProfit;
     });
 
-    // 2. Debtors & Creditors
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
     const activeDebtors = savedDebtors.filter((d: any) => Number(d.amountOwed) > 0).length;
     
     const savedCreditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
     const activeCreditors = savedCreditors.filter((c: any) => Number(c.amountOwed) > 0).length;
     
-    // 3. REAL Stock Calculation
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
     const savedInitialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const allSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
@@ -97,7 +93,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
     : t("Good evening", "Okwera gye");
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
+    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden relative">
       
       <header className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10">
         <div>
@@ -126,7 +122,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
         
         <div className="grid grid-cols-2 gap-2.5">
           
-          {/* SALES (Always unlocked on Free) */}
+          {/* SALES */}
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
             <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
@@ -136,7 +132,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          {/* PROFIT (Locked on Free) */}
+          {/* PROFIT */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
@@ -151,7 +147,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             </div>
           </div>
 
-          {/* DEBTORS (Locked on Free) */}
+          {/* DEBTORS */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
@@ -161,7 +157,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          {/* CREDITORS (Locked on Free) */}
+          {/* CREDITORS */}
           <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div className="flex justify-between items-start">
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
@@ -171,7 +167,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <p className="text-[9px] text-gray-400 font-bold mt-1">Tap to view</p>
           </div>
 
-          {/* STOCK (Locked on Free) */}
+          {/* STOCK */}
           <div onClick={() => navigate("stock")} className={`col-span-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
             <div>
               <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Stock", "Okugula")}</p>
@@ -213,6 +209,15 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       </div>
 
+      {/* FLOATING TRAFFIC BUTTON */}
+      <button 
+        onClick={() => navigate("traffic")}
+        className="absolute bottom-[75px] right-3 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
+      >
+        <Mic size={18} />
+        <span className="text-[8px] font-bold mt-0.5">Traffic</span>
+      </button>
+
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-[65px] z-30 pb-1">
         <button onClick={() => navigate("stock")} className="flex flex-col items-center gap-1 text-gray-400">
           {isPremium ? <Package size={20} /> : <Lock size={20} className="text-red-300" />}
@@ -239,4 +244,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     </div>
   );
-            }
+                                      }
