@@ -22,9 +22,25 @@ export default function SmartSaleApp() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
+  // 🚀 AUTO-UPDATE MAGIC
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch((err) => console.log('SW failed:', err));
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        // Check for updates every time the app opens
+        registration.update();
+
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New version available! Silent reload to update the UI instantly.
+                window.location.reload();
+              }
+            };
+          }
+        };
+      }).catch((err) => console.log('SW failed:', err));
     }
   }, []);
 
@@ -32,7 +48,6 @@ export default function SmartSaleApp() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
-    // 1. Collaborator Link
     const joinOwner = params.get('join');
     const expiry = params.get('exp');
     if (joinOwner && expiry) {
@@ -40,14 +55,11 @@ export default function SmartSaleApp() {
         alert("This invite link has expired. Please ask the owner for a new one.");
       } else {
         alert(`🎉 You have been invited to join a shop! Please set up your personal login details.`);
-        // In a real cloud app, this would fetch the owner's data. 
-        // Since it's local, we just let them create an account and we save the owner's phone.
         localStorage.setItem("smartsale_joining_shop", joinOwner);
       }
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // 2. Standard Referral Link
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem("smartsale_invited_by", ref);
@@ -118,7 +130,7 @@ export default function SmartSaleApp() {
 
   const screens: Record<string, React.ReactNode> = {
     welcome: <Welcome navigate={navigate} language={language} setLanguage={setLanguage} startDemo={startDemo} />,
-    login: <LockScreen onUnlock={handleUnlock} />, // Reusing LockScreen for login
+    login: <LockScreen onUnlock={handleUnlock} />,
     onboarding: <Onboarding navigate={navigate} onComplete={handleOnboardingComplete} language={language} />,
     home: <Home navigate={navigate} businessInfo={businessInfo} language={language} />,
     addSale: <AddSale navigate={navigate} businessInfo={businessInfo} language={language} />,
@@ -171,4 +183,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-                                               }
+        }
