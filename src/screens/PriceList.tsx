@@ -221,4 +221,4 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-     }
+    }
