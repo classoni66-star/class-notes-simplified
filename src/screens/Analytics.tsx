@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 export default function Analytics({ navigate, businessInfo, language }: any) {
   const [activeTab, setActiveTab] = useState<"sales" | "expenses" | "debtors" | "creditors" | "summary">("sales");
@@ -20,7 +20,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const allExpenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]").reverse();
     const allFunds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
     
-    // Group Sales by Day & Calculate Daily Cash at Hand
     const grouped: Record<string, any> = {};
     const uniqueDates = new Set<string>();
 
@@ -28,7 +27,10 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     allExpenses.forEach((e: any) => uniqueDates.add(new Date(e.date).toDateString()));
     allFunds.forEach((f: any) => uniqueDates.add(new Date(f.date).toDateString()));
 
-    Array.from(uniqueDates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()).forEach(dateStr => {
+    // Sort dates ascending so we can calculate "yesterday" correctly
+    const sortedDates = Array.from(uniqueDates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+    sortedDates.forEach((dateStr, index) => {
       const dayString = new Date(dateStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
       
       const daySalesItems = savedSales.filter((s: any) => new Date(s.date).toDateString() === dateStr);
@@ -56,16 +58,34 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       prevDate.setDate(prevDate.getDate() - 1);
       const prevCash = Number(localStorage.getItem(`smartsale_cash_${prevDate.toDateString()}`) || 0);
 
+      // Calculate % change vs yesterday
+      let percentChange = 0;
+      if (index > 0) {
+        const prevDateStr = sortedDates[index - 1];
+        const prevDaySalesItems = savedSales.filter((s: any) => new Date(s.date).toDateString() === prevDateStr);
+        const prevDaySalesTotal = prevDaySalesItems.reduce((sum, s) => sum + Number(s.total), 0);
+        
+        if (prevDaySalesTotal > 0) {
+          percentChange = ((totalDaySales - prevDaySalesTotal) / prevDaySalesTotal) * 100;
+        }
+      }
+
       const cashAtHand = prevCash + totalDayCashSales + dayFunds + dayRecovery - dayExpenses;
       localStorage.setItem(`smartsale_cash_${dateStr}`, cashAtHand.toString());
 
       grouped[dayString] = { 
         dateStr, items: daySalesItems, totalDaySales, totalDayProfit, totalDayDebts, 
-        dayFunds, dayRecovery, dayExpenses, prevCash, cashAtHand 
+        dayFunds, dayRecovery, dayExpenses, prevCash, cashAtHand, percentChange 
       };
     });
 
-    setGroupedSales(grouped);
+    // Reverse for display (newest first)
+    const reversedGrouped: Record<string, any> = {};
+    Object.keys(grouped).reverse().forEach(key => {
+      reversedGrouped[key] = grouped[key];
+    });
+
+    setGroupedSales(reversedGrouped);
     setExpenses(allExpenses);
 
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]").filter((d: any) => Number(d.amountOwed) > 0);
@@ -97,15 +117,12 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     allFunds.forEach((f: any) => {
       const d = new Date(f.date);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-        if (f.reason === "Debt Recovery") {
-          mRecoveries += Number(f.amount) || 0;
-        } else {
-          mFunds += Number(f.amount) || 0;
-        }
+        if (f.reason === "Debt Recovery") mRecoveries += Number(f.amount) || 0;
+        else mFunds += Number(f.amount) || 0;
       }
     });
 
-    const currentCashAtHand = grouped[new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })]?.cashAtHand || 0;
+    const currentCashAtHand = grouped[new Date().toDateString()]?.cashAtHand || 0;
 
     setSummary({ 
       totalSales: mSales, totalProfit: mProfit, totalDebts: mDebts, totalCreditors: mCreditors, 
@@ -186,7 +203,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         
-        {/* 1. SALES (Day-by-Day Ledger) */}
         {activeTab === "sales" && (
           <div className="space-y-4">
             {Object.entries(groupedSales).map(([dayString, data]: any) => (
@@ -209,11 +225,18 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                   </div>
                 ))}
 
-                {/* DAY LEDGER BREAKDOWN */}
                 <div className="bg-orange-50 p-3 space-y-1.5 text-xs">
-                  <div className="flex justify-between font-bold text-[#FF9800]">
+                  <div className="flex justify-between items-center font-bold text-[#FF9800]">
                     <span>TOTAL SALES</span>
-                    <span>UGX {data.totalDaySales.toLocaleString()}</span>
+                    <div className="flex items-center gap-1">
+                      <span>UGX {data.totalDaySales.toLocaleString()}</span>
+                      {data.percentChange !== 0 && (
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded flex items-center ${data.percentChange > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {data.percentChange > 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+                          {Math.abs(data.percentChange).toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between font-bold text-[#0055FF]">
                     <span>PROFIT</span>
@@ -253,7 +276,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 2. EXPENSES */}
         {activeTab === "expenses" && (
           <div className="space-y-3">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100 flex justify-between items-center">
@@ -276,7 +298,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 3. DEBTORS */}
         {activeTab === "debtors" && (
           <div className="space-y-3">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100 flex justify-between items-center">
@@ -299,7 +320,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 4. CREDITORS */}
         {activeTab === "creditors" && (
           <div className="space-y-3">
             <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 flex justify-between items-center">
@@ -322,7 +342,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* 5. SUMMARY (Monthly) */}
         {activeTab === "summary" && (
           <div className="space-y-3">
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
@@ -337,13 +356,10 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
               <p className="text-xs font-bold text-gray-500 uppercase">Total Funds Added</p>
               <p className="text-2xl font-extrabold text-green-600 mt-1">UGX {summary.totalFunds.toLocaleString()}</p>
             </div>
-            
-            {/* 👇 NEW MONTHLY RECOVERY CARD 👇 */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <p className="text-xs font-bold text-gray-500 uppercase">Total Recovered Debts</p>
               <p className="text-2xl font-extrabold text-green-600 mt-1">UGX {summary.totalRecoveries.toLocaleString()}</p>
             </div>
-            
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <p className="text-xs font-bold text-gray-500 uppercase">Total Expenses</p>
               <p className="text-2xl font-extrabold text-red-500 mt-1">UGX {summary.totalExpenses.toLocaleString()}</p>
@@ -362,4 +378,4 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-      }
+}
