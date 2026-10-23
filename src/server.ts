@@ -26,9 +26,14 @@ function getSecret(name: string): string | undefined {
 const PESAPAL_BASE_URL = "https://pay.pesapal.com/v3"; // Use sandbox URL for testing: https://cybqa.pesapal.com/pesapalv3
 
 async function getPesapalToken(): Promise<string> {
+  console.log("Attempting to get Pesapal token...");
   const key = getSecret("PESAPAL_CONSUMER_KEY");
   const secret = getSecret("PESAPAL_CONSUMER_SECRET");
-  if (!key || !secret) throw new Error("Pesapal credentials missing in Cloudflare.");
+  
+  if (!key || !secret) {
+    console.error("Pesapal credentials are missing in Cloudflare.");
+    throw new Error("Pesapal credentials missing in Cloudflare.");
+  }
 
   const res = await fetch(`${PESAPAL_BASE_URL}/api/Auth/RequestToken`, {
     method: "POST",
@@ -36,12 +41,18 @@ async function getPesapalToken(): Promise<string> {
     body: JSON.stringify({ consumer_key: key, consumer_secret: secret }),
   });
 
-  if (!res.ok) throw new Error("Failed to authenticate with Pesapal.");
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Pesapal authentication failed. Response:", errorText);
+    throw new Error(`Pesapal authentication failed: ${errorText}`);
+  }
   const data = await res.json();
+  console.log("Pesapal token received successfully.");
   return data.token;
 }
 
 async function registerIPN(token: string, ipnUrl: string): Promise<string> {
+  console.log(`Registering IPN URL: ${ipnUrl}`);
   const res = await fetch(`${PESAPAL_BASE_URL}/api/URLSetup/RegisterIPN`, {
     method: "POST",
     headers: {
@@ -53,7 +64,15 @@ async function registerIPN(token: string, ipnUrl: string): Promise<string> {
       ipn_notification_type: "GET",
     }),
   });
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Pesapal IPN registration failed. Response:", errorText);
+    throw new Error(`Pesapal IPN registration failed: ${errorText}`);
+  }
+  
   const data = await res.json();
+  console.log("IPN registration successful. ID:", data.ipn_id);
   return data.ipn_id;
 }
 
@@ -78,13 +97,15 @@ async function handleApi(request: Request): Promise<Response | null> {
 
   // 1. One-time setup to get your IPN ID
   if (url.pathname === "/api/pesapal/setup-ipn" && request.method === "GET") {
+    console.log("Starting IPN setup process...");
     try {
       const token = await getPesapalToken();
-      const ipnUrl = `https://classoni.classoni66.workers.dev/api/pesapal/ipn`; // Your IPN URL
+      const ipnUrl = `https://classoni.classoni66.workers.dev/api/pesapal/ipn`;
       const ipnId = await registerIPN(token, ipnUrl);
       return json({ ipn_id: ipnId });
-    } catch (err) {
-      return json({ error: String(err) }, 500);
+    } catch (err: any) {
+      console.error("IPN setup failed:", err.message);
+      return json({ error: err.message }, 500);
     }
   }
 
@@ -102,7 +123,7 @@ async function handleApi(request: Request): Promise<Response | null> {
         currency: "UGX",
         amount: body.amount,
         description: body.description,
-        callback_url: `https://classoni.classoni66.workers.dev/payment-callback`, // Where Pesapal redirects after payment
+        callback_url: `https://classoni.classoni66.workers.dev/payment-callback`,
         notification_id: ipnId,
         billing_address: {
           email_address: "customer@smartsale.ug",
@@ -126,15 +147,14 @@ async function handleApi(request: Request): Promise<Response | null> {
       if (orderData.error) throw new Error(orderData.error.message);
 
       return json({ redirect_url: orderData.redirect_url, order_tracking_id: orderData.order_tracking_id });
-    } catch (err) {
-      return json({ error: String(err) }, 500);
+    } catch (err: any) {
+      console.error("Payment initiation failed:", err.message);
+      return json({ error: err.message }, 500);
     }
   }
 
-  // 3. IPN Callback (Pesapal hits this when a payment status changes)
+  // 3. IPN Callback
   if (url.pathname === "/api/pesapal/ipn") {
-    // In a production app, you would verify the status with Pesapal here.
-    // For now, we just acknowledge receipt to prevent Pesapal from retrying.
     return json({ status: "success" });
   }
 
