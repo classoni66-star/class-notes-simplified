@@ -1,38 +1,44 @@
 import { useState } from "react";
-import { ArrowLeft, Store, Pill, Lock } from "lucide-react";
+import { ArrowLeft, Store, Pill, Wrench, Utensils, Briefcase, ShoppingBag, Lock } from "lucide-react";
 
 export default function Onboarding({ navigate, onComplete, language }: any) {
   const [step, setStep] = useState(1);
   const [businessName, setBusinessName] = useState("");
-  const [businessType, setBusinessType] = useState("Retail");
+  const [businessType, setBusinessType] = useState("Retailer");
   const [phone, setPhone] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const [password, setPassword] = useState("");
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
+  const categories = [
+    { id: "Retailer", icon: <Store size={20} />, label: "Retailer", desc: "Groceries, Duka, Mini-mart" },
+    { id: "Trader", icon: <Briefcase size={20} />, label: "Trader", desc: "Wholesale, Produce" },
+    { id: "Electronics", icon: <ShoppingBag size={20} />, label: "Electronics", desc: "Phones, TVs, Accessories" },
+    { id: "Spare Parts", icon: <Wrench size={20} />, label: "Spare Parts", desc: "Car & Boda parts" },
+    { id: "Restaurant", icon: <Utensils size={20} />, label: "Restaurant", desc: "Food, Drinks, Fast food" },
+    { id: "Other", icon: <Pill size={20} />, label: "Other", desc: "Pharmacy, Services, etc." },
+  ];
+
   const handleVerify = () => {
     if (smsCode.length >= 4) {
-      setStep(5); // Move to password step
+      setStep(5);
     }
   };
 
   const handleFinish = () => {
     if (password.length < 4) return alert("Password must be at least 4 characters.");
-    
-    // Save the hashed password securely in the phone's memory
     localStorage.setItem("smartsale_password", btoa(password));
 
-    // Referral logic
     const invitedBy = localStorage.getItem("smartsale_invited_by");
-    let daysToAdd = 2; // 2-day free trial
+    let daysToAdd = 2;
     
     if (invitedBy) {
       if (invitedBy.trim() === phone.trim()) {
         alert("You cannot use your own invite link.");
         localStorage.removeItem("smartsale_invited_by");
       } else {
-        daysToAdd = 7; // 7-day referral bonus
+        daysToAdd = 7;
         localStorage.removeItem("smartsale_invited_by");
         setTimeout(() => alert("🎉 Welcome! You have received 7 days of free Premium access!"), 500);
       }
@@ -63,7 +69,7 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
         </div>
         
         <h2 className="text-xl font-extrabold text-gray-800 text-center mb-8">
-          {step === 5 ? "Secure your account" : t("Create your free account", "Kora akaunti yawe")}
+          {step === 5 ? "Secure your account" : "Create your merchant account"}
         </h2>
 
         {step === 1 && (
@@ -78,16 +84,21 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
 
         {step === 2 && (
           <div className="w-full space-y-4">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Business Category</label>
-            <div className="grid grid-cols-1 gap-3">
-              <button onClick={() => { setBusinessType("Retail"); setStep(3); }} className="flex items-center gap-3 p-4 bg-white border-2 border-[#FF9800] rounded-xl text-left shadow-sm">
-                <div className="w-10 h-10 rounded-full bg-orange-50 text-[#FF9800] flex items-center justify-center"><Store size={20} /></div>
-                <div><p className="font-bold text-gray-800">Retail Shop</p><p className="text-xs text-gray-500">Groceries, Duka, Mini-mart</p></div>
-              </button>
-              <button onClick={() => { setBusinessType("Pharmacy"); setStep(3); }} className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl text-left opacity-50">
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#0055FF] flex items-center justify-center"><Pill size={20} /></div>
-                <div><p className="font-bold text-gray-800">Pharmacy</p><p className="text-xs text-gray-500">Coming soon</p></div>
-              </button>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Merchant Category</label>
+            <div className="grid grid-cols-1 gap-2">
+              {categories.map((cat) => (
+                <button 
+                  key={cat.id}
+                  onClick={() => { setBusinessType(cat.id); setStep(3); }}
+                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl text-left shadow-sm hover:border-[#FF9800] active:scale-95 transition-transform"
+                >
+                  <div className="w-10 h-10 rounded-full bg-orange-50 text-[#FF9800] flex items-center justify-center flex-shrink-0">{cat.icon}</div>
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">{cat.label}</p>
+                    <p className="text-[10px] text-gray-500">{cat.desc}</p>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -116,15 +127,8 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Create Password</label>
               <div className="relative">
                 <Lock size={18} className="absolute left-3 top-4 text-gray-400" />
-                <input 
-                  type="password" 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  placeholder="Enter a strong password" 
-                  className="w-full mt-1 pl-10 p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF9800] outline-none font-medium text-gray-800" 
-                />
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter a strong password" className="w-full mt-1 pl-10 p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF9800] outline-none font-medium text-gray-800" />
               </div>
-              <p className="text-[10px] text-gray-400 mt-2 ml-1">You will need this password every time you open the app.</p>
             </div>
             <button onClick={handleFinish} disabled={password.length < 4} className="w-full bg-[#FF9800] text-white py-4 rounded-xl font-bold mt-4 disabled:opacity-50">Finish Setup</button>
           </div>
@@ -132,4 +136,4 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
       </div>
     </div>
   );
-              }
+                         }
