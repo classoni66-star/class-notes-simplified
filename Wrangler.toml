@@ -1,6 +1,15 @@
-name = "classoni-api"
-main = "worker.js"
-compatibility_date = "2024-11-01"
+name = "classoni"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
 
-# Secrets are stored on the worker itself (via Cloudflare Dashboard),
-# not in this file. This keeps API keys out of Git history.
+# This tells Cloudflare where your main server file is
+main = ".output/server/index.mjs"
+
+# This section ensures your secrets are recognized
+[vars]
+# Non-secret variables can go here
+
+# Secrets should be added in the Cloudflare Dashboard (Settings -> Variables and Secrets)
+# PESAPAL_CONSUMER_KEY
+# PESAPAL_CONSUMER_SECRET
+# PESAPAL_IPN_ID
