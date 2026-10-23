@@ -28,12 +28,14 @@ export default function BuyStorage({ navigate, language }: any) {
 
       <div className="p-4 pb-12 space-y-4">
         
-        <div className="text-center mb-2">
+        <div className="text-center mb-4">
           <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <Crown size={32} className="text-[#FF9800]" />
           </div>
           <h2 className="text-xl font-extrabold text-gray-800">SmartSale Premium</h2>
-          <p className="text-xs text-gray-500 mt-1 mb-4">Manage your business with less stress.</p>
+          <p className="text-xs text-gray-600 mt-1 mb-4 px-2 leading-relaxed">
+            Manage your business with less stress. Know how your business is performing. Unlock unlimited calculations, analytics, and storage.
+          </p>
           
           {premiumDaysLeft > 0 ? (
             <div className="bg-green-50 border border-green-200 p-4 rounded-xl shadow-sm mb-6 flex flex-col items-center">
@@ -62,7 +64,7 @@ export default function BuyStorage({ navigate, language }: any) {
 
         <div className="space-y-4">
           
-          {/* DAILY PLAN - 1,000 UGX */}
+          {/* DAILY PLAN */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
             <div className="flex items-center gap-2 mb-1">
               <Zap size={18} className="text-yellow-500" />
@@ -77,7 +79,7 @@ export default function BuyStorage({ navigate, language }: any) {
             </button>
           </div>
 
-          {/* WEEKLY PLAN - 6,000 UGX */}
+          {/* WEEKLY PLAN - 5000 UGX */}
           <div className="bg-white p-4 rounded-2xl shadow-lg border-2 border-[#FF9800] relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-[#FF9800] text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">MOST POPULAR</div>
             <div className="flex items-center gap-2 mb-1">
@@ -85,19 +87,19 @@ export default function BuyStorage({ navigate, language }: any) {
               <h3 className="font-extrabold text-[#FF9800] text-base">Weekly Unlimited</h3>
             </div>
             <div className="flex items-end gap-2 mb-1">
-              <span className="text-2xl font-extrabold text-gray-800">6,000 UGX</span>
+              <span className="text-2xl font-extrabold text-gray-800">5,000 UGX</span>
               <span className="text-xs text-gray-500 mb-1">/ week</span>
-              <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded ml-auto mb-1">SAVE 14%</span>
+              <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded ml-auto mb-1">SAVE 29%</span>
             </div>
             <p className="text-[10px] text-green-600 font-bold mb-4 bg-green-50 inline-block px-2 py-1 rounded">
-              Less than 857 UGX per day!
+              Less than 714 UGX per day!
             </p>
-            <button onClick={() => handlePay("Weekly Plan", 6000)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
-              Pay 6,000 UGX
+            <button onClick={() => handlePay("Weekly Plan", 5000)} className="w-full py-2.5 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform">
+              Pay 5,000 UGX
             </button>
           </div>
 
-          {/* MONTHLY PLAN - 20,000 UGX */}
+          {/* MONTHLY PLAN */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
             <div className="flex items-center gap-2 mb-1">
               <Crown size={18} className="text-[#0055FF]" />
@@ -120,4 +122,4 @@ export default function BuyStorage({ navigate, language }: any) {
       </div>
     </div>
   );
-      }
+              }
