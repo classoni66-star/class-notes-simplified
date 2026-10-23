@@ -26,14 +26,10 @@ function getSecret(name: string): string | undefined {
 const PESAPAL_BASE_URL = "https://pay.pesapal.com/v3"; // Use sandbox URL for testing: https://cybqa.pesapal.com/pesapalv3
 
 async function getPesapalToken(): Promise<string> {
-  console.log("Attempting to get Pesapal token...");
   const key = getSecret("PESAPAL_CONSUMER_KEY");
   const secret = getSecret("PESAPAL_CONSUMER_SECRET");
   
-  if (!key || !secret) {
-    console.error("Pesapal credentials are missing in Cloudflare.");
-    throw new Error("Pesapal credentials missing in Cloudflare.");
-  }
+  if (!key || !secret) throw new Error("Pesapal credentials missing in Cloudflare.");
 
   const res = await fetch(`${PESAPAL_BASE_URL}/api/Auth/RequestToken`, {
     method: "POST",
@@ -43,16 +39,13 @@ async function getPesapalToken(): Promise<string> {
 
   if (!res.ok) {
     const errorText = await res.text();
-    console.error("Pesapal authentication failed. Response:", errorText);
-    throw new Error(`Pesapal authentication failed: ${errorText}`);
+    throw new Error(`Pesapal auth failed: ${errorText}`);
   }
   const data = await res.json();
-  console.log("Pesapal token received successfully.");
   return data.token;
 }
 
 async function registerIPN(token: string, ipnUrl: string): Promise<string> {
-  console.log(`Registering IPN URL: ${ipnUrl}`);
   const res = await fetch(`${PESAPAL_BASE_URL}/api/URLSetup/RegisterIPN`, {
     method: "POST",
     headers: {
@@ -67,12 +60,10 @@ async function registerIPN(token: string, ipnUrl: string): Promise<string> {
   
   if (!res.ok) {
     const errorText = await res.text();
-    console.error("Pesapal IPN registration failed. Response:", errorText);
     throw new Error(`Pesapal IPN registration failed: ${errorText}`);
   }
   
   const data = await res.json();
-  console.log("IPN registration successful. ID:", data.ipn_id);
   return data.ipn_id;
 }
 
@@ -95,21 +86,17 @@ async function handleApi(request: Request): Promise<Response | null> {
 
   // --- PESAPAL ENDPOINTS ---
 
-  // 1. One-time setup to get your IPN ID
   if (url.pathname === "/api/pesapal/setup-ipn" && request.method === "GET") {
-    console.log("Starting IPN setup process...");
     try {
       const token = await getPesapalToken();
       const ipnUrl = `https://classoni.classoni66.workers.dev/api/pesapal/ipn`;
       const ipnId = await registerIPN(token, ipnUrl);
       return json({ ipn_id: ipnId });
     } catch (err: any) {
-      console.error("IPN setup failed:", err.message);
       return json({ error: err.message }, 500);
     }
   }
 
-  // 2. Initiate a Payment
   if (url.pathname === "/api/pesapal/pay" && request.method === "POST") {
     try {
       const body: any = await request.json();
@@ -148,12 +135,10 @@ async function handleApi(request: Request): Promise<Response | null> {
 
       return json({ redirect_url: orderData.redirect_url, order_tracking_id: orderData.order_tracking_id });
     } catch (err: any) {
-      console.error("Payment initiation failed:", err.message);
       return json({ error: err.message }, 500);
     }
   }
 
-  // 3. IPN Callback
   if (url.pathname === "/api/pesapal/ipn") {
     return json({ status: "success" });
   }
@@ -161,4 +146,61 @@ async function handleApi(request: Request): Promise<Response | null> {
   return null;
 }
 
-// ... (Keep the rest of your server.ts code exactly as it is: getServerEntry, normalizeCatastrophicSsrResponse, etc.)
+let serverEntryPromise: Promise<ServerEntry> | undefined;
+
+async function getServerEntry(): Promise<ServerEntry> {
+  if (!serverEntryPromise) {
+    serverEntryPromise = import("@tanstack/react-start/server-entry").then((m) => {
+      const handler = m.default ?? m;
+      // 🛠️ THE FIX: TanStack Start sometimes exports a function instead of an object.
+      // We wrap it in an object with a fetch method so Nitro can call it.
+      if (typeof handler === 'function') {
+        return { fetch: handler } as ServerEntry;
+      }
+      return handler as ServerEntry;
+    });
+  }
+  return serverEntryPromise;
+}
+
+async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+  if (response.status < 500) return response;
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.indexOf("application/json") !== -1) return response;
+  const body = await response.clone().text();
+  if (!isH3SwallowedErrorBody(body)) return response;
+  return new Response(renderErrorPage(), { status: 500, headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
+function isH3SwallowedErrorBody(body: string): boolean {
+  try {
+    const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
+    return payload.unhandled === true && payload.message === "HTTPError";
+  } catch {
+    return false;
+  }
+}
+
+export default {
+  async fetch(request: Request, env: any, ctx: unknown) {
+    CF_ENV = env;
+    try {
+      const apiResponse = await handleApi(request);
+      if (apiResponse) return apiResponse;
+    } catch (apiErr) {
+      return new Response(JSON.stringify({ error: "API routing failed: " + String(apiErr) }), {
+        status: 500, headers: { ...GLOBAL_CORS, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const handler = await getServerEntry();
+      const response = await handler.fetch(request, env, ctx);
+      return await normalizeCatastrophicSsrResponse(response);
+    } catch (error) {
+      return new Response(renderErrorPage(), {
+        status: 500, headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" },
+      });
+    }
+  },
+};
