@@ -22,49 +22,20 @@ function getSecret(name: string): string | undefined {
   return undefined;
 }
 
-// --- PESAPAL CONFIGURATION (LIVE MODE) ---
 const PESAPAL_BASE_URL = "https://pay.pesapal.com/v3"; 
 
 async function getPesapalToken(): Promise<string> {
   const key = getSecret("PESAPAL_CONSUMER_KEY");
   const secret = getSecret("PESAPAL_CONSUMER_SECRET");
-  
-  if (!key || !secret) throw new Error("Pesapal credentials missing in Cloudflare.");
-
+  if (!key || !secret) throw new Error("Pesapal credentials missing.");
   const res = await fetch(`${PESAPAL_BASE_URL}/api/Auth/RequestToken`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ consumer_key: key, consumer_secret: secret }),
   });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Pesapal auth failed: ${errorText}`);
-  }
+  if (!res.ok) throw new Error(`Pesapal auth failed`);
   const data = await res.json();
   return data.token;
-}
-
-async function registerIPN(token: string, ipnUrl: string): Promise<string> {
-  const res = await fetch(`${PESAPAL_BASE_URL}/api/URLSetup/RegisterIPN`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      url: ipnUrl,
-      ipn_notification_type: "GET",
-    }),
-  });
-  
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Pesapal IPN registration failed: ${errorText}`);
-  }
-  
-  const data = await res.json();
-  return data.ipn_id;
 }
 
 async function handleApi(request: Request): Promise<Response | null> {
@@ -76,40 +47,19 @@ async function handleApi(request: Request): Promise<Response | null> {
       headers: { ...GLOBAL_CORS, "Content-Type": "application/json" },
     });
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: GLOBAL_CORS });
-  }
+  if (request.method === "OPTIONS") return new Response(null, { headers: GLOBAL_CORS });
+  if (url.pathname === "/api/health") return json({ status: "alive" });
 
-  if (url.pathname === "/api/health") {
-    return json({ status: "alive" });
-  }
-
-  // --- PESAPAL ENDPOINTS ---
-
-  // 1. One-time setup to get your LIVE IPN ID
-  if (url.pathname === "/api/pesapal/setup-ipn" && request.method === "GET") {
-    try {
-      const token = await getPesapalToken();
-      const ipnUrl = `https://classoni.classoni66.workers.dev/api/pesapal/ipn`;
-      const ipnId = await registerIPN(token, ipnUrl);
-      return json({ ipn_id: ipnId });
-    } catch (err: any) {
-      return json({ error: err.message }, 500);
-    }
-  }
-
-  // 2. Initiate a Payment
+  // 1. Initiate Payment
   if (url.pathname === "/api/pesapal/pay" && request.method === "POST") {
     try {
       const body: any = await request.json();
       const token = await getPesapalToken();
-      
       const ipnId = getSecret("PESAPAL_IPN_ID");
-      if (!ipnId) return json({ error: "PESAPAL_IPN_ID not set in Cloudflare." }, 500);
+      if (!ipnId) return json({ error: "PESAPAL_IPN_ID not set." }, 500);
 
-      // 🛠️ FORCE MTN FORMAT (+256...)
       let formattedPhone = body.phone || "0700000000";
-      formattedPhone = formattedPhone.replace(/\s/g, ''); // remove spaces
+      formattedPhone = formattedPhone.replace(/\s/g, ''); 
       if (formattedPhone.startsWith('0')) formattedPhone = '+256' + formattedPhone.substring(1);
       else if (formattedPhone.startsWith('256')) formattedPhone = '+' + formattedPhone;
       else if (!formattedPhone.startsWith('+')) formattedPhone = '+256' + formattedPhone;
@@ -119,7 +69,8 @@ async function handleApi(request: Request): Promise<Response | null> {
         currency: "UGX",
         amount: body.amount,
         description: body.description,
-        callback_url: `https://classoni.classoni66.workers.dev/payment-callback`,
+        // 👇 THIS IS THE MAGIC LINK. It brings the user back to the app with the tracking ID
+        callback_url: `https://classoni.classoni66.workers.dev/?payment_callback=true`,
         notification_id: ipnId,
         billing_address: {
           email_address: "customer@smartsale.ug",
@@ -132,10 +83,7 @@ async function handleApi(request: Request): Promise<Response | null> {
 
       const orderRes = await fetch(`${PESAPAL_BASE_URL}/api/Transactions/SubmitOrderRequest`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(orderPayload),
       });
 
@@ -148,67 +96,24 @@ async function handleApi(request: Request): Promise<Response | null> {
     }
   }
 
-  // 3. IPN Callback
-  if (url.pathname === "/api/pesapal/ipn") {
-    return json({ status: "success" });
+  // 2. Verify Payment Status (NEW!)
+  if (url.pathname === "/api/pesapal/verify" && request.method === "POST") {
+    try {
+      const body: any = await request.json();
+      const token = await getPesapalToken();
+      
+      const statusRes = await fetch(`${PESAPAL_BASE_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${body.orderTrackingId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      const statusData = await statusRes.json();
+      return json({ status: statusData.payment_status_description }); // "Completed", "Failed", etc.
+    } catch (err: any) {
+      return json({ error: err.message }, 500);
+    }
   }
 
   return null;
 }
 
-let serverEntryPromise: Promise<ServerEntry> | undefined;
-
-async function getServerEntry(): Promise<ServerEntry> {
-  if (!serverEntryPromise) {
-    serverEntryPromise = import("@tanstack/react-start/server-entry").then((m) => {
-      const handler = m.default ?? m;
-      if (typeof handler === 'function') {
-        return { fetch: handler } as ServerEntry;
-      }
-      return handler as ServerEntry;
-    });
-  }
-  return serverEntryPromise;
-}
-
-async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
-  if (response.status < 500) return response;
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.indexOf("application/json") !== -1) return response;
-  const body = await response.clone().text();
-  if (!isH3SwallowedErrorBody(body)) return response;
-  return new Response(renderErrorPage(), { status: 500, headers: { "content-type": "text/html; charset=utf-8" } });
-}
-
-function isH3SwallowedErrorBody(body: string): boolean {
-  try {
-    const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
-    return payload.unhandled === true && payload.message === "HTTPError";
-  } catch {
-    return false;
-  }
-}
-
-export default {
-  async fetch(request: Request, env: any, ctx: unknown) {
-    CF_ENV = env;
-    try {
-      const apiResponse = await handleApi(request);
-      if (apiResponse) return apiResponse;
-    } catch (apiErr) {
-      return new Response(JSON.stringify({ error: "API routing failed: " + String(apiErr) }), {
-        status: 500, headers: { ...GLOBAL_CORS, "Content-Type": "application/json" },
-      });
-    }
-
-    try {
-      const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
-    } catch (error) {
-      return new Response(renderErrorPage(), {
-        status: 500, headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" },
-      });
-    }
-  },
-};
+// ... (Keep the rest of your server.ts code exactly as it is: getServerEntry, normalizeCatastrophicSsrResponse, etc.)
