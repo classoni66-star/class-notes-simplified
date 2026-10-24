@@ -1,119 +1,96 @@
-import "./lib/error-capture";
-import { consumeLastCapturedError } from "./lib/error-capture";
-import { renderErrorPage } from "./lib/error-page";
+import { useEffect, useState } from "react";
+import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
-type ServerEntry = {
-  fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
-};
+export default function PaymentCallback({ navigate }: any) {
+  const [status, setStatus] = useState<"loading" | "success" | "failed">("loading");
 
-let CF_ENV: any = undefined;
+  useEffect(() => {
+    const verifyPayment = async () => {
+      // Get the orderTrackingId from the URL
+      const params = new URLSearchParams(window.location.search);
+      const orderTrackingId = params.get("OrderTrackingId");
 
-const GLOBAL_CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+      if (!orderTrackingId) {
+        setStatus("failed");
+        return;
+      }
 
-function getSecret(name: string): string | undefined {
-  if (CF_ENV && CF_ENV[name]) return CF_ENV[name];
-  const g: any = globalThis as any;
-  if (g && g.env && g.env[name]) return g.env[name];
-  if (g && g.process && g.process.env && g.process.env[name]) return g.process.env[name];
-  return undefined;
-}
+      try {
+        // Ask our backend to verify with Pesapal
+        const res = await fetch("/api/pesapal/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderTrackingId }),
+        });
+        const data = await res.json();
 
-const PESAPAL_BASE_URL = "https://pay.pesapal.com/v3"; 
+        if (data.status === "Completed") {
+          // 🎉 UNLOCK PREMIUM!
+          // We retrieve the pending plan we saved before redirecting
+          const pendingPlan = JSON.parse(localStorage.getItem("smartsale_pending_plan") || "null");
+          
+          let hoursToAdd = 24; // Default to 1 day
+          if (pendingPlan) {
+            if (pendingPlan.name === "Daily Unlimited") hoursToAdd = 24;
+            if (pendingPlan.name === "Weekly Unlimited") hoursToAdd = 24 * 7;
+            if (pendingPlan.name === "Monthly Unlimited") hoursToAdd = 24 * 30;
+          }
 
-async function getPesapalToken(): Promise<string> {
-  const key = getSecret("PESAPAL_CONSUMER_KEY");
-  const secret = getSecret("PESAPAL_CONSUMER_SECRET");
-  if (!key || !secret) throw new Error("Pesapal credentials missing.");
-  const res = await fetch(`${PESAPAL_BASE_URL}/api/Auth/RequestToken`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ consumer_key: key, consumer_secret: secret }),
-  });
-  if (!res.ok) throw new Error(`Pesapal auth failed`);
-  const data = await res.json();
-  return data.token;
-}
+          const currentPremium = Number(localStorage.getItem("smartsale_premium_until") || Date.now());
+          const newPremium = Math.max(Date.now(), currentPremium) + (hoursToAdd * 60 * 60 * 1000);
+          
+          localStorage.setItem("smartsale_premium_until", newPremium.toString());
+          localStorage.removeItem("smartsale_pending_plan");
+          
+          setStatus("success");
+          
+          // Redirect home after 3 seconds
+          setTimeout(() => {
+            navigate("home");
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }, 3000);
+        } else {
+          setStatus("failed");
+        }
+      } catch (err) {
+        setStatus("failed");
+      }
+    };
 
-async function handleApi(request: Request): Promise<Response | null> {
-  const url = new URL(request.url);
+    verifyPayment();
+  }, [navigate]);
 
-  const json = (data: any, status = 200) =>
-    new Response(JSON.stringify(data), {
-      status,
-      headers: { ...GLOBAL_CORS, "Content-Type": "application/json" },
-    });
+  return (
+    <div className="h-[100dvh] flex flex-col items-center justify-center p-6 bg-[#F3F4F6] text-center">
+      {status === "loading" && (
+        <>
+          <Loader2 size={64} className="text-[#FF9800] animate-spin mb-4" />
+          <h1 className="text-2xl font-extrabold text-gray-800 mb-2">Verifying Payment...</h1>
+          <p className="text-gray-500">Please wait while we confirm with Pesapal.</p>
+        </>
+      )}
 
-  if (request.method === "OPTIONS") return new Response(null, { headers: GLOBAL_CORS });
-  if (url.pathname === "/api/health") return json({ status: "alive" });
+      {status === "success" && (
+        <>
+          <CheckCircle size={64} className="text-green-500 mb-4" />
+          <h1 className="text-2xl font-extrabold text-gray-800 mb-2">Payment Successful!</h1>
+          <p className="text-gray-500 mb-8">Your Premium features have been unlocked. Enjoy SmartSale!</p>
+          <button onClick={() => navigate("home")} className="bg-[#FF9800] text-white px-8 py-3 rounded-xl font-bold shadow-md">
+            Go to Dashboard
+          </button>
+        </>
+      )}
 
-  // 1. Initiate Payment
-  if (url.pathname === "/api/pesapal/pay" && request.method === "POST") {
-    try {
-      const body: any = await request.json();
-      const token = await getPesapalToken();
-      const ipnId = getSecret("PESAPAL_IPN_ID");
-      if (!ipnId) return json({ error: "PESAPAL_IPN_ID not set." }, 500);
-
-      let formattedPhone = body.phone || "0700000000";
-      formattedPhone = formattedPhone.replace(/\s/g, ''); 
-      if (formattedPhone.startsWith('0')) formattedPhone = '+256' + formattedPhone.substring(1);
-      else if (formattedPhone.startsWith('256')) formattedPhone = '+' + formattedPhone;
-      else if (!formattedPhone.startsWith('+')) formattedPhone = '+256' + formattedPhone;
-
-      const orderPayload = {
-        id: `SMARTSALE-${Date.now()}`,
-        currency: "UGX",
-        amount: body.amount,
-        description: body.description,
-        // 👇 THIS IS THE MAGIC LINK. It brings the user back to the app with the tracking ID
-        callback_url: `https://classoni.classoni66.workers.dev/?payment_callback=true`,
-        notification_id: ipnId,
-        billing_address: {
-          email_address: "customer@smartsale.ug",
-          phone_number: formattedPhone,
-          first_name: "SmartSale",
-          last_name: "User",
-          country_code: "UG",
-        },
-      };
-
-      const orderRes = await fetch(`${PESAPAL_BASE_URL}/api/Transactions/SubmitOrderRequest`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload),
-      });
-
-      const orderData = await orderRes.json();
-      if (orderData.error) throw new Error(orderData.error.message);
-
-      return json({ redirect_url: orderData.redirect_url, order_tracking_id: orderData.order_tracking_id });
-    } catch (err: any) {
-      return json({ error: err.message }, 500);
+      {status === "failed" && (
+        <>
+          <XCircle size={64} className="text-red-500 mb-4" />
+          <h1 className="text-2xl font-extrabold text-gray-800 mb-2">Verification Failed</h1>
+          <p className="text-gray-500 mb-8">We could not verify your payment. If you were charged, please contact support.</p>
+          <button onClick={() => navigate("buyStorage")} className="bg-[#FF9800] text-white px-8 py-3 rounded-xl font-bold shadow-md">
+            Try Again
+          </button>
+        </>
+      )}
+    </div>
+  );
     }
-  }
-
-  // 2. Verify Payment Status (NEW!)
-  if (url.pathname === "/api/pesapal/verify" && request.method === "POST") {
-    try {
-      const body: any = await request.json();
-      const token = await getPesapalToken();
-      
-      const statusRes = await fetch(`${PESAPAL_BASE_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${body.orderTrackingId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const statusData = await statusRes.json();
-      return json({ status: statusData.payment_status_description }); // "Completed", "Failed", etc.
-    } catch (err: any) {
-      return json({ error: err.message }, 500);
-    }
-  }
-
-  return null;
-}
-
-// ... (Keep the rest of your server.ts code exactly as it is: getServerEntry, normalizeCatastrophicSsrResponse, etc.)
