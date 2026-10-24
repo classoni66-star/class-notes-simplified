@@ -50,7 +50,6 @@ async function handleApi(request: Request): Promise<Response | null> {
   if (request.method === "OPTIONS") return new Response(null, { headers: GLOBAL_CORS });
   if (url.pathname === "/api/health") return json({ status: "alive" });
 
-  // 1. Initiate Payment
   if (url.pathname === "/api/pesapal/pay" && request.method === "POST") {
     try {
       const body: any = await request.json();
@@ -95,16 +94,13 @@ async function handleApi(request: Request): Promise<Response | null> {
     }
   }
 
-  // 2. Verify Payment Status
   if (url.pathname === "/api/pesapal/verify" && request.method === "POST") {
     try {
       const body: any = await request.json();
       const token = await getPesapalToken();
-      
       const statusRes = await fetch(`${PESAPAL_BASE_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${body.orderTrackingId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
       const statusData = await statusRes.json();
       return json({ status: statusData.payment_status_description });
     } catch (err: any) {
