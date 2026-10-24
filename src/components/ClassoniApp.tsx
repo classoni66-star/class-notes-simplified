@@ -22,19 +22,15 @@ export default function SmartSaleApp() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
-  // 🚀 AUTO-UPDATE MAGIC
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
-        // Check for updates every time the app opens
         registration.update();
-
         registration.onupdatefound = () => {
           const installingWorker = registration.installing;
           if (installingWorker) {
             installingWorker.onstatechange = () => {
               if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New version available! Silent reload to update the UI instantly.
                 window.location.reload();
               }
             };
@@ -44,22 +40,8 @@ export default function SmartSaleApp() {
     }
   }, []);
 
-  // Handle Referral & 15-Min Collaborator Links
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    
-    const joinOwner = params.get('join');
-    const expiry = params.get('exp');
-    if (joinOwner && expiry) {
-      if (Date.now() > Number(expiry)) {
-        alert("This invite link has expired. Please ask the owner for a new one.");
-      } else {
-        alert(`🎉 You have been invited to join a shop! Please set up your personal login details.`);
-        localStorage.setItem("smartsale_joining_shop", joinOwner);
-      }
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem("smartsale_invited_by", ref);
@@ -77,7 +59,6 @@ export default function SmartSaleApp() {
         const parsed = JSON.parse(savedBusiness);
         if (parsed && parsed.name) {
           setBusinessInfo(parsed);
-          
           if (savedPassword && !isLoggedIn) {
             setIsLocked(true);
           } else {
@@ -96,7 +77,9 @@ export default function SmartSaleApp() {
 
   const navigate = useCallback((screen: string) => {
     const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
-    const gatedScreens = ["analytics", "stock", "priceList"];
+    
+    // 🔒 LOCK ONLY ACTION BUTTONS (Add Sale & Stock)
+    const gatedScreens = ["addSale", "stock"];
 
     if (!isPremium && gatedScreens.includes(screen)) {
       setShowPremiumModal(true);
@@ -122,7 +105,8 @@ export default function SmartSaleApp() {
       const fakeData = { name: "Saviour's Shop", phone: "0700000000", isDemo: true, priceList: [] };
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
-      localStorage.setItem("smartsale_premium_until", (Date.now() + (2 * 24 * 60 * 60 * 1000)).toString());
+      // 🕐 1 HOUR FREE TRIAL
+      localStorage.setItem("smartsale_premium_until", (Date.now() + (1 * 60 * 60 * 1000)).toString()); 
       localStorage.setItem("smartsale_is_logged_in", "true");
       navigate("home");
     }
@@ -138,7 +122,7 @@ export default function SmartSaleApp() {
     stock: <Stock navigate={navigate} businessInfo={businessInfo} language={language} />,
     analytics: <Analytics navigate={navigate} businessInfo={businessInfo} language={language} />,
     rewards: <Rewards navigate={navigate} businessInfo={businessInfo} language={language} />,
-    buyStorage: <BuyStorage navigate={navigate} language={language} />,
+    buyStorage: <BuyStorage navigate={navigate} language={language} businessInfo={businessInfo} />,
     profile: <Profile navigate={navigate} businessInfo={businessInfo} language={language} />,
     collaborators: <Collaborators navigate={navigate} businessInfo={businessInfo} language={language} />,
   };
@@ -171,8 +155,10 @@ export default function SmartSaleApp() {
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Lock size={32} className="text-[#FF9800]" />
               </div>
-              <h2 className="text-xl font-extrabold text-gray-800 mb-2">Upgrade to Premium</h2>
-              <p className="text-sm text-gray-600 mb-6 leading-relaxed">Free plan includes only making sales. For advanced analytics, upgrade to premium to unlock more analytics, manage your business with less stress, and know how you are performing.</p>
+              <h2 className="text-xl font-extrabold text-gray-800 mb-2">Trial Expired</h2>
+              <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                Your 1-hour free trial has ended. To continue adding sales and stock, upgrade to Premium. You can still view your analytics!
+              </p>
               <div className="space-y-2">
                 <button onClick={() => { setShowPremiumModal(false); navigate("buyStorage"); }} className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform">View Premium Plans</button>
                 <button onClick={() => setShowPremiumModal(false)} className="w-full text-gray-500 py-2 text-sm font-bold">Maybe Later</button>
@@ -183,4 +169,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-        }
+  }
