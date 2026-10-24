@@ -69,7 +69,6 @@ async function handleApi(request: Request): Promise<Response | null> {
         currency: "UGX",
         amount: body.amount,
         description: body.description,
-        // 👇 THIS IS THE MAGIC LINK. It brings the user back to the app with the tracking ID
         callback_url: `https://classoni.classoni66.workers.dev/?payment_callback=true`,
         notification_id: ipnId,
         billing_address: {
@@ -96,7 +95,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     }
   }
 
-  // 2. Verify Payment Status (NEW!)
+  // 2. Verify Payment Status
   if (url.pathname === "/api/pesapal/verify" && request.method === "POST") {
     try {
       const body: any = await request.json();
@@ -107,7 +106,7 @@ async function handleApi(request: Request): Promise<Response | null> {
       });
       
       const statusData = await statusRes.json();
-      return json({ status: statusData.payment_status_description }); // "Completed", "Failed", etc.
+      return json({ status: statusData.payment_status_description });
     } catch (err: any) {
       return json({ error: err.message }, 500);
     }
@@ -116,4 +115,59 @@ async function handleApi(request: Request): Promise<Response | null> {
   return null;
 }
 
-// ... (Keep the rest of your server.ts code exactly as it is: getServerEntry, normalizeCatastrophicSsrResponse, etc.)
+let serverEntryPromise: Promise<ServerEntry> | undefined;
+
+async function getServerEntry(): Promise<ServerEntry> {
+  if (!serverEntryPromise) {
+    serverEntryPromise = import("@tanstack/react-start/server-entry").then((m) => {
+      const handler = m.default ?? m;
+      if (typeof handler === 'function') {
+        return { fetch: handler } as ServerEntry;
+      }
+      return handler as ServerEntry;
+    });
+  }
+  return serverEntryPromise;
+}
+
+async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+  if (response.status < 500) return response;
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.indexOf("application/json") !== -1) return response;
+  const body = await response.clone().text();
+  if (!isH3SwallowedErrorBody(body)) return response;
+  return new Response(renderErrorPage(), { status: 500, headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
+function isH3SwallowedErrorBody(body: string): boolean {
+  try {
+    const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
+    return payload.unhandled === true && payload.message === "HTTPError";
+  } catch {
+    return false;
+  }
+}
+
+export default {
+  async fetch(request: Request, env: any, ctx: unknown) {
+    CF_ENV = env;
+    try {
+      const apiResponse = await handleApi(request);
+      if (apiResponse) return apiResponse;
+    } catch (apiErr) {
+      return new Response(JSON.stringify({ error: "API routing failed: " + String(apiErr) }), {
+        status: 500, headers: { ...GLOBAL_CORS, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const handler = await getServerEntry();
+      const response = await handler.fetch(request, env, ctx);
+      return await normalizeCatastrophicSsrResponse(response);
+    } catch (error) {
+      return new Response(renderErrorPage(), {
+        status: 500, headers: { ...GLOBAL_CORS, "content-type": "text/html; charset=utf-8" },
+      });
+    }
+  },
+};
