@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket, MessageCircle, X } from "lucide-react";
 
