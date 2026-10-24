@@ -26,7 +26,6 @@ export default function PaymentCallback({ navigate }: any) {
 
         if (data.status === "Completed") {
           // 🎉 UNLOCK PREMIUM!
-          // We retrieve the pending plan we saved before redirecting
           const pendingPlan = JSON.parse(localStorage.getItem("smartsale_pending_plan") || "null");
           
           let hoursToAdd = 24; // Default to 1 day
@@ -93,4 +92,4 @@ export default function PaymentCallback({ navigate }: any) {
       )}
     </div>
   );
-    }
+                                        }
