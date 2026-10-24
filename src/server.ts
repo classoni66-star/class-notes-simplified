@@ -22,8 +22,8 @@ function getSecret(name: string): string | undefined {
   return undefined;
 }
 
-// --- PESAPAL CONFIGURATION ---
-const PESAPAL_BASE_URL = "https://pay.pesapal.com/v3"; // Use sandbox URL for testing: https://cybqa.pesapal.com/pesapalv3
+// --- PESAPAL CONFIGURATION (LIVE MODE) ---
+const PESAPAL_BASE_URL = "https://pay.pesapal.com/v3"; 
 
 async function getPesapalToken(): Promise<string> {
   const key = getSecret("PESAPAL_CONSUMER_KEY");
@@ -86,6 +86,7 @@ async function handleApi(request: Request): Promise<Response | null> {
 
   // --- PESAPAL ENDPOINTS ---
 
+  // 1. One-time setup to get your LIVE IPN ID
   if (url.pathname === "/api/pesapal/setup-ipn" && request.method === "GET") {
     try {
       const token = await getPesapalToken();
@@ -97,6 +98,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     }
   }
 
+  // 2. Initiate a Payment
   if (url.pathname === "/api/pesapal/pay" && request.method === "POST") {
     try {
       const body: any = await request.json();
@@ -104,6 +106,13 @@ async function handleApi(request: Request): Promise<Response | null> {
       
       const ipnId = getSecret("PESAPAL_IPN_ID");
       if (!ipnId) return json({ error: "PESAPAL_IPN_ID not set in Cloudflare." }, 500);
+
+      // 🛠️ FORCE MTN FORMAT (+256...)
+      let formattedPhone = body.phone || "0700000000";
+      formattedPhone = formattedPhone.replace(/\s/g, ''); // remove spaces
+      if (formattedPhone.startsWith('0')) formattedPhone = '+256' + formattedPhone.substring(1);
+      else if (formattedPhone.startsWith('256')) formattedPhone = '+' + formattedPhone;
+      else if (!formattedPhone.startsWith('+')) formattedPhone = '+256' + formattedPhone;
 
       const orderPayload = {
         id: `SMARTSALE-${Date.now()}`,
@@ -114,7 +123,7 @@ async function handleApi(request: Request): Promise<Response | null> {
         notification_id: ipnId,
         billing_address: {
           email_address: "customer@smartsale.ug",
-          phone_number: body.phone || "0700000000",
+          phone_number: formattedPhone,
           first_name: "SmartSale",
           last_name: "User",
           country_code: "UG",
@@ -139,6 +148,7 @@ async function handleApi(request: Request): Promise<Response | null> {
     }
   }
 
+  // 3. IPN Callback
   if (url.pathname === "/api/pesapal/ipn") {
     return json({ status: "success" });
   }
@@ -152,8 +162,6 @@ async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
     serverEntryPromise = import("@tanstack/react-start/server-entry").then((m) => {
       const handler = m.default ?? m;
-      // 🛠️ THE FIX: TanStack Start sometimes exports a function instead of an object.
-      // We wrap it in an object with a fetch method so Nitro can call it.
       if (typeof handler === 'function') {
         return { fetch: handler } as ServerEntry;
       }
