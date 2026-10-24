@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket, Phone, MessageCircle, X } from "lucide-react";
+import { ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket, MessageCircle, X } from "lucide-react";
 
 export default function BuyStorage({ navigate, language, businessInfo }: any) {
   const [premiumDaysLeft, setPremiumDaysLeft] = useState(0);
@@ -10,24 +10,26 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
   const t = (en: string, run: string) => (language === "run" ? run : en);
   
   const OWNER_PHONE = "256708032236"; 
-  const MOMO_NUMBER = "0790092405 (agent Chris direct )";
+  const MOMO_NUMBER = "0708032236 (Classoni)";
 
   useEffect(() => {
     const premiumUntil = Number(localStorage.getItem("smartsale_premium_until") || 0);
     const now = Date.now();
     if (premiumUntil > now) {
-      // Calculate days OR hours left
       const msLeft = premiumUntil - now;
       if (msLeft < 24 * 60 * 60 * 1000) {
-        setPremiumDaysLeft(Math.ceil(msLeft / (1000 * 60 * 60))); // Show hours
+        setPremiumDaysLeft(Math.ceil(msLeft / (1000 * 60 * 60))); // Hours
       } else {
-        setPremiumDaysLeft(Math.ceil(msLeft / (1000 * 60 * 60 * 24))); // Show days
+        setPremiumDaysLeft(Math.ceil(msLeft / (1000 * 60 * 60 * 24))); // Days
       }
     }
   }, []);
 
   const handlePay = async (plan: string, amount: number) => {
     try {
+      // 1. Save the plan to local memory BEFORE going to Pesapal
+      localStorage.setItem("smartsale_pending_plan", JSON.stringify({ name: plan, amount: amount }));
+      
       alert(`Connecting to Pesapal for ${plan} (UGX ${amount.toLocaleString()})... Please wait.`);
       
       const response = await fetch("/api/pesapal/pay", {
@@ -56,7 +58,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
     const code = voucherCode.trim().toUpperCase();
     let hoursToAdd = 0;
 
-    // SECRET CODES (You can adjust these)
     if (code === "SMARTSALE-DAY") hoursToAdd = 24;
     else if (code === "SMARTSALE-WEEK") hoursToAdd = 24 * 7;
     else if (code === "SMARTSALE-MONTH") hoursToAdd = 24 * 30;
@@ -112,7 +113,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
 
         <div className="space-y-4">
           
-          {/* DAILY PLAN - 500 UGX */}
           <div onClick={() => setSelectedPlan({name: "Daily Unlimited", amount: 500})} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer">
             <div className="flex items-center gap-2 mb-1">
               <Zap size={18} className="text-yellow-500" />
@@ -124,7 +124,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
             </div>
           </div>
 
-          {/* WEEKLY PLAN - 3000 UGX */}
           <div onClick={() => setSelectedPlan({name: "Weekly Unlimited", amount: 3000})} className="bg-white p-4 rounded-2xl shadow-lg border-2 border-[#FF9800] relative overflow-hidden active:scale-95 transition-transform cursor-pointer">
             <div className="absolute top-0 right-0 bg-[#FF9800] text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">MOST POPULAR</div>
             <div className="flex items-center gap-2 mb-1">
@@ -141,7 +140,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
             </p>
           </div>
 
-          {/* MONTHLY PLAN - 10000 UGX */}
           <div onClick={() => setSelectedPlan({name: "Monthly Unlimited", amount: 10000})} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer">
             <div className="flex items-center gap-2 mb-1">
               <Crown size={18} className="text-[#0055FF]" />
@@ -158,7 +156,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
           </div>
         </div>
 
-        {/* VOUCHER SECTION */}
         <div className="mt-8 pt-6 border-t border-gray-200">
           {!showVoucherInput ? (
             <button onClick={() => setShowVoucherInput(true)} className="w-full py-4 bg-gray-800 text-white rounded-xl font-bold text-sm shadow-md flex justify-center items-center gap-2">
@@ -221,4 +218,4 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
       )}
     </div>
   );
-                }
+                                     }
