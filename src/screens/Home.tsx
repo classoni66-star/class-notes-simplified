@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Gift, User, ArrowUpRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus } from "lucide-react";
+import { Gift, User, ArrowUpRight, ArrowDownRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt";
 import TrafficModal from "./TrafficModal";
 import FinanceModal from "./FinanceModal";
@@ -12,7 +12,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
   const [financeModalType, setFinanceModalType] = useState<"fund" | "spend" | null>(null);
   
   const [stats, setStats] = useState({
-    sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0
+    sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0,
+    salesChange: 0, profitChange: 0, debtorsChange: 0, creditorsChange: 0, stockChange: 0
   });
 
   useEffect(() => {
@@ -33,34 +34,39 @@ export default function Home({ navigate, businessInfo, language }: any) {
   const calculateStats = () => {
     const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const todayStr = new Date().toDateString();
-    const todaySales = savedSales.filter((sale: any) => new Date(sale.date).toDateString() === todayStr);
+    
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
 
-    let totalSales = 0;
-    let totalProfit = 0;
+    const todaySales = savedSales.filter((sale: any) => new Date(sale.date).toDateString() === todayStr);
+    const yesterdaySales = savedSales.filter((sale: any) => new Date(sale.date).toDateString() === yesterdayStr);
+
+    let totalSales = 0, totalProfit = 0;
+    let yTotalSales = 0, yTotalProfit = 0;
 
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
     const hasConfirmedPrices = savedPriceList.some((item: any) => item.buyingPrice > 0 && item.sellingPrice > 0);
 
     todaySales.forEach((sale: any) => {
       totalSales += Number(sale.total) || 0;
-      
-      const sellPrice = Number(sale.sellingPrice) || 0;
-      const buyPrice = Number(sale.buyingPrice) || 0;
-      const qty = Number(sale.quantity) || 0;
-      const itemProfit = (sellPrice - buyPrice) * qty;
-      
-      if (hasConfirmedPrices && !isNaN(itemProfit)) {
-        totalProfit += itemProfit;
-      } else {
-        totalProfit = -1; // Indicate profit not ready
-      }
+      const profit = ((Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0)) * (Number(sale.quantity) || 0);
+      if (hasConfirmedPrices && !isNaN(profit)) totalProfit += profit;
+    });
+
+    yesterdaySales.forEach((sale: any) => {
+      yTotalSales += Number(sale.total) || 0;
+      const profit = ((Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0)) * (Number(sale.quantity) || 0);
+      if (hasConfirmedPrices && !isNaN(profit)) yTotalProfit += profit;
     });
 
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
     const activeDebtors = savedDebtors.filter((d: any) => Number(d.amountOwed) > 0).length;
-    
+    const yActiveDebtors = savedDebtors.filter((d: any) => new Date(d.date).toDateString() === yesterdayStr && Number(d.amountOwed) > 0).length;
+
     const savedCreditors = JSON.parse(localStorage.getItem("smartsale_creditors") || "[]");
     const activeCreditors = savedCreditors.filter((c: any) => Number(c.amountOwed) > 0).length;
+    const yActiveCreditors = savedCreditors.filter((c: any) => new Date(c.date).toDateString() === yesterdayStr && Number(c.amountOwed) > 0).length;
     
     const savedInitialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const allSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
@@ -77,15 +83,30 @@ export default function Home({ navigate, businessInfo, language }: any) {
       const current = initial - sold - removed;
       if (current > 0) totalStockLeft += current; 
     });
-    
+
+    // Helper function for percentage change
+    const getPercent = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
     setStats({
-      sales: totalSales, profit: totalProfit, debtors: activeDebtors, creditors: activeCreditors, stock: totalStockLeft
+      sales: totalSales, 
+      profit: hasConfirmedPrices ? totalProfit : -1, 
+      debtors: activeDebtors, 
+      creditors: activeCreditors, 
+      stock: totalStockLeft,
+      salesChange: getPercent(totalSales, yTotalSales),
+      profitChange: hasConfirmedPrices ? getPercent(totalProfit, yTotalProfit) : 0,
+      debtorsChange: getPercent(activeDebtors, yActiveDebtors),
+      creditorsChange: getPercent(activeCreditors, yActiveCreditors),
+      stockChange: 0 // Simple placeholder for stock trend
     });
   };
 
   useEffect(() => {
     calculateStats();
-  }, [businessInfo, financeModalType]); // Recalculate when modal opens/closes
+  }, [businessInfo, financeModalType]); 
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
@@ -103,6 +124,15 @@ export default function Home({ navigate, businessInfo, language }: any) {
   const formatMoney = (amount: number) => `UGX ${Math.round(amount).toLocaleString()}`;
   const greeting = timeOfDay === "morning" ? t("Good morning", "Oraire gye") : timeOfDay === "afternoon" ? t("Good afternoon", "Osiiba gye") : t("Good evening", "Okwera gye");
 
+  const renderChange = (val: number) => {
+    if (val === 0) return null;
+    return (
+      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${val > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+        {val > 0 ? "↑" : "↓"} {Math.abs(val).toFixed(0)}%
+      </span>
+    );
+  };
+
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden relative">
       
@@ -112,6 +142,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
           <h1 className="text-lg font-extrabold text-gray-800 leading-tight">{businessInfo.name}</h1>
           <p className="text-[10px] text-gray-400 font-medium mt-1">{todayDate}</p>
         </div>
+
         <div className="flex flex-col items-end">
           <div className="flex gap-2 mb-1">
             <button onClick={() => navigate("rewards")} className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-[#FF9800]">
@@ -132,14 +163,17 @@ export default function Home({ navigate, businessInfo, language }: any) {
         <div className="space-y-2.5">
           <div className="grid grid-cols-2 gap-2.5">
             <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
-              <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
+              <div className="flex justify-between items-start">
+                <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
+                {renderChange(stats.salesChange)}
+              </div>
               <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
             </div>
 
             <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
               <div className="flex justify-between items-start">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
-                {!isPremium && <Lock size={12} className="text-red-400" />}
+                {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.profitChange)}
               </div>
               <p className="text-base font-extrabold text-[#0055FF] mt-0.5">
                 {isPremium ? (stats.profit === -1 ? "Confirm Prices" : formatMoney(stats.profit)) : "UGX ***"}
@@ -149,7 +183,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
               <div className="flex justify-between items-start">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
-                {!isPremium && <Lock size={12} className="text-red-400" />}
+                {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.debtorsChange)}
               </div>
               <p className="text-lg font-extrabold text-red-500 mt-0.5">{isPremium ? stats.debtors : "***"}</p>
             </div>
@@ -157,7 +191,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
               <div className="flex justify-between items-start">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
-                {!isPremium && <Lock size={12} className="text-red-400" />}
+                {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.creditorsChange)}
               </div>
               <p className="text-lg font-extrabold text-orange-500 mt-0.5">{isPremium ? stats.creditors : "***"}</p>
             </div>
@@ -179,9 +213,11 @@ export default function Home({ navigate, businessInfo, language }: any) {
         <div className="mt-2">
           <button 
             onClick={() => navigate("addSale")}
-            className="w-full bg-[#FF9800] text-white py-3.5 rounded-2xl font-extrabold text-lg shadow-lg shadow-orange-500/30 active:scale-95 transition-transform flex justify-center items-center gap-2"
+            className={`w-full py-3.5 rounded-2xl font-extrabold text-lg shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 ${
+              isPremium ? 'bg-[#FF9800] text-white shadow-orange-500/30' : 'bg-gray-400 text-white shadow-gray-400/30'
+            }`}
           >
-            <PlusCircle size={20} />
+            {isPremium ? <PlusCircle size={20} /> : <Lock size={20} />}
             {t("Add Sale", "Tunda")}
           </button>
 
@@ -196,27 +232,16 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       </div>
 
-      {/* FLOATING LEFT BUTTONS (Fund & Spend) */}
       <div className="fixed bottom-[210px] left-4 flex flex-col gap-3 z-40">
-        <button 
-          onClick={() => setFinanceModalType("fund")}
-          className="w-12 h-12 bg-green-500 text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-green-500/40 active:scale-95 transition-transform border-4 border-white"
-        >
+        <button onClick={() => setFinanceModalType("fund")} className="w-12 h-12 bg-green-500 text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-green-500/40 active:scale-95 transition-transform border-4 border-white">
           <Plus size={18} />
         </button>
-        <button 
-          onClick={() => setFinanceModalType("spend")}
-          className="w-12 h-12 bg-red-500 text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-red-500/40 active:scale-95 transition-transform border-4 border-white"
-        >
+        <button onClick={() => setFinanceModalType("spend")} className="w-12 h-12 bg-red-500 text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-red-500/40 active:scale-95 transition-transform border-4 border-white">
           <MinusCircle size={18} />
         </button>
       </div>
 
-      {/* FLOATING TRAFFIC BUTTON (Right) */}
-      <button 
-        onClick={() => setIsTrafficOpen(true)}
-        className="fixed bottom-[210px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
-      >
+      <button onClick={() => setIsTrafficOpen(true)} className="fixed bottom-[210px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white">
         <Play size={18} fill="currentColor" className="ml-1" />
         <span className="text-[8px] font-bold mt-0.5">Traffic</span>
       </button>
@@ -248,4 +273,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
     </div>
   );
-                                        }
+    }
