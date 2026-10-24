@@ -6,7 +6,6 @@ export default function PaymentCallback({ navigate }: any) {
 
   useEffect(() => {
     const verifyPayment = async () => {
-      // Get the orderTrackingId from the URL
       const params = new URLSearchParams(window.location.search);
       const orderTrackingId = params.get("OrderTrackingId");
 
@@ -16,7 +15,6 @@ export default function PaymentCallback({ navigate }: any) {
       }
 
       try {
-        // Ask our backend to verify with Pesapal
         const res = await fetch("/api/pesapal/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -25,10 +23,9 @@ export default function PaymentCallback({ navigate }: any) {
         const data = await res.json();
 
         if (data.status === "Completed") {
-          // 🎉 UNLOCK PREMIUM!
           const pendingPlan = JSON.parse(localStorage.getItem("smartsale_pending_plan") || "null");
           
-          let hoursToAdd = 24; // Default to 1 day
+          let hoursToAdd = 24; 
           if (pendingPlan) {
             if (pendingPlan.name === "Daily Unlimited") hoursToAdd = 24;
             if (pendingPlan.name === "Weekly Unlimited") hoursToAdd = 24 * 7;
@@ -43,7 +40,6 @@ export default function PaymentCallback({ navigate }: any) {
           
           setStatus("success");
           
-          // Redirect home after 3 seconds
           setTimeout(() => {
             navigate("home");
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -92,4 +88,4 @@ export default function PaymentCallback({ navigate }: any) {
       )}
     </div>
   );
-                                        }
+                               }
