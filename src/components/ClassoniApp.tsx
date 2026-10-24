@@ -13,6 +13,7 @@ import BuyStorage from "../screens/BuyStorage";
 import Profile from "../screens/Profile";
 import Collaborators from "../screens/Collaborators";
 import LockScreen from "../screens/LockScreen";
+import PaymentCallback from "../screens/PaymentCallback";
 
 export default function SmartSaleApp() {
   const [currentScreen, setCurrentScreen] = useState("welcome");
@@ -22,6 +23,7 @@ export default function SmartSaleApp() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
+  // 🚀 AUTO-UPDATE MAGIC
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
@@ -40,8 +42,28 @@ export default function SmartSaleApp() {
     }
   }, []);
 
+  // Handle Referral, Collaborator Links & Pesapal Callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // 🛑 Catch the Pesapal Redirect
+    if (params.get('payment_callback') === 'true') {
+      setCurrentScreen("paymentCallback");
+      return; 
+    }
+
+    const joinOwner = params.get('join');
+    const expiry = params.get('exp');
+    if (joinOwner && expiry) {
+      if (Date.now() > Number(expiry)) {
+        alert("This invite link has expired. Please ask the owner for a new one.");
+      } else {
+        alert(`🎉 You have been invited to join a shop! Please set up your personal login details.`);
+        localStorage.setItem("smartsale_joining_shop", joinOwner);
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem("smartsale_invited_by", ref);
@@ -59,10 +81,15 @@ export default function SmartSaleApp() {
         const parsed = JSON.parse(savedBusiness);
         if (parsed && parsed.name) {
           setBusinessInfo(parsed);
-          if (savedPassword && !isLoggedIn) {
-            setIsLocked(true);
-          } else {
-            setCurrentScreen("home");
+          
+          // If we are on paymentCallback, we don't want to trigger the Lock screen yet
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('payment_callback') !== 'true') {
+            if (savedPassword && !isLoggedIn) {
+              setIsLocked(true);
+            } else {
+              setCurrentScreen("home");
+            }
           }
         }
       } catch (e) {}
@@ -125,6 +152,7 @@ export default function SmartSaleApp() {
     buyStorage: <BuyStorage navigate={navigate} language={language} businessInfo={businessInfo} />,
     profile: <Profile navigate={navigate} businessInfo={businessInfo} language={language} />,
     collaborators: <Collaborators navigate={navigate} businessInfo={businessInfo} language={language} />,
+    paymentCallback: <PaymentCallback navigate={navigate} />,
   };
 
   if (!isHydrated) return <div className="h-screen bg-[#F3F4F6]" />;
@@ -157,7 +185,7 @@ export default function SmartSaleApp() {
               </div>
               <h2 className="text-xl font-extrabold text-gray-800 mb-2">Trial Expired</h2>
               <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                Your 1-hour free trial has ended. To continue adding sales and stock, upgrade to Premium. You can still view your analytics!
+                Your free trial has ended. To continue adding sales and stock, upgrade to Premium. You can still view your analytics!
               </p>
               <div className="space-y-2">
                 <button onClick={() => { setShowPremiumModal(false); navigate("buyStorage"); }} className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform">View Premium Plans</button>
@@ -169,4 +197,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-  }
+                             }
