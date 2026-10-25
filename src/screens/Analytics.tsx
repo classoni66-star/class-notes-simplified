@@ -20,7 +20,14 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]").reverse();
     const allExpenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]").reverse();
     const allFunds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
+    const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || localStorage.getItem("smartsale_pricelist") || "[]");
     
+    // Create a fast lookup dictionary for the price list
+    const priceMap: Record<string, any> = {};
+    savedPriceList.forEach((item: any) => {
+      priceMap[item.name] = item;
+    });
+
     const grouped: Record<string, any> = {};
     const uniqueDates = new Set<string>();
 
@@ -55,10 +62,14 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
         totalDayCashSales += paidPart;
         totalDayDebts += debtPart;
         
-        if (!s.buyingPrice || Number(s.buyingPrice) <= 0) {
+        // 🧠 SMART PROFIT
+        const itemDetails = priceMap[s.itemName];
+        const currentBuyPrice = itemDetails ? Number(itemDetails.buyingPrice) : Number(s.buyingPrice);
+
+        if (!currentBuyPrice || currentBuyPrice <= 0) {
           missingBuyPrices = true;
         } else {
-          const profit = (Number(s.sellingPrice) - Number(s.buyingPrice)) * Number(s.quantity);
+          const profit = (Number(s.sellingPrice) - currentBuyPrice) * Number(s.quantity);
           totalDayProfit += profit;
         }
       });
@@ -117,16 +128,23 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       const d = new Date(s.date);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         mSales += Number(s.total) || 0;
-        if (!s.buyingPrice || Number(s.buyingPrice) <= 0) {
+        
+        const itemDetails = priceMap[s.itemName];
+        const currentBuyPrice = itemDetails ? Number(itemDetails.buyingPrice) : Number(s.buyingPrice);
+
+        if (!currentBuyPrice || currentBuyPrice <= 0) {
           monthMissingBuyPrices = true;
         } else {
-          mProfit += (Number(s.sellingPrice) - Number(s.buyingPrice)) * Number(s.quantity);
+          mProfit += (Number(s.sellingPrice) - currentBuyPrice) * Number(s.quantity);
         }
+        
         if (!s.isPaid) mDebts += Number(s.total) || 0;
       } else if (d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear) {
         lmSales += Number(s.total) || 0;
-        if (s.buyingPrice && Number(s.buyingPrice) > 0) {
-          lmProfit += (Number(s.sellingPrice) - Number(s.buyingPrice)) * Number(s.quantity);
+        const itemDetails = priceMap[s.itemName];
+        const currentBuyPrice = itemDetails ? Number(itemDetails.buyingPrice) : Number(s.buyingPrice);
+        if (currentBuyPrice && currentBuyPrice > 0) {
+          lmProfit += (Number(s.sellingPrice) - currentBuyPrice) * Number(s.quantity);
         }
       }
     });
@@ -277,7 +295,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     URL.revokeObjectURL(url);
   };
 
-
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
       <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10">
@@ -340,7 +357,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                   </div>
                   
                   {data.missingBuyPrices ? (
-                    <div className="flex justify-between font-bold text-red-500 items-center bg-red-50 -mx-1 px-1 py-1 rounded">
+                    <div className="flex justify-between font-bold text-[#0055FF] items-center bg-blue-50 -mx-1 px-1 py-1 rounded">
                       <span className="flex items-center gap-1"><AlertCircle size={12}/> PROFIT</span>
                       <span className="text-[10px]">Confirm buying prices to calculate</span>
                     </div>
@@ -476,7 +493,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                 <p className="text-xs font-bold text-gray-500 uppercase">Total Profit (This Month)</p>
                 {!summary.missingBuyPrices && renderChange(summary.profitChange)}
               </div>
-              <p className={`text-2xl font-extrabold mt-1 ${summary.missingBuyPrices ? 'text-red-500 text-sm flex items-center gap-1' : 'text-[#0055FF]'}`}>
+              <p className={`text-2xl font-extrabold mt-1 ${summary.missingBuyPrices ? 'text-[#0055FF] text-sm flex items-center gap-1' : 'text-[#0055FF]'}`}>
                 {summary.missingBuyPrices ? <><AlertCircle size={16}/> Confirm buying prices to calculate</> : `UGX ${summary.totalProfit.toLocaleString()}`}
               </p>
             </div>
@@ -509,4 +526,4 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-      }
+    }
