@@ -85,13 +85,13 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       return;
     }
 
-    let finalQty = qty ? Number(qty) : 1;
-    let finalTotal = amount ? Number(amount) : unitPrice;
+    // Safe fallback logic
+    let finalQty = Number(qty) || 1;
+    let finalTotal = Number(amount) || (unitPrice * finalQty);
 
-    if (inputMode === "qty" && !amount) {
-        finalTotal = unitPrice * finalQty;
-    } else if (inputMode === "amount" && !qty) {
-        finalQty = finalTotal / unitPrice;
+    if (!qty && !amount) {
+      finalQty = 1;
+      finalTotal = unitPrice;
     }
     
     // Calculate partial payment details
@@ -117,7 +117,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       buyingPrice: selectedItem?.buyingPrice || 0,
       sellingPrice: unitPrice,
       isPaid,
-      amountPaid: actualPaid, // Save amount paid
+      amountPaid: actualPaid, 
       clientName: isPaid ? "" : clientName.trim() || "Unknown",
     };
     localStorage.setItem("smartsale_sales", JSON.stringify([...existingSales, newSale]));
@@ -129,7 +129,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
         id: newSale.id,
         date: newSale.date,
         clientName: newSale.clientName,
-        amountOwed: debtBalance, // Save only the remaining balance
+        amountOwed: debtBalance, 
       };
       localStorage.setItem("smartsale_debtors", JSON.stringify([...existingDebts, newDebt]));
     }
