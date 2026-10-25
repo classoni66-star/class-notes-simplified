@@ -46,9 +46,13 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       let totalDayDebts = 0;
 
       daySalesItems.forEach((s: any) => {
-        totalDaySales += Number(s.total) || 0;
-        if (s.isPaid) totalDayCashSales += Number(s.total) || 0;
-        else totalDayDebts += Number(s.total) || 0;
+        const saleTotal = Number(s.total) || 0;
+        const paidPart = Number(s.amountPaid) || (s.isPaid ? saleTotal : 0);
+        const debtPart = s.isPaid ? 0 : (saleTotal - paidPart);
+
+        totalDaySales += saleTotal;
+        totalDayCashSales += paidPart;
+        totalDayDebts += debtPart;
         
         const profit = ((Number(s.sellingPrice) || 0) - (Number(s.buyingPrice) || 0)) * (Number(s.quantity) || 0);
         totalDayProfit += profit;
@@ -241,6 +245,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                     <div className="col-span-2">
                       <p className="font-bold text-gray-800 leading-tight">{sale.itemName}</p>
                       <p className="text-[9px] text-gray-500">{new Date(sale.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                      {!sale.isPaid && <span className="text-[8px] bg-red-100 text-red-600 px-1 rounded mt-1 inline-block">Credit</span>}
                     </div>
                     <div className="text-center font-bold">{sale.quantity}</div>
                     <div className={`text-right font-bold ${sale.isPaid ? 'text-green-600' : 'text-red-500'}`}>
@@ -409,4 +414,4 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-                                                                                            }
+      }
