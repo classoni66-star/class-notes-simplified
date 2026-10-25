@@ -13,7 +13,7 @@ function generateHash(str: string) {
 }
 
 export default function BuyStorage({ navigate, language, businessInfo }: any) {
-  const [premiumDaysLeft, setPremiumDaysLeft] = useState(0);
+  const [premiumDisplay, setPremiumDisplay] = useState("Free Plan");
   const [voucherCode, setVoucherCode] = useState("");
   const [showVoucherInput, setShowVoucherInput] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<{ name: string, amount: number, hours: number } | null>(null);
@@ -31,27 +31,34 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
   useEffect(() => {
     const premiumUntil = Number(localStorage.getItem("smartsale_premium_until") || 0);
     const now = Date.now();
+    
     if (premiumUntil > now) {
       const msLeft = premiumUntil - now;
-      if (msLeft < 24 * 60 * 60 * 1000) {
-        setPremiumDaysLeft(Math.ceil(msLeft / (1000 * 60 * 60)));
+      const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+      const hoursLeft = Math.ceil(msLeft / (1000 * 60 * 60));
+
+      // Accurate display logic
+      if (daysLeft > 1) {
+        setPremiumDisplay(`${daysLeft} Days`);
+      } else if (hoursLeft > 1) {
+        setPremiumDisplay(`${hoursLeft} Hours`);
       } else {
-        setPremiumDaysLeft(Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+        setPremiumDisplay("Less than 1 Hour");
       }
+    } else {
+      setPremiumDisplay("Free Plan");
     }
   }, []);
 
   const handleRedeemVoucher = () => {
     const cleanCode = voucherCode.trim().toUpperCase();
     
-    // The customer's phone must be in the system to validate
     const customerPhone = businessInfo?.phone?.trim() || "";
     if (!customerPhone) return alert("Please set your phone number in your profile first.");
 
     let hoursToAdd = 0;
     let expectedCode = "";
 
-    // Check which plan the code is for
     if (cleanCode.startsWith("D-")) {
       expectedCode = "D-" + generateHash(customerPhone + "D" + SECRET_KEY);
       hoursToAdd = 24;
@@ -65,7 +72,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
       return alert("Invalid voucher format.");
     }
 
-    // Verify the code matches the math
     if (cleanCode === expectedCode) {
       const currentPremium = Number(localStorage.getItem("smartsale_premium_until") || Date.now());
       const newPremium = Math.max(Date.now(), currentPremium) + (hoursToAdd * 60 * 60 * 1000);
@@ -78,7 +84,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
     }
   };
 
-  // Secret Owner Generator Logic
   const handleSecretTap = () => {
     const newTaps = ownerTaps + 1;
     setOwnerTaps(newTaps);
@@ -114,18 +119,17 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
             Manage your business with less stress. Know how your business is performing. Unlock unlimited calculations, analytics, and storage.
           </p>
           
-          {premiumDaysLeft > 0 && (
+          {premiumDisplay !== "Free Plan" && (
             <div className="bg-green-50 border border-green-200 p-4 rounded-xl shadow-sm mb-6 flex flex-col items-center">
               <CheckCircle2 size={32} className="text-green-500 mb-2" />
               <h3 className="text-green-800 font-bold text-lg">You are Premium!</h3>
               <p className="text-green-600 text-sm font-medium mt-1">
-                You have <strong>{premiumDaysLeft} {premiumDaysLeft <= 24 ? 'Hours' : 'Days'}</strong> remaining.
+                You have <strong>{premiumDisplay}</strong> remaining.
               </p>
             </div>
           )}
         </div>
 
-        {/* PLANS */}
         <div className="space-y-4">
           <div onClick={() => setSelectedPlan({name: "Daily Unlimited", amount: 500, hours: 24})} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer">
             <div className="flex items-center gap-2 mb-1">
@@ -164,7 +168,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
           </div>
         </div>
 
-        {/* VOUCHER REDEEM */}
         <div className="mt-8 pt-6 border-t border-gray-200">
           {!showVoucherInput ? (
             <button onClick={() => setShowVoucherInput(true)} className="w-full py-4 bg-gray-800 text-white rounded-xl font-bold text-sm shadow-md flex justify-center items-center gap-2">
@@ -190,13 +193,11 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
           )}
         </div>
 
-        {/* 🥷 SECRET OWNER VOUCHER GENERATOR */}
         <div onClick={handleSecretTap} className="text-center mt-12 pb-4 cursor-pointer text-[10px] text-gray-300">
           SmartSale Secure Merchant App
         </div>
       </div>
 
-      {/* OWNER GENERATOR MODAL */}
       {showOwnerGen && (
         <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-6">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative">
@@ -235,7 +236,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
         </div>
       )}
 
-      {/* PAYMENT MODAL */}
       {selectedPlan && (
         <div className="absolute inset-0 bg-black/60 z-[100] flex items-end justify-center pb-0">
           <div className="bg-white rounded-t-3xl w-full p-6 animate-slide-up relative">
@@ -273,4 +273,4 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
       )}
     </div>
   );
-    }
+                                           }
