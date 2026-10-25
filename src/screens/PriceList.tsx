@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, X, RotateCcw } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
 
 const LISTS: Record<string, any[]> = {
   "Retailer": [
@@ -57,7 +57,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
   const category = businessInfo?.type || "Retailer";
-
   const STORAGE_KEY = "smartsale_pricelist_v2";
 
   useEffect(() => {
@@ -104,18 +103,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
     saveItems(items.filter(i => i.id !== id));
   };
 
-  const handleClearAll = () => {
-    if (window.confirm("Are you sure? This will remove ALL items from your price list.")) {
-      saveItems([]);
-    }
-  };
-
-  const handleResetDefaults = () => {
-    if (window.confirm("This will reset your price list to the default items for your business. Any custom items you added will be lost. Are you sure?")) {
-      loadDefaults();
-    }
-  };
-
   const startEdit = (id: string, field: "name" | "unit" | "buyingPrice" | "sellingPrice", currentValue: string) => {
     setEditingId(id);
     setEditingField(field);
@@ -151,19 +138,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </button>
           <h1 className="text-lg font-extrabold text-gray-800">{t("Price List", "Ebihenda")}</h1>
         </div>
-        <div className="flex gap-2">
-          <button onClick={handleResetDefaults} className="text-blue-500 p-2 bg-blue-50 rounded-full shadow-sm active:scale-95 transition-transform" title="Reset to Defaults">
-            <RotateCcw size={20} />
-          </button>
-          {items.length > 0 && (
-            <button onClick={handleClearAll} className="text-red-500 p-2 bg-red-50 rounded-full shadow-sm active:scale-95 transition-transform" title="Delete All">
-              <X size={20} />
-            </button>
-          )}
-          <button onClick={() => setShowAddForm(true)} className="bg-[#FF9800] text-white p-2 rounded-full shadow-md active:scale-95 transition-transform">
-            <Plus size={20} />
-          </button>
-        </div>
+        {/* Top buttons removed as requested */}
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
@@ -175,6 +150,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </p>
         </div>
 
+        {/* LARGE ADD NEW ITEM BUTTON */}
         {!showAddForm && (
           <button 
             onClick={() => setShowAddForm(true)}
@@ -188,6 +164,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </button>
         )}
 
+        {/* ADD ITEM FORM */}
         {showAddForm && (
           <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-[#FF9800] mb-4 relative">
             <button onClick={() => setShowAddForm(false)} className="absolute top-2 right-2 text-gray-400 p-1 bg-gray-50 rounded-full">
@@ -223,6 +200,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
+        {/* ITEMS TABLE */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
             <div className="col-span-2">Item / Unit</div>
@@ -236,15 +214,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
               
               <div className="col-span-2 pr-2">
                 {editingId === item.id && editingField === "name" ? (
-                  <input 
-                    autoFocus
-                    type="text" 
-                    value={editValue} 
-                    onChange={(e) => setEditValue(e.target.value)} 
-                    onBlur={saveEdit}
-                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                    className="w-full p-1 bg-white border border-[#FF9800] rounded text-sm font-bold outline-none"
-                  />
+                  <input autoFocus type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} className="w-full p-1 bg-white border border-[#FF9800] rounded text-sm font-bold outline-none" />
                 ) : (
                   <p onClick={() => startEdit(item.id, "name", item.name)} className="font-bold text-gray-800 leading-tight cursor-text hover:bg-gray-100 rounded px-1 py-0.5">
                     {item.name}
@@ -252,15 +222,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
                 )}
 
                 {editingId === item.id && editingField === "unit" ? (
-                  <input 
-                    autoFocus
-                    type="text" 
-                    value={editValue} 
-                    onChange={(e) => setEditValue(e.target.value)} 
-                    onBlur={saveEdit}
-                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                    className="w-16 mt-1 p-1 bg-white border border-[#FF9800] rounded text-[10px] outline-none"
-                  />
+                  <input autoFocus type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} className="w-16 mt-1 p-1 bg-white border border-[#FF9800] rounded text-[10px] outline-none" />
                 ) : (
                   <p onClick={() => startEdit(item.id, "unit", item.unit)} className="text-[10px] text-gray-500 cursor-text hover:bg-gray-100 rounded px-1 inline-block">
                     {item.unit}
@@ -270,15 +232,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
 
               <div className="text-right pr-1">
                 {editingId === item.id && editingField === "buyingPrice" ? (
-                  <input 
-                    autoFocus
-                    type="number" 
-                    value={editValue} 
-                    onChange={(e) => setEditValue(e.target.value)} 
-                    onBlur={saveEdit}
-                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                    className="w-full text-right p-1 bg-white border border-[#FF9800] rounded text-xs outline-none"
-                  />
+                  <input autoFocus type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} className="w-full text-right p-1 bg-white border border-[#FF9800] rounded text-xs outline-none" />
                 ) : (
                   <p onClick={() => startEdit(item.id, "buyingPrice", item.buyingPrice || "")} className="text-gray-500 text-xs cursor-text hover:bg-gray-100 rounded px-1 py-0.5">
                     {item.buyingPrice ? item.buyingPrice.toLocaleString() : "-"}
@@ -288,15 +242,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
 
               <div className="text-right pr-1">
                 {editingId === item.id && editingField === "sellingPrice" ? (
-                  <input 
-                    autoFocus
-                    type="number" 
-                    value={editValue} 
-                    onChange={(e) => setEditValue(e.target.value)} 
-                    onBlur={saveEdit}
-                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                    className="w-full text-right p-1 bg-white border border-[#FF9800] rounded text-xs font-bold text-[#0055FF] outline-none"
-                  />
+                  <input autoFocus type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} className="w-full text-right p-1 bg-white border border-[#FF9800] rounded text-xs font-bold text-[#0055FF] outline-none" />
                 ) : (
                   <p onClick={() => startEdit(item.id, "sellingPrice", item.sellingPrice)} className="font-bold text-[#0055FF] text-xs cursor-text hover:bg-gray-100 rounded px-1 py-0.5">
                     {item.sellingPrice.toLocaleString()}
@@ -319,4 +265,4 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-     }
+    }
