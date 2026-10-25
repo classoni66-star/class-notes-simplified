@@ -10,13 +10,13 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState<number | "">("");
 
-  // Inputs for Sale
-  const [inputMode, setInputMode] = useState<"qty" | "amount">("amount"); // Default to amount for speed
-  const [qty, setQty] = useState<number | "">("");
+  // Inputs for Sale (Both open)
+  const [qty, setQty] = useState<number | "">(1); // Default to 1
   const [amount, setAmount] = useState<number | "">("");
 
   // Payment Status
   const [isPaid, setIsPaid] = useState(true);
+  const [amountPaid, setAmountPaid] = useState<number | "">("");
   const [clientName, setClientName] = useState("");
 
   const [priceList, setPriceList] = useState<any[]>([]);
@@ -34,15 +34,37 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
     item.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const currentUnitPrice = isAddingNew ? (Number(newItemPrice) || 0) : (selectedItem?.sellingPrice || 0);
+
+  const handleQtyChange = (val: string) => {
+    const num = Number(val);
+    setQty(val === "" ? "" : num);
+    if (num > 0 && currentUnitPrice > 0) {
+      setAmount(num * currentUnitPrice);
+    } else if (val === "") {
+      setAmount("");
+    }
+  };
+
+  const handleAmountChange = (val: string) => {
+    const num = Number(val);
+    setAmount(val === "" ? "" : num);
+    if (num > 0 && currentUnitPrice > 0) {
+      setQty(num / currentUnitPrice);
+    } else if (val === "") {
+      setQty("");
+    }
+  };
+
   const resetForm = () => {
     setSelectedItem(null);
     setIsAddingNew(false);
     setNewItemName("");
     setNewItemPrice("");
-    setQty("");
+    setQty(1);
     setAmount("");
-    setInputMode("amount");
     setIsPaid(true);
+    setAmountPaid("");
     setClientName("");
     setSearch("");
   };
@@ -63,18 +85,25 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       return;
     }
 
-    // Determine Quantity and Total
-    let finalQty = 1;
-    let finalTotal = unitPrice;
+    let finalQty = qty ? Number(qty) : 1;
+    let finalTotal = amount ? Number(amount) : unitPrice;
 
-    if (inputMode === "qty") {
-      if (qty && qty > 0) finalQty = Number(qty);
-      finalTotal = unitPrice * finalQty;
-    } else {
-      if (amount && amount > 0) {
-        finalTotal = Number(amount);
+    if (inputMode === "qty" && !amount) {
+        finalTotal = unitPrice * finalQty;
+    } else if (inputMode === "amount" && !qty) {
         finalQty = finalTotal / unitPrice;
-      }
+    }
+    
+    // Calculate partial payment details
+    let actualPaid = 0;
+    let debtBalance = 0;
+
+    if (isPaid) {
+      actualPaid = finalTotal;
+    } else {
+      actualPaid = amountPaid ? Number(amountPaid) : 0;
+      debtBalance = finalTotal - actualPaid;
+      if (debtBalance < 0) debtBalance = 0; // Failsafe
     }
     
     // 1. Save the Sale
@@ -88,18 +117,19 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       buyingPrice: selectedItem?.buyingPrice || 0,
       sellingPrice: unitPrice,
       isPaid,
+      amountPaid: actualPaid, // Save amount paid
       clientName: isPaid ? "" : clientName.trim() || "Unknown",
     };
     localStorage.setItem("smartsale_sales", JSON.stringify([...existingSales, newSale]));
 
     // 2. Handle Debt
-    if (!isPaid) {
+    if (!isPaid && debtBalance > 0) {
       const existingDebts = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
       const newDebt = {
         id: newSale.id,
         date: newSale.date,
         clientName: newSale.clientName,
-        amountOwed: finalTotal,
+        amountOwed: debtBalance, // Save only the remaining balance
       };
       localStorage.setItem("smartsale_debtors", JSON.stringify([...existingDebts, newDebt]));
     }
@@ -111,7 +141,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       
       if (!exists) {
         const newId = Date.now().toString() + "-new";
-        // Add to Price List
         const newItemForList = {
           id: newId,
           name: finalItemName,
@@ -121,15 +150,16 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
         };
         localStorage.setItem("smartsale_pricelist_v2", JSON.stringify([...currentList, newItemForList]));
 
-        // Add to Initial Stock (so it shows up in the Stock tab)
         const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
-        initialStock.push({ itemId: newId, quantity: 0 }); // Start at 0 stock
+        initialStock.push({ itemId: newId, quantity: 0 }); 
         localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
       }
     }
 
     navigate("home");
   };
+
+  const remainingDebt = (!isPaid && amount && amountPaid) ? (Number(amount) - Number(amountPaid)) : (!isPaid && amount ? Number(amount) : 0);
 
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden relative">
@@ -142,7 +172,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         
-        {/* SEARCH & ADD NEW LIST VIEW */}
         {!selectedItem && !isAddingNew && (
           <div className="space-y-4">
             <div className="relative">
@@ -156,9 +185,8 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
               />
             </div>
 
-            {/* RECTANGULAR ADD NEW ITEM BUTTON */}
             <button 
-              onClick={() => setIsAddingNew(true)}
+              onClick={() => { setIsAddingNew(true); setQty(1); setAmount(""); }}
               className="w-full bg-white border-2 border-dashed border-[#FF9800] p-4 rounded-xl flex items-center justify-center gap-2 text-[#FF9800] shadow-sm active:scale-[0.98] transition-transform"
             >
               <Plus size={20} />
@@ -169,7 +197,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
               {filteredItems.map((item) => (
                 <button 
                   key={item.id}
-                  onClick={() => { setSelectedItem(item); setSearch(""); }}
+                  onClick={() => { setSelectedItem(item); setQty(1); setAmount(item.sellingPrice); setSearch(""); }}
                   className="w-full bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center text-left active:scale-[0.98] transition-transform"
                 >
                   <div>
@@ -179,19 +207,12 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
                   <p className="font-extrabold text-[#0055FF] text-lg">UGX {item.sellingPrice.toLocaleString()}</p>
                 </button>
               ))}
-              
-              {search.length > 0 && filteredItems.length === 0 && (
-                <p className="text-center text-gray-400 py-6 text-sm">No items found. Tap the orange button above to sell this.</p>
-              )}
             </div>
           </div>
         )}
 
-        {/* SALE FORM (EXISTING OR NEW ITEM) */}
         {(selectedItem || isAddingNew) && (
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-            
-            {/* HEADER (Item Name / Price) */}
             <div className="flex justify-between items-start mb-6 border-b border-gray-100 pb-4">
               <div className="flex-1">
                 {isAddingNew ? (
@@ -216,52 +237,42 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
               <button onClick={resetForm} className="text-sm font-bold text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg ml-2 mt-1">Cancel</button>
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-4">
               
-              {/* CUSTOM PRICE INPUT */}
               {isAddingNew && (
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Selling Price (UGX) *</label>
                   <input 
                     type="number" 
                     value={newItemPrice}
-                    onChange={(e) => setNewItemPrice(Number(e.target.value))}
+                    onChange={(e) => { setNewItemPrice(Number(e.target.value)); setAmount(Number(e.target.value)); setQty(1); }}
                     placeholder="e.g. 2000"
-                    className="w-full mt-1 p-4 bg-gray-50 border border-gray-200 rounded-xl text-2xl font-extrabold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]"
+                    className="w-full mt-1 p-4 bg-gray-50 border border-gray-200 rounded-xl text-xl font-extrabold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]"
                   />
                 </div>
               )}
 
-              {/* INPUT TOGGLE (Amount is default) */}
-              <div>
-                <div className="flex bg-gray-100 p-1.5 rounded-xl mb-3">
-                  <button onClick={() => setInputMode("amount")} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${inputMode === "amount" ? "bg-white shadow-sm text-[#FF9800]" : "text-gray-500"}`}>Enter Total Amount</button>
-                  <button onClick={() => setInputMode("qty")} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${inputMode === "qty" ? "bg-white shadow-sm text-[#FF9800]" : "text-gray-500"}`}>Enter Quantity</button>
+              {/* QUANTITY & AMOUNT BOTH OPEN */}
+              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantity Sold</label>
+                  <input 
+                    type="number" 
+                    value={qty} 
+                    onChange={(e) => handleQtyChange(e.target.value)} 
+                    className="w-full mt-1 p-3 bg-white border border-gray-200 rounded-xl text-xl font-bold outline-none focus:ring-2 focus:ring-[#0055FF]" 
+                  />
                 </div>
                 
-                {inputMode === "amount" ? (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Amount (UGX)</label>
-                    <input 
-                      type="number" 
-                      value={amount} 
-                      onChange={(e) => setAmount(Number(e.target.value))} 
-                      placeholder="e.g. 10000" 
-                      className="w-full mt-1 p-4 bg-gray-50 border border-gray-200 rounded-xl text-2xl font-extrabold text-[#FF9800] outline-none focus:ring-2 focus:ring-[#FF9800]" 
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantity Sold (Optional)</label>
-                    <input 
-                      type="number" 
-                      value={qty} 
-                      onChange={(e) => setQty(Number(e.target.value))} 
-                      placeholder="Leave blank for 1" 
-                      className="w-full mt-1 p-4 bg-gray-50 border border-gray-200 rounded-xl text-xl font-bold outline-none focus:ring-2 focus:ring-[#FF9800]" 
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Price (UGX)</label>
+                  <input 
+                    type="number" 
+                    value={amount} 
+                    onChange={(e) => handleAmountChange(e.target.value)} 
+                    className="w-full mt-1 p-3 bg-white border border-gray-200 rounded-xl text-2xl font-extrabold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#0055FF]" 
+                  />
+                </div>
               </div>
 
               {/* PAYMENT STATUS */}
@@ -280,41 +291,42 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
                     onClick={() => setIsPaid(false)} 
                     className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-between px-5 border-2 transition-colors ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}
                   >
-                    <span>Credit (Not Paid)</span>
+                    <span>Credit (Debt)</span>
                     {!isPaid && <AlertCircle size={20} />}
                   </button>
                 </div>
               </div>
 
-              {/* CLIENT NAME FOR DEBT */}
+              {/* DEBT DETAILS */}
               {!isPaid && (
-                <div className="bg-red-50 p-4 rounded-xl border border-red-100 animate-fade-in-down">
-                  <label className="text-xs font-bold text-red-800 uppercase tracking-wider">Client Name (Optional)</label>
-                  <input 
-                    type="text" 
-                    value={clientName} 
-                    onChange={(e) => setClientName(e.target.value)} 
-                    placeholder="Who owes you?" 
-                    className="w-full mt-2 p-3 bg-white border border-red-200 rounded-xl outline-none focus:ring-2 focus:ring-red-400 text-lg font-medium" 
-                  />
-                  <p className="text-[10px] text-red-600 font-medium mt-2 flex items-center gap-1">
-                    <AlertCircle size={12} /> This will be added to your Debtors list.
-                  </p>
+                <div className="bg-red-50 p-4 rounded-xl border border-red-100 animate-fade-in-down space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-red-800 uppercase tracking-wider">Amount Paid Now (Optional)</label>
+                    <input 
+                      type="number" 
+                      value={amountPaid} 
+                      onChange={(e) => setAmountPaid(Number(e.target.value))} 
+                      placeholder="Leave blank if they paid nothing" 
+                      className="w-full mt-1 p-3 bg-white border border-red-200 rounded-xl outline-none focus:ring-2 focus:ring-red-400 text-lg font-bold text-gray-800" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-red-800 uppercase tracking-wider">Client Name (Optional)</label>
+                    <input 
+                      type="text" 
+                      value={clientName} 
+                      onChange={(e) => setClientName(e.target.value)} 
+                      placeholder="Who owes you?" 
+                      className="w-full mt-1 p-3 bg-white border border-red-200 rounded-xl outline-none focus:ring-2 focus:ring-red-400 text-lg font-medium" 
+                    />
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-red-200">
+                    <span className="text-xs font-bold text-red-800 uppercase">Remaining Debt:</span>
+                    <span className="text-xl font-extrabold text-red-600">UGX {remainingDebt.toLocaleString()}</span>
+                  </div>
                 </div>
               )}
 
-              {/* TOTAL DISPLAY */}
-              <div className="pt-4 border-t border-gray-100 flex justify-between items-center bg-orange-50 p-4 rounded-xl">
-                <p className="text-sm font-bold text-gray-600 uppercase tracking-wider">Total Sale</p>
-                <p className="text-3xl font-extrabold text-[#FF9800]">
-                  UGX {inputMode === "qty" 
-                    ? ((isAddingNew ? (Number(newItemPrice) || 0) : selectedItem.sellingPrice) * (Number(qty) || 1)).toLocaleString()
-                    : (Number(amount) || 0).toLocaleString()
-                  }
-                </p>
-              </div>
-
-              {/* SUBMIT BUTTON */}
               <button 
                 onClick={handleRecordSale}
                 className="w-full bg-[#FF9800] text-white py-5 rounded-xl font-extrabold text-xl shadow-lg shadow-orange-500/30 flex justify-center items-center gap-2 mt-2 active:scale-95 transition-transform"
