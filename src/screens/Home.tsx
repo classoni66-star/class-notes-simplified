@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Gift, User, ArrowUpRight, ArrowDownRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus } from "lucide-react";
+import { Gift, User, ArrowUpRight, ArrowDownRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus, AlertCircle } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt";
 import TrafficModal from "./TrafficModal";
 import FinanceModal from "./FinanceModal";
@@ -13,7 +13,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
   
   const [stats, setStats] = useState({
     sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0,
-    salesChange: 0, profitChange: 0, debtorsChange: 0, creditorsChange: 0, stockChange: 0
+    salesChange: 0, profitChange: 0, debtorsChange: 0, creditorsChange: 0,
+    missingBuyPrices: false
   });
 
   useEffect(() => {
@@ -44,20 +45,25 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     let totalSales = 0, totalProfit = 0;
     let yTotalSales = 0, yTotalProfit = 0;
-
-    const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
-    const hasConfirmedPrices = savedPriceList.some((item: any) => item.buyingPrice > 0 && item.sellingPrice > 0);
+    let missingBuyPrices = false;
 
     todaySales.forEach((sale: any) => {
       totalSales += Number(sale.total) || 0;
-      const profit = ((Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0)) * (Number(sale.quantity) || 0);
-      if (hasConfirmedPrices && !isNaN(profit)) totalProfit += profit;
+      
+      if (!sale.buyingPrice || Number(sale.buyingPrice) <= 0) {
+        missingBuyPrices = true;
+      } else {
+        const profit = (Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0);
+        totalProfit += profit * (Number(sale.quantity) || 0);
+      }
     });
 
     yesterdaySales.forEach((sale: any) => {
       yTotalSales += Number(sale.total) || 0;
-      const profit = ((Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0)) * (Number(sale.quantity) || 0);
-      if (hasConfirmedPrices && !isNaN(profit)) yTotalProfit += profit;
+      if (sale.buyingPrice && Number(sale.buyingPrice) > 0) {
+        const profit = (Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0);
+        yTotalProfit += profit * (Number(sale.quantity) || 0);
+      }
     });
 
     const savedDebtors = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
@@ -68,6 +74,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const activeCreditors = savedCreditors.filter((c: any) => Number(c.amountOwed) > 0).length;
     const yActiveCreditors = savedCreditors.filter((c: any) => new Date(c.date).toDateString() === yesterdayStr && Number(c.amountOwed) > 0).length;
     
+    const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || localStorage.getItem("smartsale_pricelist") || "[]");
     const savedInitialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const allSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const allRemovals = JSON.parse(localStorage.getItem("smartsale_removals") || "[]");
@@ -84,7 +91,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
       if (current > 0) totalStockLeft += current; 
     });
 
-    // Helper function for percentage change
     const getPercent = (current: number, previous: number) => {
       if (previous === 0) return current > 0 ? 100 : 0;
       return ((current - previous) / previous) * 100;
@@ -92,15 +98,15 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     setStats({
       sales: totalSales, 
-      profit: hasConfirmedPrices ? totalProfit : -1, 
+      profit: missingBuyPrices ? -1 : totalProfit, 
       debtors: activeDebtors, 
       creditors: activeCreditors, 
       stock: totalStockLeft,
       salesChange: getPercent(totalSales, yTotalSales),
-      profitChange: hasConfirmedPrices ? getPercent(totalProfit, yTotalProfit) : 0,
+      profitChange: missingBuyPrices ? 0 : getPercent(totalProfit, yTotalProfit),
       debtorsChange: getPercent(activeDebtors, yActiveDebtors),
       creditorsChange: getPercent(activeCreditors, yActiveCreditors),
-      stockChange: 0 // Simple placeholder for stock trend
+      missingBuyPrices
     });
   };
 
@@ -170,13 +176,13 @@ export default function Home({ navigate, businessInfo, language }: any) {
               <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
             </div>
 
-            <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
+            <div onClick={() => navigate(stats.missingBuyPrices ? "priceList" : "analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
               <div className="flex justify-between items-start">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
                 {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.profitChange)}
               </div>
-              <p className="text-base font-extrabold text-[#0055FF] mt-0.5">
-                {isPremium ? (stats.profit === -1 ? "Confirm Prices" : formatMoney(stats.profit)) : "UGX ***"}
+              <p className={`text-sm font-extrabold mt-0.5 leading-tight ${stats.missingBuyPrices ? 'text-red-500 flex items-center gap-1' : 'text-[#0055FF]'}`}>
+                {!isPremium ? "UGX ***" : (stats.missingBuyPrices ? <><AlertCircle size={12}/> Set Buy Prices</> : formatMoney(stats.profit))}
               </p>
             </div>
 
@@ -273,4 +279,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
     </div>
   );
-    }
+                       }
