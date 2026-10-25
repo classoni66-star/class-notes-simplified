@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Store, Pill, Wrench, Utensils, Briefcase, ShoppingBag, Lock } from "lucide-react";
+import { ArrowLeft, Store, Pill, Wrench, Utensils, Briefcase, ShoppingBag, Lock, ShieldQuestion } from "lucide-react";
 
 export default function Onboarding({ navigate, onComplete, language }: any) {
   const [step, setStep] = useState(1);
@@ -8,6 +8,10 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
   const [phone, setPhone] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const [password, setPassword] = useState("");
+  
+  // Security Question State
+  const [secQuestion, setSecQuestion] = useState("What is your mother's name?");
+  const [secAnswer, setSecAnswer] = useState("");
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
@@ -21,24 +25,26 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
   ];
 
   const handleVerify = () => {
-    if (smsCode.length >= 4) {
-      setStep(5);
-    }
+    if (smsCode.length >= 4) setStep(5);
   };
 
   const handleFinish = () => {
     if (password.length < 4) return alert("Password must be at least 4 characters.");
+    if (!secAnswer.trim()) return alert("Please provide a security answer.");
+
     localStorage.setItem("smartsale_password", btoa(password));
+    localStorage.setItem("smartsale_sec_question", secQuestion);
+    localStorage.setItem("smartsale_sec_answer", btoa(secAnswer.trim().toLowerCase())); // Hash answer
 
     const invitedBy = localStorage.getItem("smartsale_invited_by");
-    let hoursToAdd = 1; // 🕐 1 HOUR FREE TRIAL
+    let hoursToAdd = 1; 
     
     if (invitedBy) {
       if (invitedBy.trim() === phone.trim()) {
         alert("You cannot use your own invite link.");
         localStorage.removeItem("smartsale_invited_by");
       } else {
-        hoursToAdd = 24 * 7; // 7 days for referral
+        hoursToAdd = 24 * 7;
         localStorage.removeItem("smartsale_invited_by");
         setTimeout(() => alert("🎉 Welcome! You have received 7 days of free Premium access!"), 500);
       }
@@ -69,7 +75,7 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
         </div>
         
         <h2 className="text-xl font-extrabold text-gray-800 text-center mb-8">
-          {step === 5 ? "Secure your account" : "Create your merchant account"}
+          {step === 6 ? "Account Recovery" : step === 5 ? "Secure your account" : "Create your merchant account"}
         </h2>
 
         {step === 1 && (
@@ -87,11 +93,7 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Merchant Category</label>
             <div className="grid grid-cols-1 gap-2">
               {categories.map((cat) => (
-                <button 
-                  key={cat.id}
-                  onClick={() => { setBusinessType(cat.id); setStep(3); }}
-                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl text-left shadow-sm hover:border-[#FF9800] active:scale-95 transition-transform"
-                >
+                <button key={cat.id} onClick={() => { setBusinessType(cat.id); setStep(3); }} className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl text-left shadow-sm hover:border-[#FF9800] active:scale-95 transition-transform">
                   <div className="w-10 h-10 rounded-full bg-orange-50 text-[#FF9800] flex items-center justify-center flex-shrink-0">{cat.icon}</div>
                   <div>
                     <p className="font-bold text-gray-800 text-sm">{cat.label}</p>
@@ -130,10 +132,36 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter a strong password" className="w-full mt-1 pl-10 p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF9800] outline-none font-medium text-gray-800" />
               </div>
             </div>
-            <button onClick={handleFinish} disabled={password.length < 4} className="w-full bg-[#FF9800] text-white py-4 rounded-xl font-bold mt-4 disabled:opacity-50">Finish Setup</button>
+            <button onClick={() => setStep(6)} disabled={password.length < 4} className="w-full bg-[#FF9800] text-white py-4 rounded-xl font-bold mt-4 disabled:opacity-50">Next</button>
+          </div>
+        )}
+
+        {step === 6 && (
+          <div className="w-full space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Security Question</label>
+              <div className="relative">
+                <ShieldQuestion size={18} className="absolute left-3 top-4 text-gray-400" />
+                <select 
+                  value={secQuestion} 
+                  onChange={(e) => setSecQuestion(e.target.value)} 
+                  className="w-full mt-1 pl-10 p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF9800] outline-none font-medium text-gray-800"
+                >
+                  <option>What is your mother's name?</option>
+                  <option>What is your favorite food?</option>
+                  <option>What is your first pet's name?</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Your Answer</label>
+              <input type="text" value={secAnswer} onChange={(e) => setSecAnswer(e.target.value)} placeholder="e.g. Joy" className="w-full mt-1 p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF9800] outline-none font-medium text-gray-800" />
+              <p className="text-[10px] text-gray-400 mt-2 ml-1">You will use this if you forget your password.</p>
+            </div>
+            <button onClick={handleFinish} disabled={!secAnswer.trim()} className="w-full bg-[#FF9800] text-white py-4 rounded-xl font-bold mt-4 disabled:opacity-50">Finish Setup</button>
           </div>
         )}
       </div>
     </div>
   );
-      }
+}
