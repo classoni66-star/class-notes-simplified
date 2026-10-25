@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
-import { Gift, User, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus, AlertCircle, X, Mic } from "lucide-react";
+import { Gift, User, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus, MessageCircle, X } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt";
 import FinanceModal from "./FinanceModal";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home({ navigate, businessInfo, language }: any) {
   const [timeOfDay, setTimeOfDay] = useState("morning");
   const [todayDate, setTodayDate] = useState("");
   const [isPremium, setIsPremium] = useState(true);
   const [financeModalType, setFinanceModalType] = useState<"fund" | "spend" | null>(null);
-  const [showTrafficInfo, setShowTrafficInfo] = useState(false);
   
+  // Traffic Bubble State
+  const [showTrafficBubble, setShowTrafficBubble] = useState(false);
+  const [toastTimeout, setToastTimeout] = useState<any>(null);
+
   const [stats, setStats] = useState({
     sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0,
     salesChange: 0, profitChange: 0, debtorsChange: 0, creditorsChange: 0,
@@ -33,8 +37,15 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
   const calculateStats = () => {
     const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
-    const todayStr = new Date().toDateString();
+    const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || localStorage.getItem("smartsale_pricelist") || "[]");
     
+    // Create a fast lookup dictionary for the price list
+    const priceMap: Record<string, any> = {};
+    savedPriceList.forEach((item: any) => {
+      priceMap[item.name] = item;
+    });
+
+    const todayStr = new Date().toDateString();
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toDateString();
@@ -49,18 +60,24 @@ export default function Home({ navigate, businessInfo, language }: any) {
     todaySales.forEach((sale: any) => {
       totalSales += Number(sale.total) || 0;
       
-      if (!sale.buyingPrice || Number(sale.buyingPrice) <= 0) {
+      // 🧠 SMART PROFIT: Check the Price List first, fallback to the sale record
+      const itemDetails = priceMap[sale.itemName];
+      const currentBuyPrice = itemDetails ? Number(itemDetails.buyingPrice) : Number(sale.buyingPrice);
+      
+      if (!currentBuyPrice || currentBuyPrice <= 0) {
         missingBuyPrices = true;
       } else {
-        const profit = (Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0);
+        const profit = (Number(sale.sellingPrice) || 0) - currentBuyPrice;
         totalProfit += profit * (Number(sale.quantity) || 0);
       }
     });
 
     yesterdaySales.forEach((sale: any) => {
       yTotalSales += Number(sale.total) || 0;
-      if (sale.buyingPrice && Number(sale.buyingPrice) > 0) {
-        const profit = (Number(sale.sellingPrice) || 0) - (Number(sale.buyingPrice) || 0);
+      const itemDetails = priceMap[sale.itemName];
+      const currentBuyPrice = itemDetails ? Number(itemDetails.buyingPrice) : Number(sale.buyingPrice);
+      if (currentBuyPrice && currentBuyPrice > 0) {
+        const profit = (Number(sale.sellingPrice) || 0) - currentBuyPrice;
         yTotalProfit += profit * (Number(sale.quantity) || 0);
       }
     });
@@ -73,21 +90,27 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const activeCreditors = savedCreditors.filter((c: any) => Number(c.amountOwed) > 0).length;
     const yActiveCreditors = savedCreditors.filter((c: any) => new Date(c.date).toDateString() === yesterdayStr && Number(c.amountOwed) > 0).length;
     
-    const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || localStorage.getItem("smartsale_pricelist") || "[]");
     const savedInitialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const allSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const allRemovals = JSON.parse(localStorage.getItem("smartsale_removals") || "[]");
 
+    // 🧠 SMART STOCK CALCULATION
     let totalStockLeft = 0;
     savedPriceList.forEach((item: any) => {
       const initialEntry = savedInitialStock.find((s: any) => s.itemId === item.id);
       const initial = initialEntry ? Number(initialEntry.quantity) : 0;
+      
       const itemSales = allSales.filter((s: any) => s.itemName === item.name);
       const sold = itemSales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
+      
       const itemRemovals = allRemovals.filter((r: any) => r.itemId === item.id);
       const removed = itemRemovals.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
+      
       const current = initial - sold - removed;
-      if (current > 0) totalStockLeft += current; 
+      // Only count positive stock
+      if (current > 0) {
+        totalStockLeft += current;
+      }
     });
 
     const getPercent = (current: number, previous: number) => {
@@ -112,6 +135,15 @@ export default function Home({ navigate, businessInfo, language }: any) {
   useEffect(() => {
     calculateStats();
   }, [businessInfo, financeModalType]); 
+
+  const handleTrafficClick = () => {
+    setShowTrafficBubble(true);
+    if (toastTimeout) clearTimeout(toastTimeout);
+    const timeout = setTimeout(() => {
+      setShowTrafficBubble(false);
+    }, 4000);
+    setToastTimeout(timeout);
+  };
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
@@ -175,13 +207,13 @@ export default function Home({ navigate, businessInfo, language }: any) {
               <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
             </div>
 
-            {/* PROFIT CARD - CALM BLUE TEXT */}
+            {/* CALM BLUE PROFIT TEXT */}
             <div onClick={() => navigate(stats.missingBuyPrices ? "priceList" : "analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
               <div className="flex justify-between items-start">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
                 {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.profitChange)}
               </div>
-              <p className={`text-sm font-extrabold mt-0.5 leading-tight text-[#0055FF]`}>
+              <p className={`text-[11px] font-extrabold mt-0.5 leading-tight text-[#0055FF]`}>
                 {!isPremium ? "UGX ***" : (stats.missingBuyPrices ? "Confirm buying prices to calculate" : formatMoney(stats.profit))}
               </p>
             </div>
@@ -247,14 +279,37 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </button>
       </div>
 
-      {/* TRAFFIC BUTTON - SHOWS COMING SOON MODAL */}
+      {/* TRAFFIC BUTTON - OPENS CHAT BUBBLE */}
       <button 
-        onClick={() => setShowTrafficInfo(true)} 
+        onClick={handleTrafficClick} 
         className="fixed bottom-[210px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
       >
         <Play size={18} fill="currentColor" className="ml-1" />
         <span className="text-[8px] font-bold mt-0.5">Traffic</span>
       </button>
+
+      {/* 🚦 TRAFFIC CHAT BUBBLE */}
+      <AnimatePresence>
+        {showTrafficBubble && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20, scale: 0.9 }} 
+            animate={{ opacity: 1, y: 0, scale: 1 }} 
+            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+            className="fixed bottom-[280px] right-4 w-64 bg-[#0055FF] text-white p-4 rounded-2xl rounded-br-sm shadow-xl z-50"
+          >
+            <button onClick={() => setShowTrafficBubble(false)} className="absolute top-2 right-2 text-white/70 hover:text-white">
+              <X size={16} />
+            </button>
+            <div className="flex items-center gap-2 mb-1">
+              <MessageCircle size={18} />
+              <h4 className="font-bold text-sm">Traffic Mode</h4>
+            </div>
+            <p className="text-[11px] leading-relaxed opacity-90">
+              Coming soon! Traffic mode records your orders when traffic is high, and you review them when it reduces. We are refining this to use AI transcription for your customers' privacy.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-[65px] z-30 pb-1">
         <button onClick={() => navigate("stock")} className="flex flex-col items-center gap-1 text-gray-400">
@@ -280,33 +335,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       <InstallPrompt />
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
-
-      {/* 🚦 TRAFFIC COMING SOON MODAL */}
-      {showTrafficInfo && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl relative">
-            <button onClick={() => setShowTrafficInfo(false)} className="absolute top-4 right-4 p-1 bg-gray-100 rounded-full text-gray-500">
-              <X size={20} />
-            </button>
-            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-[#0055FF]">
-              <Mic size={32} />
-            </div>
-            <h2 className="text-xl font-extrabold text-gray-800 mb-2">Coming Soon!</h2>
-            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-              Traffic mode records your orders when traffic is high, and you review and confirm them when traffic reduces. 
-              <br/><br/>
-              We are refining this feature to ensure your customers' privacy is fully protected using AI transcription rather than voice recording.
-            </p>
-            <button 
-              onClick={() => setShowTrafficInfo(false)} 
-              className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
-
     </div>
   );
-      }
+  }
