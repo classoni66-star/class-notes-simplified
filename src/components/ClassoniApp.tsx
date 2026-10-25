@@ -23,6 +23,19 @@ export default function SmartSaleApp() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
+  // 🔄 SYNC WITH PHONE BACK BUTTON
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.screen) {
+        setCurrentScreen(event.state.screen);
+      } else {
+        setCurrentScreen("home"); // fallback
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
@@ -34,13 +47,11 @@ export default function SmartSaleApp() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
-    // Pesapal Callback
     if (params.get('payment_callback') === 'true') {
       setCurrentScreen("paymentCallback");
       return; 
     }
 
-    // Referral Link
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem("smartsale_invited_by", ref);
@@ -65,6 +76,7 @@ export default function SmartSaleApp() {
               setIsLocked(true);
             } else {
               setCurrentScreen("home");
+              window.history.replaceState({ screen: "home" }, '');
             }
           }
         }
@@ -76,6 +88,7 @@ export default function SmartSaleApp() {
   const handleUnlock = () => {
     setIsLocked(false);
     setCurrentScreen("home");
+    window.history.replaceState({ screen: "home" }, '');
   };
 
   const navigate = useCallback((screen: string) => {
@@ -86,6 +99,12 @@ export default function SmartSaleApp() {
       setShowPremiumModal(true);
       return;
     }
+    
+    // Push state to history for back button sync
+    if (screen !== "home" && screen !== "welcome") {
+      window.history.pushState({ screen }, '');
+    }
+    
     setCurrentScreen(screen);
   }, []);
 
@@ -93,8 +112,11 @@ export default function SmartSaleApp() {
     setBusinessInfo(data);
     localStorage.setItem("smartsale_business", JSON.stringify(data));
     localStorage.setItem("smartsale_is_logged_in", "true");
-    setTimeout(() => navigate("home"), 100);
-  }, [navigate]);
+    setTimeout(() => {
+      setCurrentScreen("home");
+      window.history.replaceState({ screen: "home" }, '');
+    }, 100);
+  }, []);
 
   const startDemo = (type: "new" | "returning") => {
     if (type === "new") {
@@ -108,7 +130,8 @@ export default function SmartSaleApp() {
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
       localStorage.setItem("smartsale_premium_until", (Date.now() + (1 * 60 * 60 * 1000)).toString()); 
       localStorage.setItem("smartsale_is_logged_in", "true");
-      navigate("home");
+      setCurrentScreen("home");
+      window.history.replaceState({ screen: "home" }, '');
     }
   };
 
@@ -170,4 +193,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-      }
+                        }
