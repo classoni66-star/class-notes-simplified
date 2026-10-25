@@ -22,11 +22,8 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const allFunds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || localStorage.getItem("smartsale_pricelist") || "[]");
     
-    // Create a fast lookup dictionary for the price list
     const priceMap: Record<string, any> = {};
-    savedPriceList.forEach((item: any) => {
-      priceMap[item.name] = item;
-    });
+    savedPriceList.forEach((item: any) => { priceMap[item.name] = item; });
 
     const grouped: Record<string, any> = {};
     const uniqueDates = new Set<string>();
@@ -62,7 +59,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
         totalDayCashSales += paidPart;
         totalDayDebts += debtPart;
         
-        // 🧠 SMART PROFIT
         const itemDetails = priceMap[s.itemName];
         const currentBuyPrice = itemDetails ? Number(itemDetails.buyingPrice) : Number(s.buyingPrice);
 
@@ -99,9 +95,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     });
 
     const reversedGrouped: Record<string, any> = {};
-    Object.keys(grouped).reverse().forEach(key => {
-      reversedGrouped[key] = grouped[key];
-    });
+    Object.keys(grouped).reverse().forEach(key => { reversedGrouped[key] = grouped[key]; });
     setGroupedSales(reversedGrouped);
     setExpenses(allExpenses);
 
@@ -185,6 +179,18 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       missingBuyPrices: monthMissingBuyPrices
     });
   }, []);
+
+  const handleEditPrevCash = (dateStr: string, currentVal: number) => {
+    const newVal = prompt("Enter corrected money from yesterday (UGX):", currentVal.toString());
+    if (newVal === null) return;
+    const num = Number(newVal);
+    if (isNaN(num)) return alert("Invalid amount");
+
+    const prevDate = new Date(dateStr);
+    prevDate.setDate(prevDate.getDate() - 1);
+    localStorage.setItem(`smartsale_cash_${prevDate.toDateString()}`, num.toString());
+    window.location.reload();
+  };
 
   const handleDeleteExpense = (id: string) => {
     if (!window.confirm("Delete this expense?")) return;
@@ -370,10 +376,15 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                   
                   <div className="border-t border-orange-200 my-1"></div>
                   
-                  <div className="flex justify-between text-gray-600">
+                  {/* 🛠️ EDITABLE MONEY FROM YESTERDAY */}
+                  <div 
+                    onClick={() => handleEditPrevCash(data.dateStr, data.prevCash)}
+                    className="flex justify-between text-gray-600 cursor-pointer hover:bg-orange-100 p-1 -mx-1 rounded transition-colors"
+                  >
                     <span>Money from yesterday</span>
-                    <span>+ UGX {data.prevCash.toLocaleString()}</span>
+                    <span className="font-bold border-b border-dashed border-gray-400">+ UGX {data.prevCash.toLocaleString()}</span>
                   </div>
+
                   <div className="flex justify-between text-gray-600">
                     <span>Funds added</span>
                     <span>+ UGX {data.dayFunds.toLocaleString()}</span>
@@ -526,4 +537,4 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-    }
+                                   }
