@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Lock } from "lucide-react";
@@ -24,47 +23,24 @@ export default function SmartSaleApp() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
-  // 🚀 AUTO-UPDATE MAGIC
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
         registration.update();
-        registration.onupdatefound = () => {
-          const installingWorker = registration.installing;
-          if (installingWorker) {
-            installingWorker.onstatechange = () => {
-              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                window.location.reload();
-              }
-            };
-          }
-        };
       }).catch((err) => console.log('SW failed:', err));
     }
   }, []);
 
-  // Handle Referral, Collaborator Links & Pesapal Callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
-    // 🛑 Catch the Pesapal Redirect
+    // Pesapal Callback
     if (params.get('payment_callback') === 'true') {
       setCurrentScreen("paymentCallback");
       return; 
     }
 
-    const joinOwner = params.get('join');
-    const expiry = params.get('exp');
-    if (joinOwner && expiry) {
-      if (Date.now() > Number(expiry)) {
-        alert("This invite link has expired. Please ask the owner for a new one.");
-      } else {
-        alert(`🎉 You have been invited to join a shop! Please set up your personal login details.`);
-        localStorage.setItem("smartsale_joining_shop", joinOwner);
-      }
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
+    // Referral Link
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem("smartsale_invited_by", ref);
@@ -83,7 +59,6 @@ export default function SmartSaleApp() {
         if (parsed && parsed.name) {
           setBusinessInfo(parsed);
           
-          // If we are on paymentCallback, we don't want to trigger the Lock screen yet
           const params = new URLSearchParams(window.location.search);
           if (params.get('payment_callback') !== 'true') {
             if (savedPassword && !isLoggedIn) {
@@ -105,8 +80,6 @@ export default function SmartSaleApp() {
 
   const navigate = useCallback((screen: string) => {
     const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
-    
-    // 🔒 LOCK ONLY ACTION BUTTONS (Add Sale & Stock)
     const gatedScreens = ["addSale", "stock"];
 
     if (!isPremium && gatedScreens.includes(screen)) {
@@ -133,7 +106,6 @@ export default function SmartSaleApp() {
       const fakeData = { name: "Saviour's Shop", phone: "0700000000", isDemo: true, priceList: [] };
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
-      // 🕐 1 HOUR FREE TRIAL
       localStorage.setItem("smartsale_premium_until", (Date.now() + (1 * 60 * 60 * 1000)).toString()); 
       localStorage.setItem("smartsale_is_logged_in", "true");
       navigate("home");
@@ -198,4 +170,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-                             }
+      }
