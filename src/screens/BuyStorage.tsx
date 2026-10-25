@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket, X, KeyRound } from "lucide-react";
+import { ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket, X, KeyRound, CreditCard, MessageCircle } from "lucide-react";
 
 // 🔐 A simple, fast hash function to lock the voucher to a phone number
 function generateHash(str: string) {
@@ -37,7 +37,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
       const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
       const hoursLeft = Math.ceil(msLeft / (1000 * 60 * 60));
 
-      // Accurate display logic
       if (daysLeft > 1) {
         setPremiumDisplay(`${daysLeft} Days`);
       } else if (hoursLeft > 1) {
@@ -50,6 +49,37 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
     }
   }, []);
 
+  // 💳 PRIMARY METHOD: PESAPAL
+  const handlePay = async (plan: string, amount: number) => {
+    try {
+      // Save the plan to local memory BEFORE going to Pesapal
+      localStorage.setItem("smartsale_pending_plan", JSON.stringify({ name: plan, amount: amount }));
+      
+      alert(`Connecting to Pesapal for ${plan} (UGX ${amount.toLocaleString()})... Please wait.`);
+      
+      const response = await fetch("/api/pesapal/pay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: amount,
+          description: plan,
+          phone: businessInfo?.phone || "0700000000",
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.error) throw new Error(data.error);
+
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      }
+    } catch (error: any) {
+      alert("Online payment failed: " + error.message + "\n\nPlease use the manual MTN option below to pay.");
+    }
+  };
+
+  // 🎟️ SECONDARY METHOD: SECURE VOUCHER REDEMPTION
   const handleRedeemVoucher = () => {
     const cleanCode = voucherCode.trim().toUpperCase();
     
@@ -168,15 +198,16 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
           </div>
         </div>
 
+        {/* VOUCHER REDEEM (Secondary Option) */}
         <div className="mt-8 pt-6 border-t border-gray-200">
           {!showVoucherInput ? (
-            <button onClick={() => setShowVoucherInput(true)} className="w-full py-4 bg-gray-800 text-white rounded-xl font-bold text-sm shadow-md flex justify-center items-center gap-2">
-              <Ticket size={18} /> I already have a Voucher Code
+            <button onClick={() => setShowVoucherInput(true)} className="w-full py-4 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm shadow-sm flex justify-center items-center gap-2 hover:bg-gray-200">
+              <Ticket size={18} /> I already have an Offline Voucher Code
             </button>
           ) : (
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
               <h3 className="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2"><Ticket size={16} /> Enter Voucher Code</h3>
-              <p className="text-[10px] text-blue-600 mb-3">Enter the code exactly as it was sent to you. It is locked to your phone number.</p>
+              <p className="text-[10px] text-blue-600 mb-3">Enter the secure code sent to you by the shop owner.</p>
               <div className="flex gap-2">
                 <input 
                   type="text" 
@@ -198,6 +229,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
         </div>
       </div>
 
+      {/* OWNER GENERATOR MODAL */}
       {showOwnerGen && (
         <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-6">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative">
@@ -236,6 +268,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
         </div>
       )}
 
+      {/* 💳 PAYMENT MODAL (PRIMARY = PESAPAL) */}
       {selectedPlan && (
         <div className="absolute inset-0 bg-black/60 z-[100] flex items-end justify-center pb-0">
           <div className="bg-white rounded-t-3xl w-full p-6 animate-slide-up relative">
@@ -243,34 +276,40 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
               <X size={20} />
             </button>
             
-            <div className="text-center mb-4">
-              <h2 className="text-xl font-extrabold text-gray-800">Pay via Mobile Money</h2>
-              <p className="text-xs text-gray-500 mt-1">Pay {selectedPlan.amount.toLocaleString()} UGX to get your secure code.</p>
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-extrabold text-gray-800">{selectedPlan.name}</h2>
+              <p className="text-2xl font-extrabold text-[#FF9800] mt-1">UGX {selectedPlan.amount.toLocaleString()}</p>
             </div>
 
-            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 mb-4 text-center">
-              <p className="text-[10px] font-bold text-[#FF9800] uppercase tracking-wider mb-1">Send Exactly</p>
-              <p className="text-2xl font-extrabold text-gray-800 mb-1">UGX {selectedPlan.amount.toLocaleString()}</p>
-              <p className="text-xs text-gray-600">To MTN/Airtel: <strong className="text-gray-800">0708032236 (Classoni)</strong></p>
-            </div>
-
-            <div className="space-y-2 mb-4 text-xs text-gray-600">
-              <p>1. Send the money via MTN or Airtel.</p>
-              <p>2. Tap the WhatsApp button below to notify us.</p>
-              <p>3. We will send you a secure voucher code.</p>
-            </div>
-
-            <button onClick={() => {
-                const msg = encodeURIComponent(`Hello Classoni! I want to pay for SmartSale Premium.\n\nPhone: ${businessInfo?.phone}\nPlan: ${selectedPlan.name}\nAmount: UGX ${selectedPlan.amount}\n\nI have sent the Mobile Money. Please send my secure voucher code.`);
-                window.open(`https://wa.me/256708032236?text=${msg}`, "_blank");
-              }} 
-              className="w-full bg-[#25D366] text-white py-3.5 rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 mb-3"
-            >
-              Chat Owner on WhatsApp
+            {/* PRIMARY BUTTON: PESAPAL */}
+            <button onClick={() => handlePay(selectedPlan.name, selectedPlan.amount)} className="w-full bg-[#FF9800] text-white py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform flex flex-col justify-center items-center gap-1 mb-4">
+              <div className="flex items-center gap-2">
+                <CreditCard size={20} /> Pay with Pesapal
+              </div>
+              <span className="text-[10px] font-medium opacity-80">(Instant Airtel/MTN Unlock)</span>
             </button>
+
+            <div className="relative flex py-2 items-center mb-4">
+              <div className="flex-grow border-t border-gray-300"></div>
+              <span className="flex-shrink-0 mx-4 text-gray-400 text-[10px] font-bold uppercase">OR IF NETWORK FAILS</span>
+              <div className="flex-grow border-t border-gray-300"></div>
+            </div>
+
+            {/* SECONDARY BUTTON: MANUAL / WHATSAPP */}
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-3">
+              <p className="text-xs text-center text-gray-600 mb-3">Send {selectedPlan.amount.toLocaleString()} UGX manually to <strong>0708032236 (Classoni)</strong> and chat us for a voucher code.</p>
+              <button onClick={() => {
+                  const msg = encodeURIComponent(`Hello Classoni! I want to pay for SmartSale Premium.\n\nPhone: ${businessInfo?.phone}\nPlan: ${selectedPlan.name}\nAmount: UGX ${selectedPlan.amount}\n\nI have sent the Mobile Money manually. Please send my secure voucher code.`);
+                  window.open(`https://wa.me/256708032236?text=${msg}`, "_blank");
+                }} 
+                className="w-full bg-[#25D366] text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2"
+              >
+                <MessageCircle size={18} /> Chat Owner on WhatsApp
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
-                                           }
+          }
