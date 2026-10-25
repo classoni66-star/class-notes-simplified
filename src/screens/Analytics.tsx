@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Trash2, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowLeft, Trash2, ArrowUpRight, ArrowDownRight, AlertCircle, Share2, Download } from "lucide-react";
 
 export default function Analytics({ navigate, businessInfo, language }: any) {
   const [activeTab, setActiveTab] = useState<"sales" | "expenses" | "debtors" | "creditors" | "summary">("sales");
@@ -11,7 +11,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
   const [summary, setSummary] = useState({ 
     totalSales: 0, totalProfit: 0, totalDebts: 0, totalCreditors: 0, 
     totalFunds: 0, totalExpenses: 0, totalRecoveries: 0, cashAtHand: 0,
-    salesChange: 0, profitChange: 0, expenseChange: 0
+    salesChange: 0, profitChange: 0, expenseChange: 0, missingBuyPrices: false
   });
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
@@ -44,6 +44,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       let totalDayProfit = 0;
       let totalDayCashSales = 0;
       let totalDayDebts = 0;
+      let missingBuyPrices = false;
 
       daySalesItems.forEach((s: any) => {
         const saleTotal = Number(s.total) || 0;
@@ -54,8 +55,12 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
         totalDayCashSales += paidPart;
         totalDayDebts += debtPart;
         
-        const profit = ((Number(s.sellingPrice) || 0) - (Number(s.buyingPrice) || 0)) * (Number(s.quantity) || 0);
-        totalDayProfit += profit;
+        if (!s.buyingPrice || Number(s.buyingPrice) <= 0) {
+          missingBuyPrices = true;
+        } else {
+          const profit = (Number(s.sellingPrice) - Number(s.buyingPrice)) * Number(s.quantity);
+          totalDayProfit += profit;
+        }
       });
 
       const prevDate = new Date(dateStr);
@@ -78,7 +83,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
 
       grouped[dayString] = { 
         dateStr, items: daySalesItems, totalDaySales, totalDayProfit, totalDayDebts, 
-        dayFunds, dayRecovery, dayExpenses, prevCash, cashAtHand, percentChange 
+        dayFunds, dayRecovery, dayExpenses, prevCash, cashAtHand, percentChange, missingBuyPrices 
       };
     });
 
@@ -106,16 +111,23 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
 
     let mSales = 0, mProfit = 0, mDebts = 0, mCreditors = 0, mFunds = 0, mExpenses = 0, mRecoveries = 0;
     let lmSales = 0, lmProfit = 0, lmExpenses = 0;
+    let monthMissingBuyPrices = false;
 
     savedSales.forEach((s: any) => {
       const d = new Date(s.date);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         mSales += Number(s.total) || 0;
-        mProfit += ((Number(s.sellingPrice) || 0) - (Number(s.buyingPrice) || 0)) * (Number(s.quantity) || 0);
+        if (!s.buyingPrice || Number(s.buyingPrice) <= 0) {
+          monthMissingBuyPrices = true;
+        } else {
+          mProfit += (Number(s.sellingPrice) - Number(s.buyingPrice)) * Number(s.quantity);
+        }
         if (!s.isPaid) mDebts += Number(s.total) || 0;
       } else if (d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear) {
         lmSales += Number(s.total) || 0;
-        lmProfit += ((Number(s.sellingPrice) || 0) - (Number(s.buyingPrice) || 0)) * (Number(s.quantity) || 0);
+        if (s.buyingPrice && Number(s.buyingPrice) > 0) {
+          lmProfit += (Number(s.sellingPrice) - Number(s.buyingPrice)) * Number(s.quantity);
+        }
       }
     });
 
@@ -141,11 +153,18 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     };
 
     setSummary({ 
-      totalSales: mSales, totalProfit: mProfit, totalDebts: mDebts, totalCreditors: mCreditors, 
-      totalFunds: mFunds, totalExpenses: mExpenses, totalRecoveries: mRecoveries, cashAtHand: currentCashAtHand,
+      totalSales: mSales, 
+      totalProfit: monthMissingBuyPrices ? -1 : mProfit, 
+      totalDebts: mDebts, 
+      totalCreditors: mCreditors, 
+      totalFunds: mFunds, 
+      totalExpenses: mExpenses, 
+      totalRecoveries: mRecoveries, 
+      cashAtHand: currentCashAtHand,
       salesChange: getPercent(mSales, lmSales),
-      profitChange: getPercent(mProfit, lmProfit),
-      expenseChange: getPercent(mExpenses, lmExpenses)
+      profitChange: monthMissingBuyPrices ? 0 : getPercent(mProfit, lmProfit),
+      expenseChange: getPercent(mExpenses, lmExpenses),
+      missingBuyPrices: monthMissingBuyPrices
     });
   }, []);
 
@@ -206,6 +225,59 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     );
   };
 
+  // --- SHARE & DOWNLOAD FUNCTIONS ---
+
+  const handleShareDaily = async (dayString: string, data: any) => {
+    const profitText = data.missingBuyPrices ? "Confirm buying prices to calculate" : `UGX ${data.totalDayProfit.toLocaleString()}`;
+    const text = `📊 *SmartSale Daily Report*\nDate: ${dayString}\n\nTotal Sales: UGX ${data.totalDaySales.toLocaleString()}\nProfit: ${profitText}\n\nCash from yesterday: UGX ${data.prevCash.toLocaleString()}\nFunds added: UGX ${data.dayFunds.toLocaleString()}\nRecovery: UGX ${data.dayRecovery.toLocaleString()}\nExpenses: UGX ${data.dayExpenses.toLocaleString()}\nDebts created: UGX ${data.totalDayDebts.toLocaleString()}\n\n💰 *Cash at Hand: UGX ${data.cashAtHand.toLocaleString()}*`;
+
+    if (navigator.share) {
+      try { await navigator.share({ title: `SmartSale Report ${dayString}`, text }); } catch (e) {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      alert("Report copied to clipboard!");
+    }
+  };
+
+  const handleDownloadDaily = (dayString: string, data: any) => {
+    const profitText = data.missingBuyPrices ? "Confirm buying prices to calculate" : `UGX ${data.totalDayProfit.toLocaleString()}`;
+    const text = `SmartSale Daily Report\nDate: ${dayString}\n\nTotal Sales: UGX ${data.totalDaySales.toLocaleString()}\nProfit: ${profitText}\n\nCash from yesterday: UGX ${data.prevCash.toLocaleString()}\nFunds added: UGX ${data.dayFunds.toLocaleString()}\nRecovery: UGX ${data.dayRecovery.toLocaleString()}\nExpenses: UGX ${data.dayExpenses.toLocaleString()}\nDebts created: UGX ${data.totalDayDebts.toLocaleString()}\n\nCash at Hand: UGX ${data.cashAtHand.toLocaleString()}`;
+    
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SmartSale_${dayString.replace(/ /g, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleShareMonthly = async () => {
+    const profitText = summary.missingBuyPrices ? "Confirm buying prices to calculate" : `UGX ${summary.totalProfit.toLocaleString()}`;
+    const text = `📊 *SmartSale Monthly Report*\n\nTotal Sales: UGX ${summary.totalSales.toLocaleString()}\nProfit: ${profitText}\nFunds Added: UGX ${summary.totalFunds.toLocaleString()}\nRecovered Debts: UGX ${summary.totalRecoveries.toLocaleString()}\nExpenses: UGX ${summary.totalExpenses.toLocaleString()}\nUnpaid Debts: UGX ${summary.totalDebts.toLocaleString()}\n\n💰 *Cash at Hand (Today): UGX ${summary.cashAtHand.toLocaleString()}*`;
+
+    if (navigator.share) {
+      try { await navigator.share({ title: "SmartSale Monthly Report", text }); } catch (e) {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      alert("Report copied to clipboard!");
+    }
+  };
+
+  const handleDownloadMonthly = () => {
+    const profitText = summary.missingBuyPrices ? "Confirm buying prices to calculate" : `UGX ${summary.totalProfit.toLocaleString()}`;
+    const text = `SmartSale Monthly Report\n\nTotal Sales: UGX ${summary.totalSales.toLocaleString()}\nProfit: ${profitText}\nFunds Added: UGX ${summary.totalFunds.toLocaleString()}\nRecovered Debts: UGX ${summary.totalRecoveries.toLocaleString()}\nExpenses: UGX ${summary.totalExpenses.toLocaleString()}\nUnpaid Debts: UGX ${summary.totalDebts.toLocaleString()}\n\nCash at Hand (Today): UGX ${summary.cashAtHand.toLocaleString()}`;
+    
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SmartSale_Monthly_Report.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
       <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10">
@@ -238,6 +310,10 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                 
                 <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
                   <span className="font-bold text-gray-700 text-xs uppercase">{dayString}</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleShareDaily(dayString, data)} className="text-gray-400 hover:text-[#FF9800]"><Share2 size={16} /></button>
+                    <button onClick={() => handleDownloadDaily(dayString, data)} className="text-gray-400 hover:text-[#FF9800]"><Download size={16} /></button>
+                  </div>
                 </div>
                 
                 {data.items.map((sale: any) => (
@@ -262,10 +338,18 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                       {renderChange(data.percentChange)}
                     </div>
                   </div>
-                  <div className="flex justify-between font-bold text-[#0055FF]">
-                    <span>PROFIT</span>
-                    <span>UGX {data.totalDayProfit.toLocaleString()}</span>
-                  </div>
+                  
+                  {data.missingBuyPrices ? (
+                    <div className="flex justify-between font-bold text-red-500 items-center bg-red-50 -mx-1 px-1 py-1 rounded">
+                      <span className="flex items-center gap-1"><AlertCircle size={12}/> PROFIT</span>
+                      <span className="text-[10px]">Confirm buying prices to calculate</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between font-bold text-[#0055FF]">
+                      <span>PROFIT</span>
+                      <span>UGX {data.totalDayProfit.toLocaleString()}</span>
+                    </div>
+                  )}
                   
                   <div className="border-t border-orange-200 my-1"></div>
                   
@@ -371,6 +455,15 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
 
         {activeTab === "summary" && (
           <div className="space-y-3">
+            <div className="flex justify-end gap-3 mb-2 px-1">
+              <button onClick={handleShareMonthly} className="bg-white border border-gray-200 text-gray-600 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 text-xs font-bold active:scale-95">
+                <Share2 size={14} /> Share
+              </button>
+              <button onClick={handleDownloadMonthly} className="bg-[#0055FF] text-white px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 text-xs font-bold active:scale-95">
+                <Download size={14} /> Download
+              </button>
+            </div>
+
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <div className="flex justify-between items-start">
                 <p className="text-xs font-bold text-gray-500 uppercase">Total Sales (This Month)</p>
@@ -381,9 +474,11 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <div className="flex justify-between items-start">
                 <p className="text-xs font-bold text-gray-500 uppercase">Total Profit (This Month)</p>
-                {renderChange(summary.profitChange)}
+                {!summary.missingBuyPrices && renderChange(summary.profitChange)}
               </div>
-              <p className="text-2xl font-extrabold text-[#0055FF] mt-1">UGX {summary.totalProfit.toLocaleString()}</p>
+              <p className={`text-2xl font-extrabold mt-1 ${summary.missingBuyPrices ? 'text-red-500 text-sm flex items-center gap-1' : 'text-[#0055FF]'}`}>
+                {summary.missingBuyPrices ? <><AlertCircle size={16}/> Confirm buying prices to calculate</> : `UGX ${summary.totalProfit.toLocaleString()}`}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <p className="text-xs font-bold text-gray-500 uppercase">Total Funds Added</p>
