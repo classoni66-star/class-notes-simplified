@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { ArrowLeft, Plus, X, RotateCcw } from "lucide-react";
 
 const LISTS: Record<string, any[]> = {
   "Retailer": [
@@ -51,7 +51,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", unit: "", buyingPrice: "", sellingPrice: "" });
   
-  // Inline Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<"name" | "unit" | "buyingPrice" | "sellingPrice" | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -59,27 +58,30 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
   const t = (en: string, run: string) => (language === "run" ? run : en);
   const category = businessInfo?.type || "Retailer";
 
+  const STORAGE_KEY = "smartsale_pricelist_v2";
+
   useEffect(() => {
-    const saved = localStorage.getItem("smartsale_pricelist");
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      const parsed = JSON.parse(saved);
-      // If the saved list is different from the category defaults, maybe they switched.
-      // For simplicity, we load saved if it exists.
-      setItems(parsed);
+      setItems(JSON.parse(saved));
     } else {
-      const defaultList = LISTS[category] || LISTS["Retailer"];
-      const seededList = defaultList.map((item, index) => ({
-        ...item,
-        id: (index + 1).toString()
-      }));
-      setItems(seededList);
-      localStorage.setItem("smartsale_pricelist", JSON.stringify(seededList));
+      loadDefaults();
     }
   }, [category]);
 
+  const loadDefaults = () => {
+    const defaultList = LISTS[category] || LISTS["Retailer"];
+    const seededList = defaultList.map((item, index) => ({
+      ...item,
+      id: (index + 1).toString()
+    }));
+    setItems(seededList);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(seededList));
+  };
+
   const saveItems = (newItems: any[]) => {
     setItems(newItems);
-    localStorage.setItem("smartsale_pricelist", JSON.stringify(newItems));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newItems));
   };
 
   const handleAddNew = () => {
@@ -89,7 +91,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
       id: Date.now().toString(),
       name: newItem.name,
       unit: newItem.unit || "pc",
-      buyingPrice: Number(newItem.buyingPrice) || 0, // Optional
+      buyingPrice: Number(newItem.buyingPrice) || 0,
       sellingPrice: Number(newItem.sellingPrice),
     };
 
@@ -108,7 +110,12 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
     }
   };
 
-  // --- INLINE EDITING LOGIC ---
+  const handleResetDefaults = () => {
+    if (window.confirm("This will reset your price list to the default items for your business. Any custom items you added will be lost. Are you sure?")) {
+      loadDefaults();
+    }
+  };
+
   const startEdit = (id: string, field: "name" | "unit" | "buyingPrice" | "sellingPrice", currentValue: string) => {
     setEditingId(id);
     setEditingField(field);
@@ -145,8 +152,11 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           <h1 className="text-lg font-extrabold text-gray-800">{t("Price List", "Ebihenda")}</h1>
         </div>
         <div className="flex gap-2">
+          <button onClick={handleResetDefaults} className="text-blue-500 p-2 bg-blue-50 rounded-full shadow-sm active:scale-95 transition-transform" title="Reset to Defaults">
+            <RotateCcw size={20} />
+          </button>
           {items.length > 0 && (
-            <button onClick={handleClearAll} className="text-red-500 p-2 bg-red-50 rounded-full shadow-sm active:scale-95 transition-transform">
+            <button onClick={handleClearAll} className="text-red-500 p-2 bg-red-50 rounded-full shadow-sm active:scale-95 transition-transform" title="Delete All">
               <X size={20} />
             </button>
           )}
@@ -161,11 +171,10 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
         <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4 text-center shadow-sm">
           <p className="text-[11px] text-blue-800 font-medium leading-relaxed">
             This is your <strong>{category}</strong> price list. Tap any item, unit, or price to edit it instantly.
-            <br/><span className="text-[10px] text-blue-600">(Buying price is optional. Leave blank if you don't want profit calculated).</span>
+            <br/><span className="text-[10px] text-blue-600">(At least Item Name & Selling Price are required).</span>
           </p>
         </div>
 
-        {/* LARGE ADD NEW ITEM BUTTON */}
         {!showAddForm && (
           <button 
             onClick={() => setShowAddForm(true)}
@@ -175,11 +184,10 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
               <Plus size={20} />
               <span>Tap here to add a new item</span>
             </div>
-            <span className="text-[10px] font-medium text-gray-400">Only Item Name & Selling Price are required</span>
+            <span className="text-[10px] font-medium text-gray-400">At least Item Name & Selling Price are required</span>
           </button>
         )}
 
-        {/* ADD ITEM FORM */}
         {showAddForm && (
           <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-[#FF9800] mb-4 relative">
             <button onClick={() => setShowAddForm(false)} className="absolute top-2 right-2 text-gray-400 p-1 bg-gray-50 rounded-full">
@@ -215,7 +223,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* ITEMS TABLE */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
             <div className="col-span-2">Item / Unit</div>
@@ -227,7 +234,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           {items.map((item) => (
             <div key={item.id} className="grid grid-cols-5 p-2 border-b border-gray-50 text-sm items-center hover:bg-gray-50 transition-colors group">
               
-              {/* NAME & UNIT */}
               <div className="col-span-2 pr-2">
                 {editingId === item.id && editingField === "name" ? (
                   <input 
@@ -262,7 +268,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
                 )}
               </div>
 
-              {/* BUYING PRICE */}
               <div className="text-right pr-1">
                 {editingId === item.id && editingField === "buyingPrice" ? (
                   <input 
@@ -281,7 +286,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
                 )}
               </div>
 
-              {/* SELLING PRICE */}
               <div className="text-right pr-1">
                 {editingId === item.id && editingField === "sellingPrice" ? (
                   <input 
@@ -300,7 +304,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
                 )}
               </div>
 
-              {/* DELETE BUTTON */}
               <div className="flex justify-center">
                 <button onClick={() => handleDelete(item.id)} className="text-red-500 p-1.5 bg-red-50 rounded hover:bg-red-100 transition-colors">
                   <X size={16} />
