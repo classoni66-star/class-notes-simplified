@@ -1,15 +1,14 @@
 import { useState, useEffect } from "react";
-import { Gift, User, ArrowUpRight, ArrowDownRight, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus, AlertCircle } from "lucide-react";
+import { Gift, User, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus, AlertCircle, X, Mic } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt";
-import TrafficModal from "./TrafficModal";
 import FinanceModal from "./FinanceModal";
 
 export default function Home({ navigate, businessInfo, language }: any) {
   const [timeOfDay, setTimeOfDay] = useState("morning");
   const [todayDate, setTodayDate] = useState("");
   const [isPremium, setIsPremium] = useState(true);
-  const [isTrafficOpen, setIsTrafficOpen] = useState(false);
   const [financeModalType, setFinanceModalType] = useState<"fund" | "spend" | null>(null);
+  const [showTrafficInfo, setShowTrafficInfo] = useState(false);
   
   const [stats, setStats] = useState({
     sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0,
@@ -176,13 +175,14 @@ export default function Home({ navigate, businessInfo, language }: any) {
               <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
             </div>
 
+            {/* PROFIT CARD - CALM BLUE TEXT */}
             <div onClick={() => navigate(stats.missingBuyPrices ? "priceList" : "analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
               <div className="flex justify-between items-start">
                 <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
                 {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.profitChange)}
               </div>
-              <p className={`text-sm font-extrabold mt-0.5 leading-tight ${stats.missingBuyPrices ? 'text-red-500 flex items-center gap-1' : 'text-[#0055FF]'}`}>
-                {!isPremium ? "UGX ***" : (stats.missingBuyPrices ? <><AlertCircle size={12}/> Set Buy Prices</> : formatMoney(stats.profit))}
+              <p className={`text-sm font-extrabold mt-0.5 leading-tight text-[#0055FF]`}>
+                {!isPremium ? "UGX ***" : (stats.missingBuyPrices ? "Confirm buying prices to calculate" : formatMoney(stats.profit))}
               </p>
             </div>
 
@@ -247,7 +247,11 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </button>
       </div>
 
-      <button onClick={() => setIsTrafficOpen(true)} className="fixed bottom-[210px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white">
+      {/* TRAFFIC BUTTON - SHOWS COMING SOON MODAL */}
+      <button 
+        onClick={() => setShowTrafficInfo(true)} 
+        className="fixed bottom-[210px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
+      >
         <Play size={18} fill="currentColor" className="ml-1" />
         <span className="text-[8px] font-bold mt-0.5">Traffic</span>
       </button>
@@ -275,8 +279,34 @@ export default function Home({ navigate, businessInfo, language }: any) {
       </nav>
 
       <InstallPrompt />
-      <TrafficModal isOpen={isTrafficOpen} onClose={() => setIsTrafficOpen(false)} navigate={navigate} />
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
+
+      {/* 🚦 TRAFFIC COMING SOON MODAL */}
+      {showTrafficInfo && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl relative">
+            <button onClick={() => setShowTrafficInfo(false)} className="absolute top-4 right-4 p-1 bg-gray-100 rounded-full text-gray-500">
+              <X size={20} />
+            </button>
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-[#0055FF]">
+              <Mic size={32} />
+            </div>
+            <h2 className="text-xl font-extrabold text-gray-800 mb-2">Coming Soon!</h2>
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              Traffic mode records your orders when traffic is high, and you review and confirm them when traffic reduces. 
+              <br/><br/>
+              We are refining this feature to ensure your customers' privacy is fully protected using AI transcription rather than voice recording.
+            </p>
+            <button 
+              onClick={() => setShowTrafficInfo(false)} 
+              className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
-                       }
+      }
