@@ -1,60 +1,60 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, Edit2, X, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
 
 const LISTS: Record<string, any[]> = {
   "Retailer": [
-    { name: "Sugar (Sukari)", unit: "kg", sellingPrice: 5000 },
-    { name: "Rice (Mchele)", unit: "kg", sellingPrice: 5300 },
-    { name: "Maize Flour (Posho)", unit: "kg", sellingPrice: 2800 },
-    { name: "Bread (Omugati)", unit: "loaf", sellingPrice: 6000 },
-    { name: "Beans (Yellow)", unit: "kg", sellingPrice: 5800 },
-    { name: "Cooking Oil (Mafuta)", unit: "liter", sellingPrice: 9400 },
-    { name: "Salt (Omunyo)", unit: "packet", sellingPrice: 1200 },
-    { name: "Laundry Soap (Sabuni)", unit: "bar", sellingPrice: 5400 },
-    { name: "Soda (300ml)", unit: "bottle", sellingPrice: 2000 },
-    { name: "Bottled Water (500ml)", unit: "bottle", sellingPrice: 1000 },
-    { name: "Eggs (Traysta)", unit: "tray", sellingPrice: 12000 },
+    { name: "Sugar (Sukari)", unit: "kg", buyingPrice: 4300, sellingPrice: 5000 },
+    { name: "Rice (Mchele)", unit: "kg", buyingPrice: 4800, sellingPrice: 5300 },
+    { name: "Maize Flour (Posho)", unit: "kg", buyingPrice: 2500, sellingPrice: 2800 },
+    { name: "Bread (Omugati)", unit: "loaf", buyingPrice: 5300, sellingPrice: 6000 },
+    { name: "Beans (Yellow)", unit: "kg", buyingPrice: 5200, sellingPrice: 5800 },
+    { name: "Cooking Oil (Mafuta)", unit: "liter", buyingPrice: 8500, sellingPrice: 9400 },
+    { name: "Salt (Omunyo)", unit: "packet", buyingPrice: 1000, sellingPrice: 1200 },
+    { name: "Laundry Soap (Sabuni)", unit: "bar", buyingPrice: 4900, sellingPrice: 5400 },
+    { name: "Soda (300ml)", unit: "bottle", buyingPrice: 1500, sellingPrice: 2000 },
+    { name: "Bottled Water (500ml)", unit: "bottle", buyingPrice: 800, sellingPrice: 1000 },
+    { name: "Eggs (Traysta)", unit: "tray", buyingPrice: 11000, sellingPrice: 12000 },
   ],
   "Trader": [
-    { name: "Maize (Grain)", unit: "kg", sellingPrice: 1500 },
-    { name: "Beans", unit: "kg", sellingPrice: 5000 },
-    { name: "Groundnuts", unit: "kg", sellingPrice: 7500 },
-    { name: "Cassava", unit: "kg", sellingPrice: 2000 },
-    { name: "Bananas (Matooke)", unit: "bunch", sellingPrice: 15000 },
+    { name: "Maize (Grain)", unit: "kg", buyingPrice: 1200, sellingPrice: 1400 },
+    { name: "Beans", unit: "kg", buyingPrice: 4000, sellingPrice: 4500 },
+    { name: "Groundnuts", unit: "kg", buyingPrice: 5500, sellingPrice: 6500 },
+    { name: "Cassava Chips", unit: "kg", buyingPrice: 1200, sellingPrice: 1500 },
+    { name: "Bananas (Matooke)", unit: "bunch", buyingPrice: 12000, sellingPrice: 15000 },
   ],
   "Electronics": [
-    { name: "Samsung Charger", unit: "pc", sellingPrice: 15000 },
-    { name: "Earphones (Basic)", unit: "pc", sellingPrice: 8000 },
-    { name: "USB Cable", unit: "pc", sellingPrice: 5000 },
-    { name: "Extension Cable", unit: "pc", sellingPrice: 20000 },
-    { name: "Phone Case", unit: "pc", sellingPrice: 10000 },
+    { name: "USB-C Cable", unit: "pc", buyingPrice: 5000, sellingPrice: 8000 },
+    { name: "Fast Charger", unit: "pc", buyingPrice: 12000, sellingPrice: 18000 },
+    { name: "Earphones (Basic)", unit: "pc", buyingPrice: 6000, sellingPrice: 10000 },
+    { name: "Extension Cable", unit: "pc", buyingPrice: 15000, sellingPrice: 22000 },
+    { name: "Phone Case", unit: "pc", buyingPrice: 4000, sellingPrice: 8000 },
   ],
   "Spare Parts": [
-    { name: "Engine Oil (1L)", unit: "liter", sellingPrice: 25000 },
-    { name: "Brake Pads", unit: "set", sellingPrice: 35000 },
-    { name: "Spark Plug", unit: "pc", sellingPrice: 15000 },
-    { name: "Side Mirror", unit: "pc", sellingPrice: 20000 },
-    { name: "Wiper Blades", unit: "pair", sellingPrice: 18000 },
+    { name: "Engine Oil (1L)", unit: "liter", buyingPrice: 20000, sellingPrice: 25000 },
+    { name: "Brake Pads", unit: "set", buyingPrice: 55000, sellingPrice: 70000 },
+    { name: "Spark Plug", unit: "pc", buyingPrice: 15000, sellingPrice: 20000 },
+    { name: "Wiper Blades", unit: "pair", buyingPrice: 12000, sellingPrice: 18000 },
   ],
   "Restaurant": [
-    { name: "Matooke & Beef", unit: "plate", sellingPrice: 10000 },
-    { name: "Rice & Chicken", unit: "plate", sellingPrice: 12000 },
-    { name: "Posho & Beans", unit: "plate", sellingPrice: 5000 },
-    { name: "Chapati", unit: "pc", sellingPrice: 1000 },
-    { name: "Soda (300ml)", unit: "bottle", sellingPrice: 2000 },
-    { name: "Bottled Water", unit: "bottle", sellingPrice: 1000 },
+    { name: "Matooke & Beef", unit: "plate", buyingPrice: 6000, sellingPrice: 10000 },
+    { name: "Rice & Chicken", unit: "plate", buyingPrice: 8000, sellingPrice: 15000 },
+    { name: "Posho & Beans", unit: "plate", buyingPrice: 3000, sellingPrice: 5000 },
+    { name: "Chapati", unit: "pc", buyingPrice: 800, sellingPrice: 1500 },
+    { name: "Soda (300ml)", unit: "bottle", buyingPrice: 1200, sellingPrice: 1500 },
+    { name: "Bottled Water", unit: "bottle", buyingPrice: 600, sellingPrice: 1000 },
   ],
-  "Other": [
-    { name: "Item 1", unit: "pc", sellingPrice: 0 },
-  ]
+  "Other": []
 };
 
 export default function PriceList({ navigate, businessInfo, language }: any) {
   const [items, setItems] = useState<any[]>([]);
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newItem, setNewItem] = useState({ name: "", unit: "", buyingPrice: "", sellingPrice: "" });
   
-  const [formData, setFormData] = useState({ name: "", unit: "", buyingPrice: "", sellingPrice: "" });
+  // Inline Editing State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<"name" | "unit" | "buyingPrice" | "sellingPrice" | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
   const category = businessInfo?.type || "Retailer";
@@ -62,7 +62,10 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
   useEffect(() => {
     const saved = localStorage.getItem("smartsale_pricelist");
     if (saved) {
-      setItems(JSON.parse(saved));
+      const parsed = JSON.parse(saved);
+      // If the saved list is different from the category defaults, maybe they switched.
+      // For simplicity, we load saved if it exists.
+      setItems(parsed);
     } else {
       const defaultList = LISTS[category] || LISTS["Retailer"];
       const seededList = defaultList.map((item, index) => ({
@@ -79,32 +82,24 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
     localStorage.setItem("smartsale_pricelist", JSON.stringify(newItems));
   };
 
-  const handleSave = () => {
-    if (!formData.name || !formData.sellingPrice) return;
+  const handleAddNew = () => {
+    if (!newItem.name || !newItem.sellingPrice) return alert("Item Name and Selling Price are required.");
 
     const itemData = {
-      id: editingId || Date.now().toString(),
-      name: formData.name,
-      unit: formData.unit || "pc",
-      buyingPrice: Number(formData.buyingPrice) || 0, // Optional
-      sellingPrice: Number(formData.sellingPrice) || 0,
+      id: Date.now().toString(),
+      name: newItem.name,
+      unit: newItem.unit || "pc",
+      buyingPrice: Number(newItem.buyingPrice) || 0, // Optional
+      sellingPrice: Number(newItem.sellingPrice),
     };
 
-    if (editingId) {
-      saveItems(items.map(i => i.id === editingId ? itemData : i));
-    } else {
-      saveItems([...items, itemData]);
-    }
-
-    setIsAdding(false);
-    setEditingId(null);
-    setFormData({ name: "", unit: "", buyingPrice: "", sellingPrice: "" });
+    saveItems([...items, itemData]);
+    setShowAddForm(false);
+    setNewItem({ name: "", unit: "", buyingPrice: "", sellingPrice: "" });
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm("Delete this item?")) {
-      saveItems(items.filter(i => i.id !== id));
-    }
+    saveItems(items.filter(i => i.id !== id));
   };
 
   const handleClearAll = () => {
@@ -113,15 +108,31 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
     }
   };
 
-  const startEdit = (item: any) => {
-    setEditingId(item.id);
-    setFormData({
-      name: item.name,
-      unit: item.unit,
-      buyingPrice: item.buyingPrice ? item.buyingPrice.toString() : "",
-      sellingPrice: item.sellingPrice.toString()
+  // --- INLINE EDITING LOGIC ---
+  const startEdit = (id: string, field: "name" | "unit" | "buyingPrice" | "sellingPrice", currentValue: string) => {
+    setEditingId(id);
+    setEditingField(field);
+    setEditValue(currentValue.toString());
+  };
+
+  const saveEdit = () => {
+    if (!editingId || !editingField) return;
+    
+    const updatedItems = items.map(item => {
+      if (item.id === editingId) {
+        let finalValue: any = editValue;
+        if (editingField === "buyingPrice" || editingField === "sellingPrice") {
+          finalValue = Number(editValue) || 0;
+        }
+        return { ...item, [editingField]: finalValue };
+      }
+      return item;
     });
-    setIsAdding(false);
+
+    saveItems(updatedItems);
+    setEditingId(null);
+    setEditingField(null);
+    setEditValue("");
   };
 
   return (
@@ -135,11 +146,11 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
         </div>
         <div className="flex gap-2">
           {items.length > 0 && (
-            <button onClick={handleClearAll} className="text-red-500 p-2 bg-red-50 rounded-full shadow-sm">
-              <Trash2 size={16} />
+            <button onClick={handleClearAll} className="text-red-500 p-2 bg-red-50 rounded-full shadow-sm active:scale-95 transition-transform">
+              <X size={20} />
             </button>
           )}
-          <button onClick={() => { setIsAdding(true); setEditingId(null); setFormData({ name: "", unit: "", buyingPrice: "", sellingPrice: "" }); }} className="bg-[#FF9800] text-white p-2 rounded-full shadow-md">
+          <button onClick={() => setShowAddForm(true)} className="bg-[#FF9800] text-white p-2 rounded-full shadow-md active:scale-95 transition-transform">
             <Plus size={20} />
           </button>
         </div>
@@ -149,76 +160,160 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
         
         <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4 text-center shadow-sm">
           <p className="text-[11px] text-blue-800 font-medium leading-relaxed">
-            This is your <strong>{category}</strong> price list. You can add missing items, edit prices, or remove items. 
+            This is your <strong>{category}</strong> price list. Tap any item, unit, or price to edit it instantly.
             <br/><span className="text-[10px] text-blue-600">(Buying price is optional. Leave blank if you don't want profit calculated).</span>
           </p>
         </div>
 
-        {(isAdding || editingId) && (
+        {/* LARGE ADD NEW ITEM BUTTON */}
+        {!showAddForm && (
+          <button 
+            onClick={() => setShowAddForm(true)}
+            className="w-full bg-white border-2 border-dashed border-[#FF9800] text-[#FF9800] font-bold py-4 rounded-xl mb-4 flex flex-col justify-center items-center gap-1 active:scale-95 transition-transform shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <Plus size={20} />
+              <span>Tap here to add a new item</span>
+            </div>
+            <span className="text-[10px] font-medium text-gray-400">Only Item Name & Selling Price are required</span>
+          </button>
+        )}
+
+        {/* ADD ITEM FORM */}
+        {showAddForm && (
           <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-[#FF9800] mb-4 relative">
-            <button onClick={() => { setIsAdding(false); setEditingId(null); }} className="absolute top-2 right-2 text-gray-400 p-1 bg-gray-50 rounded-full">
+            <button onClick={() => setShowAddForm(false)} className="absolute top-2 right-2 text-gray-400 p-1 bg-gray-50 rounded-full">
               <X size={18} />
             </button>
-            <h3 className="font-bold text-gray-800 mb-3">{editingId ? "Edit Item" : "Add New Item"}</h3>
+            <h3 className="font-bold text-gray-800 mb-3">Add New Item</h3>
             
-            <input type="text" placeholder="Item Name (e.g. Milk)" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full p-2 mb-2 bg-gray-50 border rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-[#FF9800]" />
-            
-            <div className="flex gap-2 mb-3">
-              <div className="w-1/3">
-                <label className="text-[9px] text-gray-500 font-bold ml-1">Unit</label>
-                <input type="text" placeholder="kg" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Item Name *</label>
+                <input type="text" placeholder="e.g. Milk" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-[#FF9800]" />
               </div>
-              <div className="w-1/3">
-                <label className="text-[9px] text-gray-500 font-bold ml-1">Buy Price (Optional)</label>
-                <input type="number" placeholder="0" value={formData.buyingPrice} onChange={(e) => setFormData({...formData, buyingPrice: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
-              </div>
-              <div className="w-1/3">
-                <label className="text-[9px] text-gray-500 font-bold ml-1">Sell Price</label>
-                <input type="number" placeholder="0" value={formData.sellingPrice} onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" />
+              
+              <div className="flex gap-2">
+                <div className="flex-[2]">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Selling Price *</label>
+                  <input type="number" placeholder="e.g. 2000" value={newItem.sellingPrice} onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Buy Price</label>
+                  <input type="number" placeholder="Optional" value={newItem.buyingPrice} onChange={(e) => setNewItem({...newItem, buyingPrice: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                </div>
+                <div className="w-[70px]">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Unit</label>
+                  <input type="text" placeholder="pc" value={newItem.unit} onChange={(e) => setNewItem({...newItem, unit: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                </div>
               </div>
             </div>
             
-            <button onClick={handleSave} className="w-full py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md">
-              {editingId ? "Save Changes" : "Add to List"}
+            <button onClick={handleAddNew} className="w-full py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md mt-4">
+              Add to List
             </button>
           </div>
         )}
 
-        <p className="text-[10px] text-gray-500 font-bold mb-2 uppercase text-center">
-          Tap any item to edit. Swipe to delete.
-        </p>
-
+        {/* ITEMS TABLE */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
             <div className="col-span-2">Item / Unit</div>
             <div className="text-right">Buy</div>
             <div className="text-right">Sell</div>
-            <div className="text-center">Action</div>
+            <div className="text-center">Del</div>
           </div>
+
           {items.map((item) => (
-            <div key={item.id} className="grid grid-cols-5 p-3 border-b border-gray-50 text-sm items-center">
-              <div className="col-span-2 pr-1 cursor-pointer" onClick={() => startEdit(item)}>
-                <p className="font-bold text-gray-800 leading-tight flex items-center gap-1">
-                  {item.name} <Edit2 size={10} className="text-gray-400" />
-                </p>
-                <p className="text-[10px] text-gray-500">{item.unit}</p>
+            <div key={item.id} className="grid grid-cols-5 p-2 border-b border-gray-50 text-sm items-center hover:bg-gray-50 transition-colors group">
+              
+              {/* NAME & UNIT */}
+              <div className="col-span-2 pr-2">
+                {editingId === item.id && editingField === "name" ? (
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={editValue} 
+                    onChange={(e) => setEditValue(e.target.value)} 
+                    onBlur={saveEdit}
+                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                    className="w-full p-1 bg-white border border-[#FF9800] rounded text-sm font-bold outline-none"
+                  />
+                ) : (
+                  <p onClick={() => startEdit(item.id, "name", item.name)} className="font-bold text-gray-800 leading-tight cursor-text hover:bg-gray-100 rounded px-1 py-0.5">
+                    {item.name}
+                  </p>
+                )}
+
+                {editingId === item.id && editingField === "unit" ? (
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={editValue} 
+                    onChange={(e) => setEditValue(e.target.value)} 
+                    onBlur={saveEdit}
+                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                    className="w-16 mt-1 p-1 bg-white border border-[#FF9800] rounded text-[10px] outline-none"
+                  />
+                ) : (
+                  <p onClick={() => startEdit(item.id, "unit", item.unit)} className="text-[10px] text-gray-500 cursor-text hover:bg-gray-100 rounded px-1 inline-block">
+                    {item.unit}
+                  </p>
+                )}
               </div>
-              <div className="text-right text-gray-500 text-xs">
-                {item.buyingPrice ? item.buyingPrice.toLocaleString() : "-"}
+
+              {/* BUYING PRICE */}
+              <div className="text-right pr-1">
+                {editingId === item.id && editingField === "buyingPrice" ? (
+                  <input 
+                    autoFocus
+                    type="number" 
+                    value={editValue} 
+                    onChange={(e) => setEditValue(e.target.value)} 
+                    onBlur={saveEdit}
+                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                    className="w-full text-right p-1 bg-white border border-[#FF9800] rounded text-xs outline-none"
+                  />
+                ) : (
+                  <p onClick={() => startEdit(item.id, "buyingPrice", item.buyingPrice || "")} className="text-gray-500 text-xs cursor-text hover:bg-gray-100 rounded px-1 py-0.5">
+                    {item.buyingPrice ? item.buyingPrice.toLocaleString() : "-"}
+                  </p>
+                )}
               </div>
-              <div className="text-right font-bold text-[#0055FF] text-xs">{item.sellingPrice.toLocaleString()}</div>
-              <div className="text-center">
-                <button onClick={() => handleDelete(item.id)} className="text-red-400 p-1 bg-red-50 rounded">
-                  <Trash2 size={14} />
+
+              {/* SELLING PRICE */}
+              <div className="text-right pr-1">
+                {editingId === item.id && editingField === "sellingPrice" ? (
+                  <input 
+                    autoFocus
+                    type="number" 
+                    value={editValue} 
+                    onChange={(e) => setEditValue(e.target.value)} 
+                    onBlur={saveEdit}
+                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                    className="w-full text-right p-1 bg-white border border-[#FF9800] rounded text-xs font-bold text-[#0055FF] outline-none"
+                  />
+                ) : (
+                  <p onClick={() => startEdit(item.id, "sellingPrice", item.sellingPrice)} className="font-bold text-[#0055FF] text-xs cursor-text hover:bg-gray-100 rounded px-1 py-0.5">
+                    {item.sellingPrice.toLocaleString()}
+                  </p>
+                )}
+              </div>
+
+              {/* DELETE BUTTON */}
+              <div className="flex justify-center">
+                <button onClick={() => handleDelete(item.id)} className="text-red-500 p-1.5 bg-red-50 rounded hover:bg-red-100 transition-colors">
+                  <X size={16} />
                 </button>
               </div>
+
             </div>
           ))}
           {items.length === 0 && (
-            <p className="text-center text-gray-400 py-6 text-sm">Your list is empty. Tap + to add items.</p>
+            <p className="text-center text-gray-400 py-8 text-sm">Your list is empty. Tap the + button to add items.</p>
           )}
         </div>
       </div>
     </div>
   );
-    }
+     }
