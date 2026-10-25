@@ -11,7 +11,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
   const [newItemPrice, setNewItemPrice] = useState<number | "">("");
 
   // Inputs for Sale
-  const [inputMode, setInputMode] = useState<"qty" | "amount">("qty");
+  const [inputMode, setInputMode] = useState<"qty" | "amount">("amount"); // Default to amount for speed
   const [qty, setQty] = useState<number | "">("");
   const [amount, setAmount] = useState<number | "">("");
 
@@ -41,7 +41,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
     setNewItemPrice("");
     setQty("");
     setAmount("");
-    setInputMode("qty");
+    setInputMode("amount");
     setIsPaid(true);
     setClientName("");
     setSearch("");
@@ -64,13 +64,11 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
     }
 
     // Determine Quantity and Total
-    let finalQty = 1; // Default to 1 if they leave it blank
+    let finalQty = 1;
     let finalTotal = unitPrice;
 
     if (inputMode === "qty") {
-      if (qty && qty > 0) {
-        finalQty = Number(qty);
-      }
+      if (qty && qty > 0) finalQty = Number(qty);
       finalTotal = unitPrice * finalQty;
     } else {
       if (amount && amount > 0) {
@@ -106,21 +104,27 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       localStorage.setItem("smartsale_debtors", JSON.stringify([...existingDebts, newDebt]));
     }
 
-    // 3. AUTO-ADD TO PRICE LIST IF NEW ITEM
+    // 3. AUTO-ADD TO PRICE LIST & STOCK IF NEW ITEM
     if (isAddingNew) {
       const currentList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || "[]");
-      // Check if it already exists to avoid duplicates
       const exists = currentList.find((i: any) => i.name.toLowerCase() === finalItemName.toLowerCase());
       
       if (!exists) {
+        const newId = Date.now().toString() + "-new";
+        // Add to Price List
         const newItemForList = {
-          id: Date.now().toString() + "-new",
+          id: newId,
           name: finalItemName,
-          unit: "pc", // Default unit
+          unit: "pc",
           buyingPrice: 0, 
           sellingPrice: unitPrice,
         };
         localStorage.setItem("smartsale_pricelist_v2", JSON.stringify([...currentList, newItemForList]));
+
+        // Add to Initial Stock (so it shows up in the Stock tab)
+        const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
+        initialStock.push({ itemId: newId, quantity: 0 }); // Start at 0 stock
+        localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
       }
     }
 
@@ -186,6 +190,8 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
         {/* SALE FORM (EXISTING OR NEW ITEM) */}
         {(selectedItem || isAddingNew) && (
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            
+            {/* HEADER (Item Name / Price) */}
             <div className="flex justify-between items-start mb-6 border-b border-gray-100 pb-4">
               <div className="flex-1">
                 {isAddingNew ? (
@@ -203,7 +209,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
                 ) : (
                   <>
                     <h2 className="text-2xl font-extrabold text-gray-800 leading-tight">{selectedItem.name}</h2>
-                    <p className="text-sm text-gray-500 font-medium mt-1">UGX {selectedItem.sellingPrice.toLocaleString()} / {selectedItem.unit}</p>
+                    <p className="text-sm text-gray-500 font-bold mt-1">UGX {selectedItem.sellingPrice.toLocaleString()} / {selectedItem.unit}</p>
                   </>
                 )}
               </div>
@@ -226,14 +232,25 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
                 </div>
               )}
 
-              {/* FLEXIBLE INPUT TOGGLE */}
+              {/* INPUT TOGGLE (Amount is default) */}
               <div>
                 <div className="flex bg-gray-100 p-1.5 rounded-xl mb-3">
-                  <button onClick={() => setInputMode("qty")} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${inputMode === "qty" ? "bg-white shadow-sm text-[#FF9800]" : "text-gray-500"}`}>Enter Quantity</button>
                   <button onClick={() => setInputMode("amount")} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${inputMode === "amount" ? "bg-white shadow-sm text-[#FF9800]" : "text-gray-500"}`}>Enter Total Amount</button>
+                  <button onClick={() => setInputMode("qty")} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${inputMode === "qty" ? "bg-white shadow-sm text-[#FF9800]" : "text-gray-500"}`}>Enter Quantity</button>
                 </div>
                 
-                {inputMode === "qty" ? (
+                {inputMode === "amount" ? (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Amount (UGX)</label>
+                    <input 
+                      type="number" 
+                      value={amount} 
+                      onChange={(e) => setAmount(Number(e.target.value))} 
+                      placeholder="e.g. 10000" 
+                      className="w-full mt-1 p-4 bg-gray-50 border border-gray-200 rounded-xl text-2xl font-extrabold text-[#FF9800] outline-none focus:ring-2 focus:ring-[#FF9800]" 
+                    />
+                  </div>
+                ) : (
                   <div>
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantity Sold (Optional)</label>
                     <input 
@@ -242,17 +259,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
                       onChange={(e) => setQty(Number(e.target.value))} 
                       placeholder="Leave blank for 1" 
                       className="w-full mt-1 p-4 bg-gray-50 border border-gray-200 rounded-xl text-xl font-bold outline-none focus:ring-2 focus:ring-[#FF9800]" 
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Amount (UGX) (Optional)</label>
-                    <input 
-                      type="number" 
-                      value={amount} 
-                      onChange={(e) => setAmount(Number(e.target.value))} 
-                      placeholder="e.g. 5000" 
-                      className="w-full mt-1 p-4 bg-gray-50 border border-gray-200 rounded-xl text-xl font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" 
                     />
                   </div>
                 )}
@@ -298,8 +304,8 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
               )}
 
               {/* TOTAL DISPLAY */}
-              <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-                <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Amount</p>
+              <div className="pt-4 border-t border-gray-100 flex justify-between items-center bg-orange-50 p-4 rounded-xl">
+                <p className="text-sm font-bold text-gray-600 uppercase tracking-wider">Total Sale</p>
                 <p className="text-3xl font-extrabold text-[#FF9800]">
                   UGX {inputMode === "qty" 
                     ? ((isAddingNew ? (Number(newItemPrice) || 0) : selectedItem.sellingPrice) * (Number(qty) || 1)).toLocaleString()
