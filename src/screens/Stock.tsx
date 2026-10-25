@@ -44,10 +44,10 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   const loadStock = () => {
-    let priceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
+    let priceList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || localStorage.getItem("smartsale_pricelist") || "[]");
     if (priceList.length === 0) {
       priceList = DEFAULT_ITEMS.map((item, index) => ({ ...item, id: (index + 1).toString() }));
-      localStorage.setItem("smartsale_pricelist", JSON.stringify(priceList));
+      localStorage.setItem("smartsale_pricelist_v2", JSON.stringify(priceList));
     }
 
     const sales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
@@ -56,18 +56,15 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     const todayStr = new Date().toDateString();
 
     const combined = priceList.map((item: any) => {
-      // 1. ALL TIME IN
       const stockEntry = initialStock.find((s: any) => s.itemId === item.id);
       const initial = stockEntry ? Number(stockEntry.quantity) : 0;
 
-      // 2. ALL TIME OUT (For calculating true Left)
       const allItemSales = sales.filter((s: any) => s.itemName === item.name);
       const allTimeSold = allItemSales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
       
       const allItemRemovals = removals.filter((r: any) => r.itemId === item.id);
       const allTimeRemoved = allItemRemovals.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
 
-      // 3. TODAY'S OUT (For the "Out" column)
       const todaySales = allItemSales.filter((s: any) => new Date(s.date).toDateString() === todayStr);
       const todaySold = todaySales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
 
@@ -95,7 +92,7 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   };
 
   const handleAddStock = () => {
-    if (!qty || !selectedItem) return;
+    if (!qty || !selectedItem || !totalCost) return alert("Please enter both quantity and total cost.");
 
     // 1. Update Stock Quantity
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
@@ -165,9 +162,9 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   };
 
   const handleCreateNewItem = () => {
-    if (!newItem.name || !newItem.sellingPrice || !qty) return;
+    if (!newItem.name || !newItem.sellingPrice || !qty || !totalCost) return alert("Please fill all required fields including quantity and total cost.");
 
-    const priceList = JSON.parse(localStorage.getItem("smartsale_pricelist") || "[]");
+    const priceList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || "[]");
     const newId = Date.now().toString();
     
     const itemToAdd = {
@@ -178,19 +175,19 @@ export default function Stock({ navigate, businessInfo, language }: any) {
       sellingPrice: Number(newItem.sellingPrice) || 0,
     };
     priceList.push(itemToAdd);
-    localStorage.setItem("smartsale_pricelist", JSON.stringify(priceList));
+    localStorage.setItem("smartsale_pricelist_v2", JSON.stringify(priceList));
 
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     initialStock.push({ itemId: newId, quantity: Number(qty) });
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
-    const cost = (Number(newItem.buyingPrice) || 0) * Number(qty);
-    if (isPaid && cost > 0) {
+    // Auto-log expense
+    if (isPaid && totalCost > 0) {
       const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
       expenses.push({
         id: Date.now().toString(),
         date: new Date().toISOString(),
-        amount: cost,
+        amount: Number(totalCost),
         reason: `New Item Purchase: ${newItem.name}`
       });
       localStorage.setItem("smartsale_expenses", JSON.stringify(expenses));
@@ -223,7 +220,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* UPDATED HEADERS */}
           <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100 text-center">
             <div className="text-left col-span-2">Item</div>
             <div>Total In</div>
@@ -278,97 +274,101 @@ export default function Stock({ navigate, businessInfo, language }: any) {
             )}
 
             {modalMode === "add" && (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity Received</label>
-                    <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Total Cost (UGX)</label>
-                    <input type="number" value={totalCost} onChange={(e) => setTotalCost(Number(e.target.value))} placeholder="e.g. 40000" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
-                  </div>
+              <div className="space-y-4">
+                {/* 🛠️ UPDATED: Total Cost is now above Quantity */}
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Cost (UGX) *</label>
+                  <input type="number" value={totalCost} onChange={(e) => setTotalCost(Number(e.target.value))} placeholder="e.g. 40000" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl text-lg font-bold text-[#FF9800] outline-none focus:ring-2 focus:ring-[#FF9800]" />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Payment Status</label>
-                  <div className="flex gap-2 mt-1">
-                    <button onClick={() => setIsPaid(true)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${isPaid ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}>Paid in Full</button>
-                    <button onClick={() => setIsPaid(false)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>Credit (Not Paid)</button>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Quantity Received *</label>
+                  <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl text-lg font-bold outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                </div>
+
+                <div className="pt-2">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">Payment Status</label>
+                  <div className="flex gap-2">
+                    <button onClick={() => setIsPaid(true)} className={`flex-1 py-3 rounded-xl font-bold text-sm border-2 transition-colors ${isPaid ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}>Paid in Full</button>
+                    <button onClick={() => setIsPaid(false)} className={`flex-1 py-3 rounded-xl font-bold text-sm border-2 transition-colors ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>Credit (Not Paid)</button>
                   </div>
                 </div>
 
                 {!isPaid && (
-                  <div className="bg-red-50 p-3 rounded-lg border border-red-100 space-y-2 mt-2">
+                  <div className="bg-red-50 p-4 rounded-xl border border-red-100 space-y-3 mt-2">
                     <div>
-                      <label className="text-[10px] font-bold text-red-800 uppercase">Amount Paid Now (Optional)</label>
-                      <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Number(e.target.value))} placeholder="e.g. 10000" className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
+                      <label className="text-[10px] font-bold text-red-800 uppercase tracking-wider">Amount Paid Now (Optional)</label>
+                      <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Number(e.target.value))} placeholder="e.g. 10000" className="w-full p-2 mt-1 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-red-800 uppercase">Supplier Name</label>
-                      <input type="text" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="Who supplied this?" className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
+                      <label className="text-[10px] font-bold text-red-800 uppercase tracking-wider">Supplier Name *</label>
+                      <input type="text" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="Who supplied this?" className="w-full p-2 mt-1 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
                     </div>
                     {calculatedBalance > 0 && <p className="text-xs font-bold text-red-600 mt-1">Balance to owe: UGX {calculatedBalance.toLocaleString()}</p>}
                   </div>
                 )}
 
                 <div className="flex gap-2 pt-2">
-                  <button onClick={() => setModalMode("menu")} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-sm">Back</button>
-                  <button onClick={handleAddStock} disabled={!qty} className="flex-[2] py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md disabled:opacity-50">Add to Stock</button>
+                  <button onClick={() => setModalMode("menu")} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm">Back</button>
+                  <button onClick={handleAddStock} disabled={!qty || !totalCost} className="flex-[2] py-3 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md disabled:opacity-50">Add to Stock</button>
                 </div>
               </div>
             )}
 
             {modalMode === "remove" && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center mb-2">
                   <p className="text-xs text-red-800 font-medium">Use this to record items that spoiled, broke, or were lost. This will reduce your available stock.</p>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity to Remove</label>
-                  <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 2" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" />
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Quantity to Remove</label>
+                  <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 2" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl text-lg font-bold outline-none focus:ring-2 focus:ring-red-400" />
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <button onClick={() => setModalMode("menu")} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-sm">Back</button>
-                  <button onClick={handleRemoveStock} disabled={!qty} className="flex-[2] py-2.5 bg-red-500 text-white rounded-lg font-bold text-sm shadow-md disabled:opacity-50">Confirm Removal</button>
+                  <button onClick={() => setModalMode("menu")} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm">Back</button>
+                  <button onClick={handleRemoveStock} disabled={!qty} className="flex-[2] py-3 bg-red-500 text-white rounded-xl font-bold text-sm shadow-md disabled:opacity-50">Confirm Removal</button>
                 </div>
               </div>
             )}
 
             {modalMode === "newItem" && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Item Name</label>
-                  <input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} placeholder="e.g. Milk" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Item Name *</label>
+                  <input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} placeholder="e.g. Milk" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#FF9800]" />
                 </div>
                 <div className="flex gap-2">
                   <div className="w-1/3">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Unit</label>
-                    <input type="text" value={newItem.unit} onChange={(e) => setNewItem({...newItem, unit: e.target.value})} placeholder="kg" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Unit</label>
+                    <input type="text" value={newItem.unit} onChange={(e) => setNewItem({...newItem, unit: e.target.value})} placeholder="kg" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#FF9800]" />
                   </div>
                   <div className="w-1/3">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Buy Price</label>
-                    <input type="number" value={newItem.buyingPrice} onChange={(e) => setNewItem({...newItem, buyingPrice: e.target.value})} placeholder="0" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Buy Price</label>
+                    <input type="number" value={newItem.buyingPrice} onChange={(e) => setNewItem({...newItem, buyingPrice: e.target.value})} placeholder="0" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#FF9800]" />
                   </div>
                   <div className="w-1/3">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Sell Price</label>
-                    <input type="number" value={newItem.sellingPrice} onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})} placeholder="0" className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sell Price *</label>
+                    <input type="number" value={newItem.sellingPrice} onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})} placeholder="0" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Initial Quantity</label>
-                  <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Cost (UGX) *</label>
+                  <input type="number" value={totalCost} onChange={(e) => setTotalCost(Number(e.target.value))} placeholder="e.g. 40000" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl text-lg font-bold text-[#FF9800] outline-none focus:ring-2 focus:ring-[#FF9800]" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Was this stock paid for?</label>
-                  <div className="flex gap-2 mt-1">
-                    <button onClick={() => setIsPaid(true)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${isPaid ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}>Yes (Paid)</button>
-                    <button onClick={() => setIsPaid(false)} className={`flex-1 py-2 rounded-lg font-bold text-xs border-2 ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>No (Credit)</button>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Initial Quantity *</label>
+                  <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="e.g. 10" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl text-lg font-bold outline-none focus:ring-2 focus:ring-[#FF9800]" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">Was this stock paid for?</label>
+                  <div className="flex gap-2">
+                    <button onClick={() => setIsPaid(true)} className={`flex-1 py-3 rounded-xl font-bold text-sm border-2 transition-colors ${isPaid ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}>Yes (Paid)</button>
+                    <button onClick={() => setIsPaid(false)} className={`flex-1 py-3 rounded-xl font-bold text-sm border-2 transition-colors ${!isPaid ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>No (Credit)</button>
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <button onClick={() => setSelectedItem(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-sm">Cancel</button>
-                  <button onClick={handleCreateNewItem} disabled={!newItem.name || !newItem.sellingPrice || !qty} className="flex-[2] py-2.5 bg-[#FF9800] text-white rounded-lg font-bold text-sm shadow-md disabled:opacity-50">Add to Stock & List</button>
+                  <button onClick={() => setSelectedItem(null)} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm">Cancel</button>
+                  <button onClick={handleCreateNewItem} disabled={!newItem.name || !newItem.sellingPrice || !qty || !totalCost} className="flex-[2] py-3 bg-[#FF9800] text-white rounded-xl font-bold text-sm shadow-md disabled:opacity-50">Add to Stock & List</button>
                 </div>
               </div>
             )}
@@ -377,4 +377,4 @@ export default function Stock({ navigate, businessInfo, language }: any) {
       )}
     </div>
   );
-  }
+    }
