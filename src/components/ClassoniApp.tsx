@@ -29,7 +29,7 @@ export default function SmartSaleApp() {
       if (event.state && event.state.screen) {
         setCurrentScreen(event.state.screen);
       } else {
-        setCurrentScreen("home"); // fallback
+        setCurrentScreen("home");
       }
     };
     window.addEventListener("popstate", handlePopState);
@@ -100,7 +100,6 @@ export default function SmartSaleApp() {
       return;
     }
     
-    // Push state to history for back button sync
     if (screen !== "home" && screen !== "welcome") {
       window.history.pushState({ screen }, '');
     }
@@ -128,8 +127,8 @@ export default function SmartSaleApp() {
       const fakeData = { name: "Saviour's Shop", phone: "0700000000", isDemo: true, priceList: [] };
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
-      // 🕐 1 DAY FREE TRIAL FOR DEMO
-      localStorage.setItem("smartsale_premium_until", (Date.now() + (24 * 60 * 60 * 1000)).toString()); 
+      // 🕐 7 DAYS FREE TRIAL FOR DEMO
+      localStorage.setItem("smartsale_premium_until", (Date.now() + (7 * 24 * 60 * 60 * 1000)).toString()); 
       localStorage.setItem("smartsale_is_logged_in", "true");
       setCurrentScreen("home");
       window.history.replaceState({ screen: "home" }, '');
@@ -182,7 +181,7 @@ export default function SmartSaleApp() {
               </div>
               <h2 className="text-xl font-extrabold text-gray-800 mb-2">Trial Expired</h2>
               <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                Your free trial has ended. To continue adding sales and stock, upgrade to Premium. You can still view your analytics!
+                Your 7-day free trial has ended. To continue adding sales and stock, upgrade to Premium. You can still view your analytics!
               </p>
               <div className="space-y-2">
                 <button onClick={() => { setShowPremiumModal(false); navigate("buyStorage"); }} className="w-full bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform">View Premium Plans</button>
@@ -194,4 +193,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-      }
+}
