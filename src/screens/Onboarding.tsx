@@ -36,16 +36,16 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
     localStorage.setItem("smartsale_sec_answer", btoa(secAnswer.trim().toLowerCase()));
 
     const invitedBy = localStorage.getItem("smartsale_invited_by");
-    let daysToAdd = 1; // 🕐 1 DAY FREE TRIAL
+    let daysToAdd = 7; // 🕐 7 DAYS FREE TRIAL
     
     if (invitedBy) {
       if (invitedBy.trim() === phone.trim()) {
         alert("You cannot use your own invite link.");
         localStorage.removeItem("smartsale_invited_by");
       } else {
-        daysToAdd = 7; // 7 days for referral
+        daysToAdd += 7; // Add 7 extra days for referral (Total 14 days)
         localStorage.removeItem("smartsale_invited_by");
-        setTimeout(() => alert("🎉 Welcome! You have received 7 days of free Premium access!"), 500);
+        setTimeout(() => alert("🎉 Welcome! Because you were invited, you have received an extra 7 days of free Premium access!"), 500);
       }
     }
 
@@ -163,4 +163,4 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
       </div>
     </div>
   );
-              }
+    }
