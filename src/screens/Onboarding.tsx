@@ -9,7 +9,6 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
   const [smsCode, setSmsCode] = useState("");
   const [password, setPassword] = useState("");
   
-  // Security Question State
   const [secQuestion, setSecQuestion] = useState("What is your mother's name?");
   const [secAnswer, setSecAnswer] = useState("");
 
@@ -34,24 +33,24 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
 
     localStorage.setItem("smartsale_password", btoa(password));
     localStorage.setItem("smartsale_sec_question", secQuestion);
-    localStorage.setItem("smartsale_sec_answer", btoa(secAnswer.trim().toLowerCase())); // Hash answer
+    localStorage.setItem("smartsale_sec_answer", btoa(secAnswer.trim().toLowerCase()));
 
     const invitedBy = localStorage.getItem("smartsale_invited_by");
-    let hoursToAdd = 1; 
+    let daysToAdd = 1; // 🕐 1 DAY FREE TRIAL
     
     if (invitedBy) {
       if (invitedBy.trim() === phone.trim()) {
         alert("You cannot use your own invite link.");
         localStorage.removeItem("smartsale_invited_by");
       } else {
-        hoursToAdd = 24 * 7;
+        daysToAdd = 7; // 7 days for referral
         localStorage.removeItem("smartsale_invited_by");
         setTimeout(() => alert("🎉 Welcome! You have received 7 days of free Premium access!"), 500);
       }
     }
 
     const currentPremium = Number(localStorage.getItem("smartsale_premium_until") || 0);
-    const newPremium = Math.max(Date.now(), currentPremium) + (hoursToAdd * 60 * 60 * 1000);
+    const newPremium = Math.max(Date.now(), currentPremium) + (daysToAdd * 24 * 60 * 60 * 1000);
     localStorage.setItem("smartsale_premium_until", newPremium.toString());
 
     onComplete({
@@ -164,4 +163,4 @@ export default function Onboarding({ navigate, onComplete, language }: any) {
       </div>
     </div>
   );
-}
+              }
