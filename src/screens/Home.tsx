@@ -10,7 +10,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
   const [isPremium, setIsPremium] = useState(true);
   const [financeModalType, setFinanceModalType] = useState<"fund" | "spend" | null>(null);
   
-  // Traffic Bubble State
   const [showTrafficBubble, setShowTrafficBubble] = useState(false);
   const [toastTimeout, setToastTimeout] = useState<any>(null);
 
@@ -39,11 +38,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const savedSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const savedPriceList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || localStorage.getItem("smartsale_pricelist") || "[]");
     
-    // Create a fast lookup dictionary for the price list
     const priceMap: Record<string, any> = {};
-    savedPriceList.forEach((item: any) => {
-      priceMap[item.name] = item;
-    });
+    savedPriceList.forEach((item: any) => { priceMap[item.name] = item; });
 
     const todayStr = new Date().toDateString();
     const yesterday = new Date();
@@ -60,7 +56,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
     todaySales.forEach((sale: any) => {
       totalSales += Number(sale.total) || 0;
       
-      // 🧠 SMART PROFIT: Check the Price List first, fallback to the sale record
       const itemDetails = priceMap[sale.itemName];
       const currentBuyPrice = itemDetails ? Number(itemDetails.buyingPrice) : Number(sale.buyingPrice);
       
@@ -94,23 +89,16 @@ export default function Home({ navigate, businessInfo, language }: any) {
     const allSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const allRemovals = JSON.parse(localStorage.getItem("smartsale_removals") || "[]");
 
-    // 🧠 SMART STOCK CALCULATION
     let totalStockLeft = 0;
     savedPriceList.forEach((item: any) => {
       const initialEntry = savedInitialStock.find((s: any) => s.itemId === item.id);
       const initial = initialEntry ? Number(initialEntry.quantity) : 0;
-      
       const itemSales = allSales.filter((s: any) => s.itemName === item.name);
       const sold = itemSales.reduce((sum: number, s: any) => sum + Number(s.quantity), 0);
-      
       const itemRemovals = allRemovals.filter((r: any) => r.itemId === item.id);
       const removed = itemRemovals.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
-      
       const current = initial - sold - removed;
-      // Only count positive stock
-      if (current > 0) {
-        totalStockLeft += current;
-      }
+      if (current > 0) totalStockLeft += current; 
     });
 
     const getPercent = (current: number, previous: number) => {
@@ -171,9 +159,9 @@ export default function Home({ navigate, businessInfo, language }: any) {
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden relative">
+    <div className="min-h-[100dvh] flex flex-col bg-[#F3F4F6] relative pb-[80px]">
       
-      <header className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10">
+      <header className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0">
         <div>
           <p className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">{greeting}</p>
           <h1 className="text-lg font-extrabold text-gray-800 leading-tight">{businessInfo.name}</h1>
@@ -195,60 +183,57 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col justify-between p-4 pb-[75px] overflow-y-auto">
-        
-        <div className="space-y-2.5">
-          <div className="grid grid-cols-2 gap-2.5">
-            <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
-              <div className="flex justify-between items-start">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
-                {renderChange(stats.salesChange)}
-              </div>
-              <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
+      {/* SCROLLABLE CONTENT AREA */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
+          <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
+            <div className="flex justify-between items-start">
+              <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Sales", "Okutunda")}</p>
+              {renderChange(stats.salesChange)}
             </div>
+            <p className="text-base font-extrabold text-gray-800 mt-0.5">{formatMoney(stats.sales)}</p>
+          </div>
 
-            {/* CALM BLUE PROFIT TEXT */}
-            <div onClick={() => navigate(stats.missingBuyPrices ? "priceList" : "analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
-              <div className="flex justify-between items-start">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
-                {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.profitChange)}
-              </div>
-              <p className={`text-[11px] font-extrabold mt-0.5 leading-tight text-[#0055FF]`}>
-                {!isPremium ? "UGX ***" : (stats.missingBuyPrices ? "Confirm buying prices to calculate" : formatMoney(stats.profit))}
+          <div onClick={() => navigate(stats.missingBuyPrices ? "priceList" : "analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
+            <div className="flex justify-between items-start">
+              <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Profit", "Amagoba")}</p>
+              {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.profitChange)}
+            </div>
+            <p className={`text-[11px] font-extrabold mt-0.5 leading-tight text-[#0055FF]`}>
+              {!isPremium ? "UGX ***" : (stats.missingBuyPrices ? "Confirm buying prices to calculate" : formatMoney(stats.profit))}
+            </p>
+          </div>
+
+          <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
+            <div className="flex justify-between items-start">
+              <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
+              {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.debtorsChange)}
+            </div>
+            <p className="text-lg font-extrabold text-red-500 mt-0.5">{isPremium ? stats.debtors : "***"}</p>
+          </div>
+
+          <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
+            <div className="flex justify-between items-start">
+              <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
+              {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.creditorsChange)}
+            </div>
+            <p className="text-lg font-extrabold text-orange-500 mt-0.5">{isPremium ? stats.creditors : "***"}</p>
+          </div>
+
+          <div onClick={() => navigate("stock")} className={`col-span-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
+            <div>
+              <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Stock", "Okugula")}</p>
+              <p className="text-base font-extrabold text-gray-800 mt-0.5">
+                {isPremium ? `${stats.stock} Items` : "Locked"}
               </p>
             </div>
-
-            <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
-              <div className="flex justify-between items-start">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Debtors", "Babanja")}</p>
-                {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.debtorsChange)}
-              </div>
-              <p className="text-lg font-extrabold text-red-500 mt-0.5">{isPremium ? stats.debtors : "***"}</p>
-            </div>
-
-            <div onClick={() => navigate("analytics")} className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
-              <div className="flex justify-between items-start">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Creditors", "Abakuguzi")}</p>
-                {!isPremium ? <Lock size={12} className="text-red-400" /> : renderChange(stats.creditorsChange)}
-              </div>
-              <p className="text-lg font-extrabold text-orange-500 mt-0.5">{isPremium ? stats.creditors : "***"}</p>
-            </div>
-
-            <div onClick={() => navigate("stock")} className={`col-span-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition-transform ${!isPremium ? 'opacity-70' : ''}`}>
-              <div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase">{t("Stock", "Okugula")}</p>
-                <p className="text-base font-extrabold text-gray-800 mt-0.5">
-                  {isPremium ? `${stats.stock} Items` : "Locked"}
-                </p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-[#FF9800]">
-                {isPremium ? <Package size={16} /> : <Lock size={16} className="text-red-400" />}
-              </div>
+            <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-[#FF9800]">
+              {isPremium ? <Package size={16} /> : <Lock size={16} className="text-red-400" />}
             </div>
           </div>
         </div>
 
-        <div className="mt-2">
+        <div className="mt-4">
           <button 
             onClick={() => navigate("addSale")}
             className={`w-full py-3.5 rounded-2xl font-extrabold text-lg shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 ${
@@ -267,10 +252,9 @@ export default function Home({ navigate, businessInfo, language }: any) {
             <a href="https://wa.me/256708032236" target="_blank" rel="noreferrer" className="bg-[#0055FF] text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">Chat Us</a>
           </div>
         </div>
-
       </div>
 
-      <div className="fixed bottom-[210px] left-4 flex flex-col gap-3 z-40">
+      <div className="fixed bottom-[140px] left-4 flex flex-col gap-3 z-40">
         <button onClick={() => setFinanceModalType("fund")} className="w-12 h-12 bg-green-500 text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-green-500/40 active:scale-95 transition-transform border-4 border-white">
           <Plus size={18} />
         </button>
@@ -279,23 +263,21 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </button>
       </div>
 
-      {/* TRAFFIC BUTTON - OPENS CHAT BUBBLE */}
       <button 
         onClick={handleTrafficClick} 
-        className="fixed bottom-[210px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
+        className="fixed bottom-[140px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
       >
         <Play size={18} fill="currentColor" className="ml-1" />
         <span className="text-[8px] font-bold mt-0.5">Traffic</span>
       </button>
 
-      {/* 🚦 TRAFFIC CHAT BUBBLE */}
       <AnimatePresence>
         {showTrafficBubble && (
           <motion.div 
             initial={{ opacity: 0, y: 20, scale: 0.9 }} 
             animate={{ opacity: 1, y: 0, scale: 1 }} 
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            className="fixed bottom-[280px] right-4 w-64 bg-[#0055FF] text-white p-4 rounded-2xl rounded-br-sm shadow-xl z-50"
+            className="fixed bottom-[210px] right-4 w-64 bg-[#0055FF] text-white p-4 rounded-2xl rounded-br-sm shadow-xl z-50"
           >
             <button onClick={() => setShowTrafficBubble(false)} className="absolute top-2 right-2 text-white/70 hover:text-white">
               <X size={16} />
@@ -337,4 +319,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
     </div>
   );
-  }
+    }
