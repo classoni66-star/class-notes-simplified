@@ -5,16 +5,13 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
   const [search, setSearch] = useState("");
   const [selectedItem, setSelectedItem] = useState<any>(null);
   
-  // Custom Item Form State
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState<number | "">("");
 
-  // Inputs for Sale (Both open)
-  const [qty, setQty] = useState<number | "">(1); // Default to 1
+  const [qty, setQty] = useState<number | "">(1);
   const [amount, setAmount] = useState<number | "">("");
 
-  // Payment Status
   const [isPaid, setIsPaid] = useState(true);
   const [amountPaid, setAmountPaid] = useState<number | "">("");
   const [clientName, setClientName] = useState("");
@@ -39,21 +36,15 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
   const handleQtyChange = (val: string) => {
     const num = Number(val);
     setQty(val === "" ? "" : num);
-    if (num > 0 && currentUnitPrice > 0) {
-      setAmount(num * currentUnitPrice);
-    } else if (val === "") {
-      setAmount("");
-    }
+    if (num > 0 && currentUnitPrice > 0) setAmount(num * currentUnitPrice);
+    else if (val === "") setAmount("");
   };
 
   const handleAmountChange = (val: string) => {
     const num = Number(val);
     setAmount(val === "" ? "" : num);
-    if (num > 0 && currentUnitPrice > 0) {
-      setQty(num / currentUnitPrice);
-    } else if (val === "") {
-      setQty("");
-    }
+    if (num > 0 && currentUnitPrice > 0) setQty(num / currentUnitPrice);
+    else if (val === "") setQty("");
   };
 
   const resetForm = () => {
@@ -85,7 +76,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       return;
     }
 
-    // Safe fallback logic
     let finalQty = Number(qty) || 1;
     let finalTotal = Number(amount) || (unitPrice * finalQty);
 
@@ -94,7 +84,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       finalTotal = unitPrice;
     }
     
-    // Calculate partial payment details
     let actualPaid = 0;
     let debtBalance = 0;
 
@@ -103,10 +92,9 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
     } else {
       actualPaid = amountPaid ? Number(amountPaid) : 0;
       debtBalance = finalTotal - actualPaid;
-      if (debtBalance < 0) debtBalance = 0; // Failsafe
+      if (debtBalance < 0) debtBalance = 0;
     }
     
-    // 1. Save the Sale
     const existingSales = JSON.parse(localStorage.getItem("smartsale_sales") || "[]");
     const newSale = {
       id: Date.now().toString(),
@@ -122,7 +110,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
     };
     localStorage.setItem("smartsale_sales", JSON.stringify([...existingSales, newSale]));
 
-    // 2. Handle Debt
     if (!isPaid && debtBalance > 0) {
       const existingDebts = JSON.parse(localStorage.getItem("smartsale_debtors") || "[]");
       const newDebt = {
@@ -134,7 +121,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       localStorage.setItem("smartsale_debtors", JSON.stringify([...existingDebts, newDebt]));
     }
 
-    // 3. AUTO-ADD TO PRICE LIST & STOCK IF NEW ITEM
     if (isAddingNew) {
       const currentList = JSON.parse(localStorage.getItem("smartsale_pricelist_v2") || "[]");
       const exists = currentList.find((i: any) => i.name.toLowerCase() === finalItemName.toLowerCase());
@@ -162,15 +148,15 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
   const remainingDebt = (!isPaid && amount && amountPaid) ? (Number(amount) - Number(amountPaid)) : (!isPaid && amount ? Number(amount) : 0);
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden relative">
-      <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10">
+    <div className="min-h-[100dvh] flex flex-col bg-[#F3F4F6] relative pb-[80px]">
+      <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10 sticky top-0 shrink-0">
         <button onClick={() => navigate("home")} className="text-gray-500">
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-lg font-extrabold text-gray-800">{t("Add Sale", "Tunda")}</h1>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 pb-24">
+      <div className="flex-1 overflow-y-auto p-4">
         
         {!selectedItem && !isAddingNew && (
           <div className="space-y-4">
@@ -193,7 +179,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
               <span className="font-extrabold text-base">Sell an item not in the list</span>
             </button>
             
-            <div className="space-y-3">
+            <div className="space-y-3 pb-8">
               {filteredItems.map((item) => (
                 <button 
                   key={item.id}
@@ -212,7 +198,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
         )}
 
         {(selectedItem || isAddingNew) && (
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 pb-10">
             <div className="flex justify-between items-start mb-6 border-b border-gray-100 pb-4">
               <div className="flex-1">
                 {isAddingNew ? (
@@ -252,7 +238,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
                 </div>
               )}
 
-              {/* QUANTITY & AMOUNT BOTH OPEN */}
               <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-4">
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantity Sold</label>
@@ -275,7 +260,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
                 </div>
               </div>
 
-              {/* PAYMENT STATUS */}
               <div className="pt-2 border-t border-gray-100">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Payment Status</label>
                 <div className="flex flex-col gap-2">
@@ -297,9 +281,8 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
                 </div>
               </div>
 
-              {/* DEBT DETAILS */}
               {!isPaid && (
-                <div className="bg-red-50 p-4 rounded-xl border border-red-100 animate-fade-in-down space-y-4">
+                <div className="bg-red-50 p-4 rounded-xl border border-red-100 space-y-4">
                   <div>
                     <label className="text-xs font-bold text-red-800 uppercase tracking-wider">Amount Paid Now (Optional)</label>
                     <input 
@@ -329,7 +312,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
 
               <button 
                 onClick={handleRecordSale}
-                className="w-full bg-[#FF9800] text-white py-5 rounded-xl font-extrabold text-xl shadow-lg shadow-orange-500/30 flex justify-center items-center gap-2 mt-2 active:scale-95 transition-transform"
+                className="w-full bg-[#FF9800] text-white py-5 rounded-xl font-extrabold text-xl shadow-lg shadow-orange-500/30 flex justify-center items-center gap-2 mt-4 active:scale-95 transition-transform"
               >
                 <Check size={24} />
                 Confirm Sale
@@ -340,4 +323,4 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-    }
+            }
