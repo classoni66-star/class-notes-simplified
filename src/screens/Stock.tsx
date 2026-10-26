@@ -27,18 +27,15 @@ const DEFAULT_ITEMS = [
 export default function Stock({ navigate, businessInfo, language }: any) {
   const [stockData, setStockData] = useState<any[]>([]);
   
-  // Modal State
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [modalMode, setModalMode] = useState<"menu" | "add" | "remove" | "newItem">("menu");
   
-  // Form State
   const [qty, setQty] = useState<number | "">("");
   const [totalCost, setTotalCost] = useState<number | "">("");
   const [isPaid, setIsPaid] = useState(true);
   const [amountPaid, setAmountPaid] = useState<number | "">("");
   const [supplierName, setSupplierName] = useState("");
 
-  // New Item State
   const [newItem, setNewItem] = useState({ name: "", unit: "pc", buyingPrice: "", sellingPrice: "" });
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
@@ -94,7 +91,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
   const handleAddStock = () => {
     if (!qty || !selectedItem || !totalCost) return alert("Please enter both quantity and total cost.");
 
-    // 1. Update Stock Quantity
     const initialStock = JSON.parse(localStorage.getItem("smartsale_initial_stock") || "[]");
     const existingIndex = initialStock.findIndex((s: any) => s.itemId === selectedItem.id);
 
@@ -105,7 +101,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     }
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
-    // 2. Handle Expenses & Creditors
     const cost = Number(totalCost) || 0;
     const paid = Number(amountPaid) || 0;
     const balance = cost - paid;
@@ -181,7 +176,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
     initialStock.push({ itemId: newId, quantity: Number(qty) });
     localStorage.setItem("smartsale_initial_stock", JSON.stringify(initialStock));
 
-    // Auto-log expense
     if (isPaid && totalCost > 0) {
       const expenses = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
       expenses.push({
@@ -249,12 +243,12 @@ export default function Stock({ navigate, businessInfo, language }: any) {
         <p className="text-[10px] text-gray-400 mt-3 text-center">"Today Out" resets to 0 every morning. "Left" is your actual physical stock.</p>
       </div>
 
-      {/* BOTTOM SHEET MODAL */}
+      {/* BOTTOM SHEET MODAL - UPDATED FOR SMALL SCREENS */}
       {selectedItem && (
         <div className="absolute inset-0 bg-black/50 z-50 flex flex-col justify-end">
-          <div className="bg-white rounded-t-3xl p-5 w-full animate-slide-up max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-t-3xl p-5 w-full animate-slide-up max-h-[85vh] overflow-y-auto pb-24">
             
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-2">
               <h2 className="text-lg font-extrabold text-gray-800">{selectedItem.name}</h2>
               <button onClick={() => { setSelectedItem(null); setModalMode("menu"); }} className="p-1 bg-gray-100 rounded-full text-gray-500">
                 <X size={20} />
@@ -275,7 +269,6 @@ export default function Stock({ navigate, businessInfo, language }: any) {
 
             {modalMode === "add" && (
               <div className="space-y-4">
-                {/* 🛠️ UPDATED: Total Cost is now above Quantity */}
                 <div>
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Cost (UGX) *</label>
                   <input type="number" value={totalCost} onChange={(e) => setTotalCost(Number(e.target.value))} placeholder="e.g. 40000" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl text-lg font-bold text-[#FF9800] outline-none focus:ring-2 focus:ring-[#FF9800]" />
@@ -343,11 +336,11 @@ export default function Stock({ navigate, businessInfo, language }: any) {
                     <input type="text" value={newItem.unit} onChange={(e) => setNewItem({...newItem, unit: e.target.value})} placeholder="kg" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#FF9800]" />
                   </div>
                   <div className="w-1/3">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Buy Price</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Buying Price</label>
                     <input type="number" value={newItem.buyingPrice} onChange={(e) => setNewItem({...newItem, buyingPrice: e.target.value})} placeholder="0" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#FF9800]" />
                   </div>
                   <div className="w-1/3">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sell Price *</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Selling Price *</label>
                     <input type="number" value={newItem.sellingPrice} onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})} placeholder="0" className="w-full p-3 mt-1 bg-gray-50 border border-gray-200 rounded-xl font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" />
                   </div>
                 </div>
