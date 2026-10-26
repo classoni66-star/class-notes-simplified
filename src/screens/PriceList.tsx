@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { ArrowLeft, Plus, X, MoreVertical } from "lucide-react";
 
 const LISTS: Record<string, any[]> = {
   "Retailer": [
@@ -55,6 +55,9 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
   const [editingField, setEditingField] = useState<"name" | "unit" | "buyingPrice" | "sellingPrice" | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  // State for the 3-dots menu
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
   const t = (en: string, run: string) => (language === "run" ? run : en);
   const category = businessInfo?.type || "Retailer";
   const STORAGE_KEY = "smartsale_pricelist_v2";
@@ -101,12 +104,14 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
 
   const handleDelete = (id: string) => {
     saveItems(items.filter(i => i.id !== id));
+    setMenuOpenId(null); // Close menu after deleting
   };
 
   const startEdit = (id: string, field: "name" | "unit" | "buyingPrice" | "sellingPrice", currentValue: string) => {
     setEditingId(id);
     setEditingField(field);
     setEditValue(currentValue.toString());
+    setMenuOpenId(null); // Close menu if open
   };
 
   const saveEdit = () => {
@@ -138,7 +143,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </button>
           <h1 className="text-lg font-extrabold text-gray-800">{t("Price List", "Ebihenda")}</h1>
         </div>
-        {/* Top buttons removed as requested */}
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24">
@@ -150,7 +154,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </p>
         </div>
 
-        {/* LARGE ADD NEW ITEM BUTTON */}
         {!showAddForm && (
           <button 
             onClick={() => setShowAddForm(true)}
@@ -164,7 +167,6 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </button>
         )}
 
-        {/* ADD ITEM FORM */}
         {showAddForm && (
           <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-[#FF9800] mb-4 relative">
             <button onClick={() => setShowAddForm(false)} className="absolute top-2 right-2 text-gray-400 p-1 bg-gray-50 rounded-full">
@@ -200,13 +202,12 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
           </div>
         )}
 
-        {/* ITEMS TABLE */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
             <div className="col-span-2">Item / Unit</div>
             <div className="text-right">Buy</div>
             <div className="text-right">Sell</div>
-            <div className="text-center">Del</div>
+            <div className="text-center">More</div>
           </div>
 
           {items.map((item) => (
@@ -250,19 +251,34 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
                 )}
               </div>
 
-              <div className="flex justify-center">
-                <button onClick={() => handleDelete(item.id)} className="text-red-500 p-1.5 bg-red-50 rounded hover:bg-red-100 transition-colors">
-                  <X size={16} />
+              {/* 🛠️ 3 DOTS MENU */}
+              <div className="flex justify-center relative">
+                <button 
+                  onClick={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)} 
+                  className="text-gray-400 p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <MoreVertical size={16} />
                 </button>
+
+                {menuOpenId === item.id && (
+                  <div className="absolute right-0 top-8 bg-white border border-gray-200 shadow-xl rounded-xl z-20 w-28 overflow-hidden animate-fade-in-down">
+                    <button 
+                      onClick={() => handleDelete(item.id)} 
+                      className="w-full text-left px-4 py-3 text-xs text-red-600 font-bold hover:bg-red-50 active:bg-red-100 transition-colors"
+                    >
+                      Remove Item
+                    </button>
+                  </div>
+                )}
               </div>
 
             </div>
           ))}
           {items.length === 0 && (
-            <p className="text-center text-gray-400 py-8 text-sm">Your list is empty. Tap the + button to add items.</p>
+            <p className="text-center text-gray-400 py-8 text-sm">Your list is empty. Tap the button above to add items.</p>
           )}
         </div>
       </div>
     </div>
   );
-    }
+  }
