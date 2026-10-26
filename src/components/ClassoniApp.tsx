@@ -128,7 +128,8 @@ export default function SmartSaleApp() {
       const fakeData = { name: "Saviour's Shop", phone: "0700000000", isDemo: true, priceList: [] };
       setBusinessInfo(fakeData);
       localStorage.setItem("smartsale_business", JSON.stringify(fakeData));
-      localStorage.setItem("smartsale_premium_until", (Date.now() + (1 * 60 * 60 * 1000)).toString()); 
+      // 🕐 1 DAY FREE TRIAL FOR DEMO
+      localStorage.setItem("smartsale_premium_until", (Date.now() + (24 * 60 * 60 * 1000)).toString()); 
       localStorage.setItem("smartsale_is_logged_in", "true");
       setCurrentScreen("home");
       window.history.replaceState({ screen: "home" }, '');
@@ -193,4 +194,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-                        }
+      }
