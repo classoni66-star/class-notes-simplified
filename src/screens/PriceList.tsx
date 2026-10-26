@@ -186,7 +186,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
                   <input type="number" placeholder="e.g. 2000" value={newItem.sellingPrice} onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm font-bold text-[#0055FF] outline-none focus:ring-2 focus:ring-[#FF9800]" />
                 </div>
                 <div className="flex-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Buy Price</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Buying Price</label>
                   <input type="number" placeholder="Optional" value={newItem.buyingPrice} onChange={(e) => setNewItem({...newItem, buyingPrice: e.target.value})} className="w-full p-2 bg-gray-50 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#FF9800]" />
                 </div>
                 <div className="w-[70px]">
@@ -203,10 +203,11 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
         )}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="grid grid-cols-5 bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-100">
+          {/* UPDATED HEADERS */}
+          <div className="grid grid-cols-5 bg-gray-50 p-3 text-[9px] font-bold text-gray-500 uppercase border-b border-gray-100 leading-tight">
             <div className="col-span-2">Item / Unit</div>
-            <div className="text-right">Buy</div>
-            <div className="text-right">Sell</div>
+            <div className="text-right">Buying<br/>Price</div>
+            <div className="text-right">Selling<br/>Price</div>
             <div className="text-center">More</div>
           </div>
 
@@ -251,7 +252,7 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
                 )}
               </div>
 
-              {/* 🛠️ 3 DOTS MENU */}
+              {/* 3 DOTS MENU */}
               <div className="flex justify-center relative">
                 <button 
                   onClick={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)} 
@@ -281,4 +282,4 @@ export default function PriceList({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-  }
+     }
