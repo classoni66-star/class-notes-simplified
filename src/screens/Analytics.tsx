@@ -157,7 +157,7 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       }
     });
 
-    // 🛠️ FIX: Grab the last calculated cash at hand from the sorted dates
+    // Grab the last calculated cash at hand
     let currentCashAtHand = 0;
     if (sortedDates.length > 0) {
       const latestDateStr = sortedDates[sortedDates.length - 1];
@@ -186,47 +186,35 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     });
   }, []);
 
-  const handleEditPrevCash = (dateStr: string, currentVal: number) => {
+  // 🛠️ FIXED: Edits the state directly for instant UI update
+  const handleEditPrevCash = (dayString: string, dateStr: string, currentVal: number) => {
     const newVal = prompt("Enter corrected money from yesterday (UGX):", currentVal.toString());
     if (newVal === null) return;
     const num = Number(newVal);
     if (isNaN(num) || num < 0) return alert("Invalid amount");
+    if (num === currentVal) return;
 
-    const difference = num - currentVal;
-    
-    // 1. Update the historical cash for yesterday
+    // 1. Update UI instantly
+    setGroupedSales(prev => {
+      const updated = { ...prev };
+      const dayData = updated[dayString];
+      if (!dayData) return prev;
+
+      const difference = num - dayData.prevCash;
+      const newCashAtHand = dayData.cashAtHand + difference;
+
+      updated[dayString] = {
+        ...dayData,
+        prevCash: num, // Update the displayed number
+        cashAtHand: newCashAtHand // Update the calculated cash
+      };
+      return updated;
+    });
+
+    // 2. Save to localStorage so it persists
     const prevDate = new Date(dateStr);
     prevDate.setDate(prevDate.getDate() - 1);
     localStorage.setItem(`smartsale_cash_${prevDate.toDateString()}`, num.toString());
-
-    // 2. Adjust today's funds or expenses based on the difference
-    if (difference !== 0) {
-      const todayStr = new Date().toISOString();
-      
-      if (difference > 0) {
-        // Added money -> Log as Fund
-        const funds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
-        funds.push({
-          id: Date.now().toString(),
-          date: todayStr,
-          amount: difference,
-          reason: "Adjustment for yesterday's cash"
-        });
-        localStorage.setItem("smartsale_funds", JSON.stringify(funds));
-      } else {
-        // Subtracted money -> Log as Expense
-        const expensesList = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
-        expensesList.push({
-          id: Date.now().toString(),
-          date: todayStr,
-          amount: Math.abs(difference),
-          reason: "Adjustment for yesterday's cash"
-        });
-        localStorage.setItem("smartsale_expenses", JSON.stringify(expensesList));
-      }
-    }
-
-    window.location.reload();
   };
 
   const handleDeleteExpense = (id: string) => {
@@ -285,8 +273,6 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </span>
     );
   };
-
-  // --- SHARE & DOWNLOAD FUNCTIONS ---
 
   const handleShareDaily = async (dayString: string, data: any) => {
     const profitText = data.missingBuyPrices ? "Confirm buying prices to calculate" : `UGX ${data.totalDayProfit.toLocaleString()}`;
@@ -413,9 +399,8 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
                   
                   <div className="border-t border-orange-200 my-1"></div>
                   
-                  {/* 🛠️ EDITABLE MONEY FROM YESTERDAY */}
                   <div 
-                    onClick={() => handleEditPrevCash(data.dateStr, data.prevCash)}
+                    onClick={() => handleEditPrevCash(dayString, data.dateStr, data.prevCash)}
                     className="flex justify-between text-gray-600 cursor-pointer hover:bg-orange-100 p-1 -mx-1 rounded transition-colors"
                   >
                     <span>Money from yesterday</span>
