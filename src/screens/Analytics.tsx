@@ -157,7 +157,13 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       }
     });
 
-    const currentCashAtHand = grouped[new Date().toDateString()]?.cashAtHand || 0;
+    // 🛠️ FIX: Grab the last calculated cash at hand from the sorted dates
+    let currentCashAtHand = 0;
+    if (sortedDates.length > 0) {
+      const latestDateStr = sortedDates[sortedDates.length - 1];
+      const latestDayString = new Date(latestDateStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+      currentCashAtHand = grouped[latestDayString]?.cashAtHand || 0;
+    }
 
     const getPercent = (current: number, previous: number) => {
       if (previous === 0) return current > 0 ? 100 : 0;
@@ -184,11 +190,42 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
     const newVal = prompt("Enter corrected money from yesterday (UGX):", currentVal.toString());
     if (newVal === null) return;
     const num = Number(newVal);
-    if (isNaN(num)) return alert("Invalid amount");
+    if (isNaN(num) || num < 0) return alert("Invalid amount");
 
+    const difference = num - currentVal;
+    
+    // 1. Update the historical cash for yesterday
     const prevDate = new Date(dateStr);
     prevDate.setDate(prevDate.getDate() - 1);
     localStorage.setItem(`smartsale_cash_${prevDate.toDateString()}`, num.toString());
+
+    // 2. Adjust today's funds or expenses based on the difference
+    if (difference !== 0) {
+      const todayStr = new Date().toISOString();
+      
+      if (difference > 0) {
+        // Added money -> Log as Fund
+        const funds = JSON.parse(localStorage.getItem("smartsale_funds") || "[]");
+        funds.push({
+          id: Date.now().toString(),
+          date: todayStr,
+          amount: difference,
+          reason: "Adjustment for yesterday's cash"
+        });
+        localStorage.setItem("smartsale_funds", JSON.stringify(funds));
+      } else {
+        // Subtracted money -> Log as Expense
+        const expensesList = JSON.parse(localStorage.getItem("smartsale_expenses") || "[]");
+        expensesList.push({
+          id: Date.now().toString(),
+          date: todayStr,
+          amount: Math.abs(difference),
+          reason: "Adjustment for yesterday's cash"
+        });
+        localStorage.setItem("smartsale_expenses", JSON.stringify(expensesList));
+      }
+    }
+
     window.location.reload();
   };
 
@@ -537,4 +574,4 @@ export default function Analytics({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-                                   }
+      }
