@@ -148,15 +148,18 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
   const remainingDebt = (!isPaid && amount && amountPaid) ? (Number(amount) - Number(amountPaid)) : (!isPaid && amount ? Number(amount) : 0);
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-[#F3F4F6] relative pb-[80px]">
-      <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10 sticky top-0 shrink-0">
+    {/* 🛠️ FIXED: Strict height to allow internal scrolling */}
+    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
+      
+      <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10 shrink-0">
         <button onClick={() => navigate("home")} className="text-gray-500">
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-lg font-extrabold text-gray-800">{t("Add Sale", "Tunda")}</h1>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* 🛠️ FIXED: Scrollable content area */}
+      <div className="flex-1 overflow-y-auto p-4 pb-24">
         
         {!selectedItem && !isAddingNew && (
           <div className="space-y-4">
@@ -323,4 +326,4 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-            }
+         }
