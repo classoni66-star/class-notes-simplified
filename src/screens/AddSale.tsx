@@ -148,7 +148,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
   const remainingDebt = (!isPaid && amount && amountPaid) ? (Number(amount) - Number(amountPaid)) : (!isPaid && amount ? Number(amount) : 0);
 
   return (
-    {/* 🛠️ FIXED: Strict height to allow internal scrolling */}
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
       
       <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10 shrink-0">
@@ -158,7 +157,6 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
         <h1 className="text-lg font-extrabold text-gray-800">{t("Add Sale", "Tunda")}</h1>
       </header>
 
-      {/* 🛠️ FIXED: Scrollable content area */}
       <div className="flex-1 overflow-y-auto p-4 pb-24">
         
         {!selectedItem && !isAddingNew && (
@@ -326,4 +324,4 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       </div>
     </div>
   );
-         }
+    }
