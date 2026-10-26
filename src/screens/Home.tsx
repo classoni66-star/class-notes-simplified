@@ -159,7 +159,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-[#F3F4F6] relative pb-[80px]">
+    <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden relative">
       
       <header className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0">
         <div>
@@ -183,7 +183,9 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+      {/* Scrollable area with flex-col to push content down */}
+      <div className="flex-1 flex flex-col p-4 pb-[75px] overflow-y-auto">
+        
         <div className="grid grid-cols-2 gap-2.5">
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
             <div className="flex justify-between items-start">
@@ -232,8 +234,11 @@ export default function Home({ navigate, businessInfo, language }: any) {
           </div>
         </div>
 
-        {/* 🛠️ FIXED: Added mt-6 for spacing */}
-        <div className="mt-6">
+        {/* 🛠️ SPACER: This pushes the Add Sale button to the bottom */}
+        <div className="flex-1 min-h-[30px]"></div>
+
+        {/* Bottom Action Area */}
+        <div className="mt-4 shrink-0">
           <button 
             onClick={() => navigate("addSale")}
             className={`w-full py-3.5 rounded-2xl font-extrabold text-lg shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 ${
@@ -244,7 +249,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             {t("Add Sale", "Tunda")}
           </button>
 
-          <div className="mt-4 bg-blue-50 p-2.5 rounded-xl border border-blue-100 flex justify-between items-center">
+          <div className="mt-3 bg-blue-50 p-2.5 rounded-xl border border-blue-100 flex justify-between items-center">
             <div>
               <h3 className="text-[11px] font-bold text-blue-800">Have a suggestion?</h3>
               <p className="text-[9px] text-blue-600">Help us improve SmartSale.</p>
@@ -254,7 +259,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </div>
       </div>
 
-      <div className="fixed bottom-[140px] left-4 flex flex-col gap-3 z-40">
+      {/* Floating buttons pushed higher up */}
+      <div className="fixed bottom-[220px] left-4 flex flex-col gap-3 z-40">
         <button onClick={() => setFinanceModalType("fund")} className="w-12 h-12 bg-green-500 text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-green-500/40 active:scale-95 transition-transform border-4 border-white">
           <Plus size={18} />
         </button>
@@ -265,7 +271,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       <button 
         onClick={handleTrafficClick} 
-        className="fixed bottom-[140px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
+        className="fixed bottom-[220px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
       >
         <Play size={18} fill="currentColor" className="ml-1" />
         <span className="text-[8px] font-bold mt-0.5">Traffic</span>
@@ -277,7 +283,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             initial={{ opacity: 0, y: 20, scale: 0.9 }} 
             animate={{ opacity: 1, y: 0, scale: 1 }} 
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            className="fixed bottom-[210px] right-4 w-64 bg-[#0055FF] text-white p-4 rounded-2xl rounded-br-sm shadow-xl z-50"
+            className="fixed bottom-[290px] right-4 w-64 bg-[#0055FF] text-white p-4 rounded-2xl rounded-br-sm shadow-xl z-50"
           >
             <button onClick={() => setShowTrafficBubble(false)} className="absolute top-2 right-2 text-white/70 hover:text-white">
               <X size={16} />
@@ -319,4 +325,4 @@ export default function Home({ navigate, businessInfo, language }: any) {
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
     </div>
   );
-    }
+}
