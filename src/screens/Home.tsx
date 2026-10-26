@@ -183,7 +183,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </div>
       </header>
 
-      {/* SCROLLABLE CONTENT AREA */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
         <div className="grid grid-cols-2 gap-2.5">
           <div onClick={() => navigate("analytics")} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-transform">
@@ -233,7 +232,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
           </div>
         </div>
 
-        <div className="mt-4">
+        {/* 🛠️ FIXED: Added mt-6 for spacing */}
+        <div className="mt-6">
           <button 
             onClick={() => navigate("addSale")}
             className={`w-full py-3.5 rounded-2xl font-extrabold text-lg shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 ${
@@ -244,7 +244,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
             {t("Add Sale", "Tunda")}
           </button>
 
-          <div className="mt-3 bg-blue-50 p-2.5 rounded-xl border border-blue-100 flex justify-between items-center">
+          <div className="mt-4 bg-blue-50 p-2.5 rounded-xl border border-blue-100 flex justify-between items-center">
             <div>
               <h3 className="text-[11px] font-bold text-blue-800">Have a suggestion?</h3>
               <p className="text-[9px] text-blue-600">Help us improve SmartSale.</p>
