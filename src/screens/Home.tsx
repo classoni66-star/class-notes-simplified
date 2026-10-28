@@ -1,18 +1,16 @@
 import { useState, useEffect } from "react";
-import { Gift, User, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus, MessageCircle, X } from "lucide-react";
+import { Gift, User, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt";
 import FinanceModal from "./FinanceModal";
-import { motion, AnimatePresence } from "framer-motion";
+import TranscribeModal from "../components/TranscribeModal";
 
 export default function Home({ navigate, businessInfo, language }: any) {
   const [timeOfDay, setTimeOfDay] = useState("morning");
   const [todayDate, setTodayDate] = useState("");
   const [isPremium, setIsPremium] = useState(true);
   const [financeModalType, setFinanceModalType] = useState<"fund" | "spend" | null>(null);
+  const [isTranscribeOpen, setIsTranscribeOpen] = useState(false);
   
-  const [showTrafficBubble, setShowTrafficBubble] = useState(false);
-  const [toastTimeout, setToastTimeout] = useState<any>(null);
-
   const [stats, setStats] = useState({
     sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0,
     salesChange: 0, profitChange: 0, debtorsChange: 0, creditorsChange: 0,
@@ -32,6 +30,13 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     const premiumUntil = Number(localStorage.getItem("smartsale_premium_until") || 0);
     setIsPremium(premiumUntil > Date.now());
+
+    // 🛠️ CHECK IF WE NEED TO RE-OPEN MODAL AFTER SALE
+    const openTranscribe = localStorage.getItem("smartsale_open_transcribe");
+    if (openTranscribe === "true") {
+      setIsTranscribeOpen(true);
+      localStorage.removeItem("smartsale_open_transcribe");
+    }
   }, []);
 
   const calculateStats = () => {
@@ -124,15 +129,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
     calculateStats();
   }, [businessInfo, financeModalType]); 
 
-  const handleTrafficClick = () => {
-    setShowTrafficBubble(true);
-    if (toastTimeout) clearTimeout(toastTimeout);
-    const timeout = setTimeout(() => {
-      setShowTrafficBubble(false);
-    }, 4000);
-    setToastTimeout(timeout);
-  };
-
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
   if (!businessInfo) {
@@ -183,7 +179,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </div>
       </header>
 
-      {/* Scrollable area with flex-col to push content down */}
       <div className="flex-1 flex flex-col p-4 pb-[75px] overflow-y-auto">
         
         <div className="grid grid-cols-2 gap-2.5">
@@ -234,10 +229,8 @@ export default function Home({ navigate, businessInfo, language }: any) {
           </div>
         </div>
 
-        {/* 🛠️ SPACER: This pushes the Add Sale button to the bottom */}
         <div className="flex-1 min-h-[30px]"></div>
 
-        {/* Bottom Action Area */}
         <div className="mt-4 shrink-0">
           <button 
             onClick={() => navigate("addSale")}
@@ -259,7 +252,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
         </div>
       </div>
 
-      {/* Floating buttons pushed higher up */}
       <div className="fixed bottom-[220px] left-4 flex flex-col gap-3 z-40">
         <button onClick={() => setFinanceModalType("fund")} className="w-12 h-12 bg-green-500 text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-green-500/40 active:scale-95 transition-transform border-4 border-white">
           <Plus size={18} />
@@ -270,34 +262,12 @@ export default function Home({ navigate, businessInfo, language }: any) {
       </div>
 
       <button 
-        onClick={handleTrafficClick} 
+        onClick={() => setIsTranscribeOpen(true)} 
         className="fixed bottom-[220px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
       >
         <Play size={18} fill="currentColor" className="ml-1" />
         <span className="text-[8px] font-bold mt-0.5">Traffic</span>
       </button>
-
-      <AnimatePresence>
-        {showTrafficBubble && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.9 }} 
-            animate={{ opacity: 1, y: 0, scale: 1 }} 
-            exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            className="fixed bottom-[290px] right-4 w-64 bg-[#0055FF] text-white p-4 rounded-2xl rounded-br-sm shadow-xl z-50"
-          >
-            <button onClick={() => setShowTrafficBubble(false)} className="absolute top-2 right-2 text-white/70 hover:text-white">
-              <X size={16} />
-            </button>
-            <div className="flex items-center gap-2 mb-1">
-              <MessageCircle size={18} />
-              <h4 className="font-bold text-sm">Traffic Mode</h4>
-            </div>
-            <p className="text-[11px] leading-relaxed opacity-90">
-              Coming soon! Traffic mode records your orders when traffic is high, and you review them when it reduces. We are refining this to use AI transcription for your customers' privacy.
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-[65px] z-30 pb-1">
         <button onClick={() => navigate("stock")} className="flex flex-col items-center gap-1 text-gray-400">
@@ -323,6 +293,13 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       <InstallPrompt />
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
+      
+      {/* 🛠️ THE NEW CHAT BUBBLE POPUP */}
+      <TranscribeModal 
+        isOpen={isTranscribeOpen} 
+        onClose={() => { setIsTranscribeOpen(false); calculateStats(); }} 
+        navigate={navigate} 
+      />
     </div>
   );
-}
+                      }
