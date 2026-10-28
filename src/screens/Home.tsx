@@ -2,14 +2,12 @@ import { useState, useEffect } from "react";
 import { Gift, User, PlusCircle, Package, BarChart3, Home as HomeIcon, Lock, Play, MinusCircle, Plus } from "lucide-react";
 import InstallPrompt from "../components/InstallPrompt";
 import FinanceModal from "./FinanceModal";
-import TranscribeModal from "../components/TranscribeModal";
 
 export default function Home({ navigate, businessInfo, language }: any) {
   const [timeOfDay, setTimeOfDay] = useState("morning");
   const [todayDate, setTodayDate] = useState("");
   const [isPremium, setIsPremium] = useState(true);
   const [financeModalType, setFinanceModalType] = useState<"fund" | "spend" | null>(null);
-  const [isTranscribeOpen, setIsTranscribeOpen] = useState(false);
   
   const [stats, setStats] = useState({
     sales: 0, profit: 0, debtors: 0, creditors: 0, stock: 0,
@@ -30,13 +28,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     const premiumUntil = Number(localStorage.getItem("smartsale_premium_until") || 0);
     setIsPremium(premiumUntil > Date.now());
-
-    // 🛠️ CHECK IF WE NEED TO RE-OPEN MODAL AFTER SALE
-    const openTranscribe = localStorage.getItem("smartsale_open_transcribe");
-    if (openTranscribe === "true") {
-      setIsTranscribeOpen(true);
-      localStorage.removeItem("smartsale_open_transcribe");
-    }
   }, []);
 
   const calculateStats = () => {
@@ -60,7 +51,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
     todaySales.forEach((sale: any) => {
       totalSales += Number(sale.total) || 0;
-      
       const itemDetails = priceMap[sale.itemName];
       const currentBuyPrice = itemDetails ? Number(itemDetails.buyingPrice) : Number(sale.buyingPrice);
       
@@ -262,7 +252,7 @@ export default function Home({ navigate, businessInfo, language }: any) {
       </div>
 
       <button 
-        onClick={() => setIsTranscribeOpen(true)} 
+        onClick={() => alert("Traffic Mode is currently being updated.")} 
         className="fixed bottom-[220px] right-4 w-14 h-14 bg-[#0055FF] text-white rounded-full flex flex-col items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform z-40 border-4 border-white"
       >
         <Play size={18} fill="currentColor" className="ml-1" />
@@ -293,13 +283,6 @@ export default function Home({ navigate, businessInfo, language }: any) {
 
       <InstallPrompt />
       <FinanceModal isOpen={!!financeModalType} type={financeModalType} onClose={() => setFinanceModalType(null)} />
-      
-      {/* 🛠️ THE NEW CHAT BUBBLE POPUP */}
-      <TranscribeModal 
-        isOpen={isTranscribeOpen} 
-        onClose={() => { setIsTranscribeOpen(false); calculateStats(); }} 
-        navigate={navigate} 
-      />
     </div>
   );
-                      }
+  }
