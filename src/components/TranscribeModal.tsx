@@ -1,270 +1,169 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Mic, AlertCircle, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mic, Square, Check, X, Loader2, ShieldCheck } from "lucide-react";
 
-// ------------------------------------------------------------------
-// 1. Load Transformers.js from jsDelivr (much more reliable than esm.sh)
-// ------------------------------------------------------------------
-const TRANSFORMERS_CDN =
-  'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+export default function TranscribeModal({ isOpen, onClose, navigate }: any) {
+  const [consent, setConsent] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [chunks, setChunks] = useState<any[]>([]);
+  const [modelStatus, setModelStatus] = useState("AI Ready (Safe Mode)");
 
-let pipeline: any = null;
-let env: any = null;
-
-const loadTransformers = async () => {
-  if (pipeline) return { pipeline, env };
-
-  const module = await import(
-    /* @vite-ignore */
-    `${TRANSFORMERS_CDN}/dist/transformers.min.js`
-  );
-  pipeline = module.pipeline;
-  env = module.env;
-
-  // ------------------------------------------------------------------
-  // 2. Critical environment settings for mobile / offline use
-  // ------------------------------------------------------------------
-  // We are not hosting models locally, so skip the local check.
-  env.allowLocalModels = false;
-
-  // Allow the browser to cache the model & WASM files after first download.
-  // This is essential for offline use and saves data on repeat uses.
-  env.useBrowserCache = true;
-
-  // Force a single WASM thread – avoids SharedArrayBuffer/CORS issues on
-  // many mobile browsers and prevents the “stuck on downloading” loop.
-  if (env.backends?.onnx?.wasm) {
-    env.backends.onnx.wasm.numThreads = 1;
-  }
-
-  return { pipeline, env };
-};
-
-// ------------------------------------------------------------------
-// 3. Component
-// ------------------------------------------------------------------
-interface TranscribeModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onTranscript: (text: string) => void;
-}
-
-export default function TranscribeModal({
-  isOpen,
-  onClose,
-  onTranscript,
-}: TranscribeModalProps) {
-  const [status, setStatus] = useState<
-    'idle' | 'loading' | 'downloading' | 'transcribing' | 'done' | 'error'
-  >('idle');
-  const [progress, setProgress] = useState(0);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [transcript, setTranscript] = useState('');
-  const transcriberRef = useRef<any>(null);
-
-  // Reset state when modal opens/closes
   useEffect(() => {
-    if (!isOpen) {
-      setStatus('idle');
-      setProgress(0);
-      setErrorMessage('');
-      setTranscript('');
-    }
+    const saved = JSON.parse(localStorage.getItem("smartsale_transcriptions") || "[]");
+    setChunks(saved);
+    
+    const savedConsent = localStorage.getItem("smartsale_traffic_consent");
+    if (savedConsent === "true") setConsent(true);
   }, [isOpen]);
 
-  // ------------------------------------------------------------------
-  // 4. Main transcription flow
-  // ------------------------------------------------------------------
-  const handleStartTranscription = async () => {
-    setStatus('loading');
-    setErrorMessage('');
-    setProgress(0);
-
-    try {
-      // Load the library from CDN
-      const { pipeline: createPipeline, env } = await loadTransformers();
-
-      // If we already have a transcriber instance, reuse it (model is cached)
-      if (transcriberRef.current) {
-        setStatus('transcribing');
-        await runTranscription(transcriberRef.current);
-        return;
-      }
-
-      // ----------------------------------------------------------------
-      // 5. Create the ASR pipeline (this is where the model downloads)
-      // ----------------------------------------------------------------
-      setStatus('downloading');
-
-      // Use the smaller English‑only model to reduce download size.
-      // If you need multilingual support, change to 'Xenova/whisper-tiny'.
-      const modelId = 'Xenova/whisper-tiny.en';
-
-      const transcriber = await createPipeline(
-        'automatic-speech-recognition',
-        modelId,
-        {
-          quantized: true, // smaller quantized weights
-          progress_callback: (data: any) => {
-            // `data` contains { status, progress, file, ... }
-            if (data.status === 'progress') {
-              // progress is a percentage (0–100)
-              setProgress(Math.round(data.progress));
-            }
-            if (data.status === 'done') {
-              // One file finished; keep the bar at 100 for that file
-              setProgress(100);
-            }
-          },
-        }
-      );
-
-      transcriberRef.current = transcriber;
-      setStatus('transcribing');
-      await runTranscription(transcriber);
-    } catch (err: any) {
-      console.error('Transcription failed:', err);
-      setStatus('error');
-      setErrorMessage(
-        'Could not load the AI model. Please check your internet connection, ' +
-          'then try again. The model will be cached after the first successful download.'
-      );
-    }
+  const saveChunks = (newChunks: any[]) => {
+    localStorage.setItem("smartsale_transcriptions", JSON.stringify(newChunks));
+    setChunks(newChunks);
   };
 
-  const runTranscription = async (transcriber: any) => {
-    // In a real implementation you would record audio via the MediaRecorder API
-    // and pass the audio Blob/File to the transcriber.
-    // For this handover the placeholder below demonstrates the call.
-    //
-    // const audioBlob = await recordAudio(); // your existing recorder logic
-    // const result = await transcriber(audioBlob);
-    // setTranscript(result.text);
-    // onTranscript(result.text);
-    //
-    // Because the recorder logic is outside the scope of this fix, we simulate
-    // a successful transcription after a short delay so you can test the UI.
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const fakeText = 'This is a simulated transcription. Replace with real audio.';
-    setTranscript(fakeText);
-    onTranscript(fakeText);
-    setStatus('done');
+  const handleAcceptConsent = () => {
+    localStorage.setItem("smartsale_traffic_consent", "true");
+    setConsent(true);
   };
 
-  // ------------------------------------------------------------------
-  // 6. Render (UI kept exactly as described)
-  // ------------------------------------------------------------------
-  if (!isOpen) return null;
+  const startListening = () => {
+    setIsListening(true);
+    // Simulate a transcription for now
+    setTimeout(() => {
+      const newChunk = {
+        id: Date.now().toString(),
+        text: "Simulated order: 2 sugars, 1 bread",
+        status: "pending"
+      };
+      const latestSaved = JSON.parse(localStorage.getItem("smartsale_transcriptions") || "[]");
+      saveChunks([...latestSaved, newChunk]);
+      setIsListening(false);
+    }, 3000);
+  };
+
+  const stopListening = () => {
+    setIsListening(false);
+  };
+
+  const handleGoToSale = (chunk: any) => {
+    localStorage.setItem("smartsale_current_transcription", JSON.stringify({ id: chunk.id, text: chunk.text }));
+    stopListening();
+    onClose();
+    navigate("addSale");
+  };
+
+  const handleDelete = (id: string) => {
+    const updated = chunks.filter(c => c.id !== id);
+    saveChunks(updated);
+  };
 
   return (
     <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-      >
-        <motion.div
-          className="w-full max-w-md rounded-t-3xl bg-white shadow-xl"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* -------------------- Banner -------------------- */}
-          <div className="flex items-center justify-between rounded-t-3xl bg-[#0055FF] px-5 py-4 text-white">
-            <div className="flex items-center gap-2">
-              <Mic size={20} />
-              <span className="font-semibold">Voice to Sale</span>
+      {isOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => { stopListening(); onClose(); }}
+            className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed bottom-0 left-0 right-0 bg-[#F3F4F6] z-[101] rounded-t-3xl shadow-2xl h-[85vh] flex flex-col"
+          >
+            <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 rounded-t-3xl shrink-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-extrabold text-gray-800">Traffic Mode</h2>
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded bg-green-100 text-green-700`}>
+                  {modelStatus}
+                </span>
+              </div>
+              <button onClick={() => { stopListening(); onClose(); }} className="p-1.5 bg-gray-100 rounded-full text-gray-500">
+                <X size={18} />
+              </button>
             </div>
-            <button onClick={onClose} className="rounded-full p-1 hover:bg-white/20">
-              <X size={20} />
-            </button>
-          </div>
 
-          {/* -------------------- Body -------------------- */}
-          <div className="px-5 py-6">
-            {status === 'idle' && (
-              <div className="text-center">
-                <p className="mb-4 text-gray-600">
-                  Tap the button and speak your sale. The AI will turn it into text.
-                </p>
-                <button
-                  onClick={handleStartTranscription}
-                  className="w-full rounded-xl bg-[#FF9800] py-3 font-semibold text-white shadow hover:bg-[#e68a00]"
-                >
-                  Start Recording
-                </button>
+            {consent && (
+              <div className="bg-[#0055FF] text-white text-center py-2 px-4 shadow-sm shrink-0">
+                <p className="text-[11px] font-bold tracking-wide">Transcribing your order. You are free to opt out.</p>
               </div>
             )}
 
-            {(status === 'loading' || status === 'downloading') && (
-              <div className="text-center">
-                <Loader2 className="mx-auto mb-3 animate-spin text-[#0055FF]" size={32} />
-                <p className="text-sm font-medium text-gray-700">
-                  {status === 'loading'
-                    ? 'Loading AI library…'
-                    : `Downloading AI model… ${progress}%`}
-                </p>
-                {status === 'downloading' && (
-                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                    <div
-                      className="h-full bg-[#0055FF] transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
+              {!consent ? (
+                <div className="h-full flex flex-col items-center justify-center text-center px-4">
+                  <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-[#0055FF]">
+                    <ShieldCheck size={32} />
                   </div>
+                  <h2 className="text-lg font-extrabold text-gray-800 mb-2">Privacy First</h2>
+                  <p className="text-xs text-gray-600 mb-6 leading-relaxed">
+                    This feature transcribes orders directly on your phone. No audio is sent to the internet.
+                    <br/><br/>
+                    By continuing, you agree to inform your customers that their orders are being transcribed.
+                  </p>
+                  <button onClick={handleAcceptConsent} className="w-full max-w-xs bg-[#FF9800] text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform">
+                    I Understand & Agree
+                  </button>
+                </div>
+              ) : chunks.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                  <Mic size={48} className="mb-4 opacity-20" />
+                  <p className="text-xs font-medium text-center px-8">
+                    Press Start to begin. The app will automatically split orders when a customer stops speaking.
+                  </p>
+                </div>
+              ) : (
+                chunks.map((chunk) => (
+                  <div key={chunk.id} className={`p-3 rounded-2xl shadow-sm border flex flex-col gap-2 transition-colors ${chunk.status === 'completed' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'}`}>
+                    <p className={`text-sm font-bold leading-relaxed ${chunk.status === 'completed' ? 'text-green-800' : 'text-gray-800'}`}>
+                      "{chunk.text}"
+                    </p>
+                    
+                    <div className="flex justify-between items-center border-t border-gray-100/50 pt-2">
+                      {chunk.status === 'completed' ? (
+                        <span className="text-[10px] font-bold text-green-600 flex items-center gap-1">
+                          <Check size={12} /> Sale Recorded
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 font-bold">Pending...</span>
+                      )}
+
+                      <div className="flex gap-2">
+                        <button onClick={() => handleDelete(chunk.id)} className="bg-red-50 text-red-500 p-1.5 rounded-lg active:scale-95 border border-red-100">
+                          <X size={16} />
+                        </button>
+                        {chunk.status !== 'completed' && (
+                          <button onClick={() => handleGoToSale(chunk)} className="bg-green-500 text-white px-3 py-1.5 rounded-lg active:scale-95 shadow-sm flex items-center gap-1 text-xs font-bold">
+                            <Check size={14} /> Add Sale
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {consent && (
+              <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 pb-6 z-[102]">
+                {!isListening ? (
+                  <button onClick={startListening} className="w-full bg-[#FF9800] text-white py-3.5 rounded-xl font-extrabold text-lg shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2">
+                    <Mic size={20} /> Start Transcribing
+                  </button>
+                ) : (
+                  <button onClick={stopListening} className="w-full bg-red-500 text-white py-3.5 rounded-xl font-extrabold text-lg shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2 animate-pulse">
+                    <Square size={20} fill="currentColor" /> Stop Transcribing
+                  </button>
                 )}
-                <p className="mt-2 text-xs text-gray-400">
-                  First time may take a few minutes on mobile data.
-                </p>
               </div>
             )}
-
-            {status === 'transcribing' && (
-              <div className="text-center">
-                <Loader2 className="mx-auto mb-3 animate-spin text-[#FF9800]" size={32} />
-                <p className="text-sm font-medium text-gray-700">Transcribing…</p>
-              </div>
-            )}
-
-            {status === 'done' && (
-              <div className="text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                  <Check className="text-green-600" size={24} />
-                </div>
-                <p className="mb-2 text-sm font-medium text-gray-700">Transcription complete</p>
-                <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
-                  {transcript}
-                </p>
-                <button
-                  onClick={onClose}
-                  className="mt-4 w-full rounded-xl bg-[#0055FF] py-2 text-sm font-semibold text-white"
-                >
-                  Use this text
-                </button>
-              </div>
-            )}
-
-            {status === 'error' && (
-              <div className="text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                  <X className="text-red-600" size={24} />
-                </div>
-                <p className="text-sm font-medium text-red-600">Something went wrong</p>
-                <p className="mt-2 text-xs text-gray-500">{errorMessage}</p>
-                <button
-                  onClick={handleStartTranscription}
-                  className="mt-4 w-full rounded-xl bg-[#FF9800] py-2 text-sm font-semibold text-white"
-                >
-                  Try Again
-                </button>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      </motion.div>
+          </motion.div>
+        </>
+      )}
     </AnimatePresence>
   );
-}
+    }
