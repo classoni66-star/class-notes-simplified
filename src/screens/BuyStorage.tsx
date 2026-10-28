@@ -1,17 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket, X, KeyRound, CreditCard, MessageCircle, Delete } from "lucide-react";
-
-// 🔢 Secure 4-Digit Hash Generator
-function generate4DigitCode(str: string) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; 
-  }
-  // Get a number between 1000 and 9999
-  return (Math.abs(hash) % 9000 + 1000).toString();
-}
+import { ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket, MessageCircle, X } from "lucide-react";
 
 export default function BuyStorage({ navigate, language, businessInfo }: any) {
   const [premiumDisplay, setPremiumDisplay] = useState("Free Plan");
@@ -26,7 +14,8 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
   const [generatedCode, setGeneratedCode] = useState("");
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
-  const SECRET_KEY = "SMARTSALE_UG_2026";
+  const OWNER_PHONE = "256708032236"; 
+  const MOMO_NUMBER = "0708032236 (Classoni)";
 
   useEffect(() => {
     const premiumUntil = Number(localStorage.getItem("smartsale_premium_until") || 0);
@@ -68,47 +57,34 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
   const handleRedeemVoucher = () => {
     const cleanCode = voucherCode.trim();
     const customerPhone = businessInfo?.phone?.trim() || "";
-    
     if (!customerPhone) return alert("Please set your phone number in your profile first.");
-    if (cleanCode.length !== 4) return alert("Code must be exactly 4 numbers.");
+    if (cleanCode.length !== 6) return alert("Voucher code must be exactly 6 numbers.");
 
-    // 🛑 CHECK IF ALREADY USED
     const usedVouchers = JSON.parse(localStorage.getItem("smartsale_used_vouchers") || "[]");
     if (usedVouchers.includes(cleanCode)) {
       return alert("❌ This voucher code has already been used on this phone.");
     }
 
-    // 🔍 CHECK WHICH PLAN THE CODE MATCHES
-    const dailyCode = generate4DigitCode(customerPhone + "D" + SECRET_KEY);
-    const weeklyCode = generate4DigitCode(customerPhone + "W" + SECRET_KEY);
-    const monthlyCode = generate4DigitCode(customerPhone + "M" + SECRET_KEY);
+    const dailyCode = generateNumericHash(customerPhone + "D" + SECRET_KEY);
+    const weeklyCode = generateNumericHash(customerPhone + "W" + SECRET_KEY);
+    const monthlyCode = generateNumericHash(customerPhone + "M" + SECRET_KEY);
 
     let hoursToAdd = 0;
 
     if (cleanCode === dailyCode) hoursToAdd = 24;
     else if (cleanCode === weeklyCode) hoursToAdd = 24 * 7;
     else if (cleanCode === monthlyCode) hoursToAdd = 24 * 30;
-    else return alert("❌ Invalid code for this phone number. Please check the numbers and try again.");
+    else return alert("❌ Invalid voucher code for this phone number. Please check the numbers and try again.");
 
-    // 🎉 UNLOCK!
     const currentPremium = Number(localStorage.getItem("smartsale_premium_until") || Date.now());
     const newPremium = Math.max(Date.now(), currentPremium) + (hoursToAdd * 60 * 60 * 1000);
     localStorage.setItem("smartsale_premium_until", newPremium.toString());
     
-    // 🛑 SAVE TO USED LIST
     usedVouchers.push(cleanCode);
     localStorage.setItem("smartsale_used_vouchers", JSON.stringify(usedVouchers));
 
     alert(`🎉 Success! Premium unlocked.`);
     window.location.reload();
-  };
-
-  const handleKeypadPress = (num: string) => {
-    if (voucherCode.length < 4) setVoucherCode(prev => prev + num);
-  };
-
-  const handleKeypadDelete = () => {
-    setVoucherCode(prev => prev.slice(0, -1));
   };
 
   const handleSecretTap = () => {
@@ -122,62 +98,128 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
 
   const generateVoucher = () => {
     if (!targetPhone || targetPhone.length < 9) return alert("Enter a valid phone number");
-    const code = generate4DigitCode(targetPhone.trim() + targetPlan + SECRET_KEY);
-    setGeneratedCode(code);
+    const hash = generateNumericHash(targetPhone.trim() + targetPlan + SECRET_KEY);
+    setGeneratedCode(hash);
   };
 
   return (
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-y-auto relative">
       <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10 sticky top-0">
-        <button onClick={() => navigate("home")} className="text-gray-500"><ArrowLeft size={24} /></button>
+        <button onClick={() => navigate("home")} className="text-gray-500">
+          <ArrowLeft size={24} />
+        </button>
         <h1 className="text-lg font-extrabold text-gray-800">Go Premium</h1>
       </header>
 
       <div className="p-4 pb-24 space-y-4">
+        
         <div className="text-center mb-4">
           <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <Crown size={32} className="text-[#FF9800]" />
           </div>
           <h2 className="text-xl font-extrabold text-gray-800">Unlock SmartSale Premium</h2>
-          <p className="text-xs text-gray-600 mt-1 mb-4 px-2 leading-relaxed">Manage your business with less stress. Unlock unlimited analytics and storage.</p>
+          <p className="text-xs text-gray-600 mt-1 mb-4 px-2 leading-relaxed">
+            Manage your business with less stress. Unlock unlimited calculations, analytics, and storage.
+          </p>
           
           {premiumDisplay !== "Free Plan" && (
             <div className="bg-green-50 border border-green-200 p-4 rounded-xl shadow-sm mb-6 flex flex-col items-center">
               <CheckCircle2 size={32} className="text-green-500 mb-2" />
               <h3 className="text-green-800 font-bold text-lg">You are Premium!</h3>
-              <p className="text-green-600 text-sm font-medium mt-1">You have <strong>{premiumDisplay}</strong> remaining.</p>
+              <p className="text-green-600 text-sm font-medium mt-1">
+                You have <strong>{premiumDisplay}</strong> remaining.
+              </p>
             </div>
           )}
         </div>
 
         <div className="space-y-4">
+          
+          {/* DAILY PLAN */}
           <div onClick={() => setSelectedPlan({name: "Daily Unlimited", amount: 500, hours: 24})} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer">
-            <div className="flex items-center gap-2 mb-1"><Zap size={18} className="text-yellow-500" /><h3 className="font-extrabold text-gray-800 text-base">Daily Unlimited</h3></div>
-            <div className="flex items-end gap-1"><span className="text-2xl font-extrabold text-gray-800">500 UGX</span><span className="text-xs text-gray-500 mb-1">/ day</span></div>
+            <div className="flex items-center gap-2 mb-1">
+              <Zap size={18} className="text-yellow-500" />
+              <h3 className="font-extrabold text-gray-800 text-base">Daily Unlimited</h3>
+              <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded ml-auto">Most convenient</span>
+            </div>
+            <div className="flex items-end gap-1 mb-2">
+              <span className="text-2xl font-extrabold text-gray-800">500 UGX</span>
+              <span className="text-xs text-gray-500 mb-1">/ day</span>
+            </div>
+            <p className="text-[10px] text-gray-500 font-medium">
+              Best if things are too tight.
+            </p>
           </div>
 
+          {/* WEEKLY PLAN */}
           <div onClick={() => setSelectedPlan({name: "Weekly Unlimited", amount: 3000, hours: 24*7})} className="bg-white p-4 rounded-2xl shadow-lg border-2 border-[#FF9800] relative overflow-hidden active:scale-95 transition-transform cursor-pointer">
             <div className="absolute top-0 right-0 bg-[#FF9800] text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">MOST POPULAR</div>
-            <div className="flex items-center gap-2 mb-1"><Star size={18} className="text-[#FF9800]" fill="currentColor" /><h3 className="font-extrabold text-[#FF9800] text-base">Weekly Unlimited</h3></div>
-            <div className="flex items-end gap-2 mb-1"><span className="text-2xl font-extrabold text-gray-800">3,000 UGX</span><span className="text-xs text-gray-500 mb-1">/ week</span><span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded ml-auto mb-1">SAVE 14%</span></div>
+            <div className="flex items-center gap-2 mb-1">
+              <Star size={18} className="text-[#FF9800]" fill="currentColor" />
+              <h3 className="font-extrabold text-[#FF9800] text-base">Weekly Unlimited</h3>
+            </div>
+            <div className="flex items-end gap-2 mb-2">
+              <span className="text-2xl font-extrabold text-gray-800">3,000 UGX</span>
+              <span className="text-xs text-gray-500 mb-1">/ week</span>
+            </div>
+            <div className="bg-orange-50 inline-block px-2 py-1 rounded mb-2">
+              <p className="text-[10px] text-[#FF9800] font-bold">
+                429 UGX per day
+              </p>
+            </div>
+            <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
+              Cheaper than a plate of lunch and work stress free for the whole week.
+            </p>
           </div>
 
+          {/* MONTHLY PLAN */}
           <div onClick={() => setSelectedPlan({name: "Monthly Unlimited", amount: 10000, hours: 24*30})} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer">
-            <div className="flex items-center gap-2 mb-1"><Crown size={18} className="text-[#0055FF]" /><h3 className="font-extrabold text-[#0055FF] text-base">Monthly Unlimited</h3></div>
-            <div className="flex items-end gap-2 mb-1"><span className="text-2xl font-extrabold text-gray-800">10,000 UGX</span><span className="text-xs text-gray-500 mb-1">/ month</span><span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded ml-auto mb-1">SAVE 33%</span></div>
+            <div className="flex items-center gap-2 mb-1">
+              <Crown size={18} className="text-[#0055FF]" />
+              <h3 className="font-extrabold text-[#0055FF] text-base">Monthly Unlimited</h3>
+            </div>
+            <div className="flex items-end gap-2 mb-2">
+              <span className="text-2xl font-extrabold text-gray-800">10,000 UGX</span>
+              <span className="text-xs text-gray-500 mb-1">/ month</span>
+            </div>
+            <div className="bg-blue-50 inline-block px-2 py-1 rounded mb-2">
+              <p className="text-[10px] text-[#0055FF] font-bold">
+                333 UGX per day
+              </p>
+            </div>
+            <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
+              Pay once and work stress free for the whole month.
+            </p>
           </div>
         </div>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
-          <button onClick={() => setShowVoucherInput(true)} className="w-full py-4 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm shadow-sm flex justify-center items-center gap-2 hover:bg-gray-200">
-            <Ticket size={18} /> I have a 4-digit Code from the Owner
-          </button>
+          {!showVoucherInput ? (
+            <button onClick={() => setShowVoucherInput(true)} className="w-full py-4 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm shadow-sm flex justify-center items-center gap-2 hover:bg-gray-200">
+              <Ticket size={18} /> I already have a Voucher Code
+            </button>
+          ) : (
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+              <h3 className="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2"><Ticket size={16} /> Enter Voucher Code</h3>
+              <p className="text-[10px] text-blue-600 mb-3">Enter the secure code sent to you by the shop owner.</p>
+              <div className="flex gap-2">
+                <input 
+                  type="tel" 
+                  maxLength={6}
+                  value={voucherCode} 
+                  onChange={(e) => setVoucherCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 123456" 
+                  className="flex-1 p-3 bg-white border border-blue-200 rounded-xl text-center text-xl tracking-[0.2em] font-bold outline-none focus:ring-2 focus:ring-[#0055FF]" 
+                />
+                <button onClick={handleRedeemVoucher} className="bg-[#0055FF] text-white px-4 rounded-xl font-bold shadow-md active:scale-95">Unlock</button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div onClick={handleSecretTap} className="text-center mt-12 pb-4 cursor-pointer text-[10px] text-gray-300">SmartSale Secure Merchant App</div>
       </div>
 
-      {/* OWNER VOUCHER GENERATOR */}
       {showOwnerGen && (
         <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-6">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative">
@@ -197,13 +239,13 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
                   <option value="M">Monthly (10000 UGX)</option>
                 </select>
               </div>
-              <button onClick={generateVoucher} className="w-full bg-[#0055FF] text-white py-2 rounded-lg font-bold text-sm">Generate 4-Digit Code</button>
+              <button onClick={generateVoucher} className="w-full bg-[#0055FF] text-white py-2 rounded-lg font-bold text-sm">Generate 6-Digit Code</button>
               
               {generatedCode && (
                 <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl text-center">
-                  <p className="text-[10px] font-bold text-[#FF9800] uppercase mb-1">Tell customer to enter:</p>
-                  <p className="text-5xl font-extrabold text-gray-800 tracking-[0.2em]">{generatedCode}</p>
-                  <p className="text-[9px] text-gray-500 mt-2">Only works on {targetPhone}</p>
+                  <p className="text-[10px] font-bold text-[#FF9800] uppercase mb-1">Voucher Code</p>
+                  <p className="text-3xl font-extrabold text-gray-800 tracking-[0.3em]">{generatedCode}</p>
+                  <p className="text-[9px] text-gray-500 mt-2">This code will ONLY work on {targetPhone} and CANNOT be reused.</p>
                 </div>
               )}
             </div>
@@ -211,56 +253,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
         </div>
       )}
 
-      {/* CUSTOMER KEYPAD MODAL */}
-      {showVoucherInput && (
-        <div className="absolute inset-0 bg-black/80 z-[200] flex flex-col justify-end">
-          <div className="bg-white rounded-t-3xl p-6 w-full animate-slide-up relative">
-            <button onClick={() => { setShowVoucherInput(false); setVoucherCode(""); }} className="absolute top-4 right-4 bg-gray-100 p-2 rounded-full text-gray-500"><X size={20} /></button>
-            
-            <div className="text-center mb-6 mt-2">
-              <h2 className="text-xl font-extrabold text-gray-800">Enter 4-Digit Code</h2>
-              <p className="text-xs text-gray-500 mt-1">Type the 4 numbers given by the shop owner.</p>
-            </div>
-
-            {/* CODE DISPLAY BOXES */}
-            <div className="flex justify-center gap-4 mb-8">
-              {[0, 1, 2, 3].map((index) => (
-                <div key={index} className={`w-14 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-extrabold ${voucherCode.length === index ? 'border-[#FF9800] bg-orange-50 text-[#FF9800]' : 'border-gray-200 bg-gray-50 text-gray-800'}`}>
-                  {voucherCode[index] || ""}
-                </div>
-              ))}
-            </div>
-
-            {/* GIANT NUMERIC KEYPAD */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                <button key={num} onClick={() => handleKeypadPress(num.toString())} className="bg-gray-50 active:bg-gray-200 text-gray-800 text-2xl font-bold py-4 rounded-xl shadow-sm">
-                  {num}
-                </button>
-              ))}
-              <button onClick={() => setVoucherCode("")} className="bg-red-50 active:bg-red-100 text-red-500 font-bold py-4 rounded-xl shadow-sm text-sm">
-                Clear
-              </button>
-              <button onClick={() => handleKeypadPress("0")} className="bg-gray-50 active:bg-gray-200 text-gray-800 text-2xl font-bold py-4 rounded-xl shadow-sm">
-                0
-              </button>
-              <button onClick={handleKeypadDelete} className="bg-gray-50 active:bg-gray-200 text-gray-800 flex items-center justify-center py-4 rounded-xl shadow-sm">
-                <Delete size={24} />
-              </button>
-            </div>
-
-            <button 
-              onClick={handleRedeemVoucher} 
-              disabled={voucherCode.length !== 4}
-              className="w-full bg-[#FF9800] text-white py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform disabled:opacity-50"
-            >
-              Unlock Premium
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* PAYMENT MODAL */}
       {selectedPlan && (
         <div className="absolute inset-0 bg-black/60 z-[100] flex items-end justify-center pb-0">
           <div className="bg-white rounded-t-3xl w-full p-6 animate-slide-up relative">
@@ -283,10 +275,10 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
             </div>
 
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-3">
-              <p className="text-xs text-center text-gray-600 mb-3">Send {selectedPlan.amount.toLocaleString()} UGX manually to <strong>0708032236 (Classoni)</strong> and chat us for a 4-digit code.</p>
+              <p className="text-xs text-center text-gray-600 mb-3">Send {selectedPlan.amount.toLocaleString()} UGX manually to <strong>0708032236 (Classoni)</strong> and chat us for a voucher code.</p>
               <button onClick={() => {
-                  const msg = encodeURIComponent(`Hello Classoni! I want to pay for SmartSale Premium.\n\nPhone: ${businessInfo?.phone}\nPlan: ${selectedPlan.name}\nAmount: UGX ${selectedPlan.amount}\n\nI have sent the Mobile Money manually. Please send my 4-digit code.`);
-                  window.open(`https://wa.me/256708032236?text=${msg}`, "_blank");
+                  const msg = encodeURIComponent(`Hello Classoni! I want to pay for SmartSale Premium.\n\nPhone: ${businessInfo?.phone}\nPlan: ${selectedPlan.name}\nAmount: UGX ${selectedPlan.amount}\n\nI have sent the Mobile Money manually. Please send my secure voucher code.`);
+                  window.open(`https://wa.me/${OWNER_PHONE}?text=${msg}`, "_blank");
                 }} className="w-full bg-[#25D366] text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2">
                 <MessageCircle size={18} /> Chat Owner on WhatsApp
               </button>
@@ -296,4 +288,18 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
       )}
     </div>
   );
-            }
+}
+
+// Helper functions must be defined outside or imported
+function generateNumericHash(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; 
+  }
+  const num = Math.abs(hash) % 900000 + 100000;
+  return num.toString();
+}
+
+const SECRET_KEY = "SMARTSALE_UGANDA_2026";
