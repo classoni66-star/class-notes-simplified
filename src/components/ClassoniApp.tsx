@@ -36,6 +36,7 @@ export default function SmartSaleApp() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  // 🚀 SERVICE WORKER FOR AUTO-UPDATES
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
@@ -44,6 +45,7 @@ export default function SmartSaleApp() {
     }
   }, []);
 
+  // 🎁 HANDLE REFERRAL & PAYMENT CALLBACKS
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
@@ -59,6 +61,7 @@ export default function SmartSaleApp() {
     }
   }, []);
 
+  // 🏁 HYDRATE APP STATE
   useEffect(() => {
     const savedBusiness = localStorage.getItem("smartsale_business");
     const savedPassword = localStorage.getItem("smartsale_password");
@@ -91,6 +94,7 @@ export default function SmartSaleApp() {
     window.history.replaceState({ screen: "home" }, '');
   };
 
+  // 🚦 NAVIGATION & PREMIUM GATEKEEPER
   const navigate = useCallback((screen: string) => {
     const isPremium = Number(localStorage.getItem("smartsale_premium_until") || 0) > Date.now();
     const gatedScreens = ["addSale", "stock"];
@@ -100,6 +104,7 @@ export default function SmartSaleApp() {
       return;
     }
     
+    // Push state to history for back button sync
     if (screen !== "home" && screen !== "welcome") {
       window.history.pushState({ screen }, '');
     }
@@ -193,4 +198,4 @@ export default function SmartSaleApp() {
       </AnimatePresence>
     </div>
   );
-}
+            }
