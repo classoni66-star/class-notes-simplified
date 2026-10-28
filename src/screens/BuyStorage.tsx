@@ -151,7 +151,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
             </p>
           </div>
 
-          {/* WEEKLY PLAN */}
+          {/* WEEKLY PLAN - DESIGN UPDATED HERE */}
           <div onClick={() => setSelectedPlan({name: "Weekly Unlimited", amount: 3000, hours: 24*7})} className="bg-white p-4 rounded-2xl shadow-lg border-2 border-[#FF9800] relative overflow-hidden active:scale-95 transition-transform cursor-pointer">
             <div className="absolute top-0 right-0 bg-[#FF9800] text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">MOST POPULAR</div>
             <div className="flex items-center gap-2 mb-1">
@@ -159,12 +159,12 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
               <h3 className="font-extrabold text-[#FF9800] text-base">Weekly Unlimited</h3>
             </div>
             <div className="flex items-end gap-2 mb-2">
-              <span className="text-2xl font-extrabold text-gray-800">3,000 UGX</span>
-              <span className="text-xs text-gray-500 mb-1">/ week</span>
+              <span className="text-2xl font-extrabold text-gray-800">429 UGX</span>
+              <span className="text-xs text-gray-500 mb-1">/ day</span>
             </div>
             <div className="bg-orange-50 inline-block px-2 py-1 rounded mb-2">
               <p className="text-[10px] text-[#FF9800] font-bold">
-                429 UGX per day
+                (3,000 UGX total per week)
               </p>
             </div>
             <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
@@ -172,19 +172,19 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
             </p>
           </div>
 
-          {/* MONTHLY PLAN */}
+          {/* MONTHLY PLAN - DESIGN UPDATED HERE */}
           <div onClick={() => setSelectedPlan({name: "Monthly Unlimited", amount: 10000, hours: 24*30})} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer">
             <div className="flex items-center gap-2 mb-1">
               <Crown size={18} className="text-[#0055FF]" />
               <h3 className="font-extrabold text-[#0055FF] text-base">Monthly Unlimited</h3>
             </div>
             <div className="flex items-end gap-2 mb-2">
-              <span className="text-2xl font-extrabold text-gray-800">10,000 UGX</span>
-              <span className="text-xs text-gray-500 mb-1">/ month</span>
+              <span className="text-2xl font-extrabold text-gray-800">333 UGX</span>
+              <span className="text-xs text-gray-500 mb-1">/ day</span>
             </div>
             <div className="bg-blue-50 inline-block px-2 py-1 rounded mb-2">
               <p className="text-[10px] text-[#0055FF] font-bold">
-                333 UGX per day
+                (10,000 UGX total per month)
               </p>
             </div>
             <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
