@@ -17,6 +17,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
   const [clientName, setClientName] = useState("");
 
   const [priceList, setPriceList] = useState<any[]>([]);
+  const [transcriptionId, setTranscriptionId] = useState<string | null>(null);
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
 
@@ -24,6 +25,14 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
     const saved = localStorage.getItem("smartsale_pricelist_v2") || localStorage.getItem("smartsale_pricelist");
     if (saved) {
       setPriceList(JSON.parse(saved));
+    }
+
+    const transcribed = localStorage.getItem("smartsale_current_transcription");
+    if (transcribed) {
+      const parsed = JSON.parse(transcribed);
+      setSearch(parsed.text);
+      setTranscriptionId(parsed.id);
+      localStorage.removeItem("smartsale_current_transcription"); 
     }
   }, [businessInfo]);
 
@@ -58,6 +67,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
     setAmountPaid("");
     setClientName("");
     setSearch("");
+    setTranscriptionId(null);
   };
 
   const handleRecordSale = () => {
@@ -142,7 +152,17 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
       }
     }
 
-    navigate("home");
+    if (transcriptionId) {
+      const chunks = JSON.parse(localStorage.getItem("smartsale_transcriptions") || "[]");
+      const updated = chunks.map((c: any) => c.id === transcriptionId ? { ...c, status: "completed" } : c);
+      localStorage.setItem("smartsale_transcriptions", JSON.stringify(updated));
+      
+      // 🛠️ FLAG TO RE-OPEN MODAL ON HOME SCREEN
+      localStorage.setItem("smartsale_open_transcribe", "true");
+      navigate("home"); 
+    } else {
+      navigate("home");
+    }
   };
 
   const remainingDebt = (!isPaid && amount && amountPaid) ? (Number(amount) - Number(amountPaid)) : (!isPaid && amount ? Number(amount) : 0);
@@ -151,7 +171,7 @@ export default function AddSale({ navigate, businessInfo, language }: any) {
     <div className="h-[100dvh] flex flex-col bg-[#F3F4F6] overflow-hidden">
       
       <header className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm z-10 shrink-0">
-        <button onClick={() => navigate("home")} className="text-gray-500">
+        <button onClick={() => { if(transcriptionId) { localStorage.setItem("smartsale_open_transcribe", "true"); navigate("home"); } else { navigate("home"); } }} className="text-gray-500">
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-lg font-extrabold text-gray-800">{t("Add Sale", "Tunda")}</h1>
