@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket, MessageCircle, X } from "lucide-react";
+import {
+  ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket,
+  MessageCircle, X, CreditCard, KeyRound
+} from "lucide-react";
 
 export default function BuyStorage({ navigate, language, businessInfo }: any) {
   const [premiumDisplay, setPremiumDisplay] = useState("Free Plan");
   const [voucherCode, setVoucherCode] = useState("");
   const [showVoucherInput, setShowVoucherInput] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<{ name: string, amount: number, hours: number } | null>(null);
-  
+
   const [ownerTaps, setOwnerTaps] = useState(0);
   const [showOwnerGen, setShowOwnerGen] = useState(false);
   const [targetPhone, setTargetPhone] = useState("");
@@ -14,13 +17,13 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
   const [generatedCode, setGeneratedCode] = useState("");
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
-  const OWNER_PHONE = "256708032236"; 
+  const OWNER_PHONE = "256708032236";
   const MOMO_NUMBER = "0708032236 (Classoni)";
 
   useEffect(() => {
     const premiumUntil = Number(localStorage.getItem("smartsale_premium_until") || 0);
     const now = Date.now();
-    
+
     if (premiumUntil > now) {
       const msLeft = premiumUntil - now;
       const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
@@ -38,7 +41,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
     try {
       localStorage.setItem("smartsale_pending_plan", JSON.stringify({ name: plan, amount: amount }));
       alert(`Connecting to Pesapal for ${plan} (UGX ${amount.toLocaleString()})... Please wait.`);
-      
+
       const response = await fetch("/api/pesapal/pay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -48,7 +51,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       if (data.redirect_url) window.location.href = data.redirect_url;
-      
+
     } catch (error: any) {
       alert("Online payment failed: " + error.message + "\n\nPlease use the manual MTN option below to pay.");
     }
@@ -79,7 +82,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
     const currentPremium = Number(localStorage.getItem("smartsale_premium_until") || Date.now());
     const newPremium = Math.max(Date.now(), currentPremium) + (hoursToAdd * 60 * 60 * 1000);
     localStorage.setItem("smartsale_premium_until", newPremium.toString());
-    
+
     usedVouchers.push(cleanCode);
     localStorage.setItem("smartsale_used_vouchers", JSON.stringify(usedVouchers));
 
@@ -112,7 +115,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
       </header>
 
       <div className="p-4 pb-24 space-y-4">
-        
+
         <div className="text-center mb-4">
           <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <Crown size={32} className="text-[#FF9800]" />
@@ -121,7 +124,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
           <p className="text-xs text-gray-600 mt-1 mb-4 px-2 leading-relaxed">
             Manage your business with less stress. Unlock unlimited calculations, analytics, and storage.
           </p>
-          
+
           {premiumDisplay !== "Free Plan" && (
             <div className="bg-green-50 border border-green-200 p-4 rounded-xl shadow-sm mb-6 flex flex-col items-center">
               <CheckCircle2 size={32} className="text-green-500 mb-2" />
@@ -134,7 +137,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
         </div>
 
         <div className="space-y-4">
-          
+
           {/* DAILY PLAN */}
           <div onClick={() => setSelectedPlan({name: "Daily Unlimited", amount: 500, hours: 24})} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer">
             <div className="flex items-center gap-2 mb-1">
@@ -203,13 +206,13 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
               <h3 className="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2"><Ticket size={16} /> Enter Voucher Code</h3>
               <p className="text-[10px] text-blue-600 mb-3">Enter the secure code sent to you by the shop owner.</p>
               <div className="flex gap-2">
-                <input 
-                  type="tel" 
+                <input
+                  type="tel"
                   maxLength={6}
-                  value={voucherCode} 
+                  value={voucherCode}
                   onChange={(e) => setVoucherCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="e.g. 123456" 
-                  className="flex-1 p-3 bg-white border border-blue-200 rounded-xl text-center text-xl tracking-[0.2em] font-bold outline-none focus:ring-2 focus:ring-[#0055FF]" 
+                  placeholder="e.g. 123456"
+                  className="flex-1 p-3 bg-white border border-blue-200 rounded-xl text-center text-xl tracking-[0.2em] font-bold outline-none focus:ring-2 focus:ring-[#0055FF]"
                 />
                 <button onClick={handleRedeemVoucher} className="bg-[#0055FF] text-white px-4 rounded-xl font-bold shadow-md active:scale-95">Unlock</button>
               </div>
@@ -225,7 +228,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative">
             <button onClick={() => setShowOwnerGen(false)} className="absolute top-3 right-3 text-gray-400 p-1 bg-gray-100 rounded-full"><X size={16} /></button>
             <div className="flex items-center gap-2 mb-4"><KeyRound size={20} className="text-[#FF9800]" /><h2 className="text-lg font-extrabold text-gray-800">Owner Voucher Generator</h2></div>
-            
+
             <div className="space-y-3">
               <div>
                 <label className="text-[10px] font-bold text-gray-500 uppercase">Customer Phone</label>
@@ -240,7 +243,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
                 </select>
               </div>
               <button onClick={generateVoucher} className="w-full bg-[#0055FF] text-white py-2 rounded-lg font-bold text-sm">Generate 6-Digit Code</button>
-              
+
               {generatedCode && (
                 <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl text-center">
                   <p className="text-[10px] font-bold text-[#FF9800] uppercase mb-1">Voucher Code</p>
@@ -257,7 +260,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
         <div className="absolute inset-0 bg-black/60 z-[100] flex items-end justify-center pb-0">
           <div className="bg-white rounded-t-3xl w-full p-6 animate-slide-up relative">
             <button onClick={() => setSelectedPlan(null)} className="absolute top-4 right-4 bg-gray-100 p-2 rounded-full text-gray-500"><X size={20} /></button>
-            
+
             <div className="text-center mb-6">
               <h2 className="text-xl font-extrabold text-gray-800">{selectedPlan.name}</h2>
               <p className="text-2xl font-extrabold text-[#FF9800] mt-1">UGX {selectedPlan.amount.toLocaleString()}</p>
@@ -296,7 +299,7 @@ function generateNumericHash(str: string) {
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; 
+    hash = hash & hash;
   }
   const num = Math.abs(hash) % 900000 + 100000;
   return num.toString();
