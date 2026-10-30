@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  ArrowLeft, Zap, Star, Crown, CheckCircle2, Ticket,
+  ArrowLeft, Star, Crown, CheckCircle2, Ticket,
   MessageCircle, X, CreditCard, KeyRound
 } from "lucide-react";
 
@@ -13,7 +13,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
   const [ownerTaps, setOwnerTaps] = useState(0);
   const [showOwnerGen, setShowOwnerGen] = useState(false);
   const [targetPhone, setTargetPhone] = useState("");
-  const [targetPlan, setTargetPlan] = useState<"D" | "W" | "M">("W");
+  const [targetPlan, setTargetPlan] = useState<"W" | "M">("W");
   const [generatedCode, setGeneratedCode] = useState("");
 
   const t = (en: string, run: string) => (language === "run" ? run : en);
@@ -68,14 +68,12 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
       return alert("❌ This voucher code has already been used on this phone.");
     }
 
-    const dailyCode = generateNumericHash(customerPhone + "D" + SECRET_KEY);
     const weeklyCode = generateNumericHash(customerPhone + "W" + SECRET_KEY);
     const monthlyCode = generateNumericHash(customerPhone + "M" + SECRET_KEY);
 
     let hoursToAdd = 0;
 
-    if (cleanCode === dailyCode) hoursToAdd = 24;
-    else if (cleanCode === weeklyCode) hoursToAdd = 24 * 7;
+    if (cleanCode === weeklyCode) hoursToAdd = 24 * 7;
     else if (cleanCode === monthlyCode) hoursToAdd = 24 * 30;
     else return alert("❌ Invalid voucher code for this phone number. Please check the numbers and try again.");
 
@@ -138,22 +136,6 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
 
         <div className="space-y-4">
 
-          {/* DAILY PLAN */}
-          <div onClick={() => setSelectedPlan({name: "Daily Unlimited", amount: 500, hours: 24})} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer">
-            <div className="flex items-center gap-2 mb-1">
-              <Zap size={18} className="text-yellow-500" />
-              <h3 className="font-extrabold text-gray-800 text-base">Daily Unlimited</h3>
-              <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded ml-auto">Most convenient</span>
-            </div>
-            <div className="flex items-end gap-1 mb-2">
-              <span className="text-2xl font-extrabold text-gray-800">500 UGX</span>
-              <span className="text-xs text-gray-500 mb-1">/ day</span>
-            </div>
-            <p className="text-[10px] text-gray-500 font-medium">
-              Best if things are too tight.
-            </p>
-          </div>
-
           {/* WEEKLY PLAN */}
           <div onClick={() => setSelectedPlan({name: "Weekly Unlimited", amount: 3000, hours: 24*7})} className="bg-white p-4 rounded-2xl shadow-lg border-2 border-[#FF9800] relative overflow-hidden active:scale-95 transition-transform cursor-pointer">
             <div className="absolute top-0 right-0 bg-[#FF9800] text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">MOST POPULAR</div>
@@ -162,20 +144,13 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
               <h3 className="font-extrabold text-[#FF9800] text-base">Weekly Unlimited</h3>
             </div>
             <div className="flex items-end gap-2 mb-2">
-              <span className="text-2xl font-extrabold text-gray-800">3,000 UGX</span>
+              <span className="text-2xl font-extrabold text-gray-800">3,000 UGX</span>{/* 💰 PRICE */}
               <span className="text-xs text-gray-500 mb-1">/ week</span>
             </div>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              <div className="bg-orange-50 inline-block px-2 py-1 rounded">
-                <p className="text-[10px] text-[#FF9800] font-bold">
-                  429 UGX per day
-                </p>
-              </div>
-              <div className="bg-green-50 inline-block px-2 py-1 rounded">
-                <p className="text-[10px] text-green-600 font-bold">
-                  Save 500 UGX (14% off)
-                </p>
-              </div>
+            <div className="bg-orange-50 inline-block px-2 py-1 rounded mb-2">
+              <p className="text-[10px] text-[#FF9800] font-bold">
+                429 UGX per day
+              </p>
             </div>
             <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
               Cheaper than a plate of lunch and work stress free for the whole week.
@@ -187,9 +162,10 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
             <div className="flex items-center gap-2 mb-1">
               <Crown size={18} className="text-[#0055FF]" />
               <h3 className="font-extrabold text-[#0055FF] text-base">Monthly Unlimited</h3>
+              <span className="bg-blue-100 text-[#0055FF] text-[10px] font-bold px-2 py-0.5 rounded ml-auto">BEST VALUE</span>
             </div>
             <div className="flex items-end gap-2 mb-2">
-              <span className="text-2xl font-extrabold text-gray-800">10,000 UGX</span>
+              <span className="text-2xl font-extrabold text-gray-800">10,000 UGX</span>{/* 💰 PRICE */}
               <span className="text-xs text-gray-500 mb-1">/ month</span>
             </div>
             <div className="flex flex-wrap gap-1.5 mb-2">
@@ -200,7 +176,7 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
               </div>
               <div className="bg-green-50 inline-block px-2 py-1 rounded">
                 <p className="text-[10px] text-green-600 font-bold">
-                  Save 5,000 UGX (33% off)
+                  Save 2,000 UGX vs weekly
                 </p>
               </div>
             </div>
@@ -251,9 +227,8 @@ export default function BuyStorage({ navigate, language, businessInfo }: any) {
               <div>
                 <label className="text-[10px] font-bold text-gray-500 uppercase">Plan</label>
                 <select value={targetPlan} onChange={(e) => setTargetPlan(e.target.value as any)} className="w-full p-2 bg-gray-50 border rounded-lg text-sm">
-                  <option value="D">Daily (500 UGX)</option>
-                  <option value="W">Weekly (3000 UGX)</option>
-                  <option value="M">Monthly (10000 UGX)</option>
+                  <option value="W">Weekly (3,000 UGX)</option>
+                  <option value="M">Monthly (10,000 UGX)</option>
                 </select>
               </div>
               <button onClick={generateVoucher} className="w-full bg-[#0055FF] text-white py-2 rounded-lg font-bold text-sm">Generate 6-Digit Code</button>
