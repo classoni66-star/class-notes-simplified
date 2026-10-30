@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import {
   ArrowLeft, Star, Crown, CheckCircle2, Ticket,
